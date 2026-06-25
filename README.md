@@ -2,15 +2,6 @@
 
 Frankloo is a comprehensive, collaborative workspace and board productivity platform designed to coordinate tasks, documents, goals, and external integrations in a single unified interface.
 
-## Table of Contents
-
-- Overview
-- Key Features
-- Technology Stack
-- Getting Started
-- Environment Configuration
-- Project Structure
-
 ## Overview
 
 Frankloo is structured as a monorepo containing a decoupled frontend and backend. The application enables users to manage multiple workspaces, collaborate using Kanban-style boards, write documents in a Notion-like workspace, track project-wide goals and milestones, and sync external sources like Gmail, Slack, Discord, and GitHub. Real-time updates are powered by WebSockets to ensure updates propagate instantly across all active users in a workspace.
@@ -97,38 +88,6 @@ npm run db:generate
 
 # Populate the database with default seed data
 npm run db:seed
-```
-
-### Running the Application
-To start both the backend server and the frontend client concurrently in development mode, run:
-```bash
-npm run dev
-```
-By default:
-- The frontend will be accessible at http://localhost:5173
-- The backend server will run at http://localhost:5000
-
-## Environment Configuration
-
-Create a file named `.env` in the `backend/` directory with the following variables:
-
-```env
-PORT=5000
-DATABASE_URL="file:./dev.db"
-JWT_SECRET="your-super-secret-key"
-
-# Google OAuth Configuration (for Gmail synchronization)
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-GOOGLE_REDIRECT_URI=http://localhost:5000/api/gmail/callback
-
-# GitHub Integration
-GITHUB_WEBHOOK_SECRET=your-github-webhook-secret
-
-# SMTP Email Configuration (Nodemailer fallback client)
-SMTP_USER=your-smtp-email
-SMTP_PASS=your-smtp-password
-SMTP_FROM="Your App Name <no-reply@yourdomain.com>"
 ```
 
 ## Project Structure
