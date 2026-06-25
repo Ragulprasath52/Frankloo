@@ -1,0 +1,461 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ── Users ────────────────────────────────────────────────
+model User {
+  id           String            @id @default(uuid())
+  email        String            @unique
+  username     String            @unique
+  password     String
+  name         String?
+  avatarUrl    String?
+  googleId     String?           @unique
+  googleToken  String?           // JSON string of OAuth token details
+  googleEmail  String?           // Connected Gmail email address
+  authProvider String            @default("local") // Authentication provider ("local", "google")
+  gmailSandboxMode Boolean       @default(true) // Sandbox mode toggle
+  dailySummaryEnabled Boolean    @default(true)
+  upcomingDeadlinesEnabled Boolean @default(true)
+  overdueAlertsEnabled Boolean   @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  workspaces   WorkspaceMember[]
+  cardsAssigned CardAssignee[]
+  comments     Comment[]
+  logs         ActivityLog[]
+  notifications Notification[]
+  attachments  CardAttachment[]
+}
+
+// ── Workspaces ───────────────────────────────────────────
+model Workspace {
+  id                       String              @id @default(uuid())
+  name                     String
+  description              String?
+  shortName                String?
+  website                  String?
+  visibility               String              @default("PRIVATE") // "PRIVATE", "PUBLIC"
+  boardCreationRestriction String              @default("ANYONE")  // "ANYONE", "ADMINS"
+  guestInvitesAllowed      Boolean             @default(true)
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+
+  members                  WorkspaceMember[]
+  boards                   Board[]
+  goals                    Goal[]
+  integrations             IntegrationConfig[]
+  documents                Document[]
+  inboxItems               InboxItem[]
+  invitations              WorkspaceInvitation[]
+  emailSettings            WorkspaceEmailSettings?
+}
+
+model Document {
+  id               String     @id @default(uuid())
+  workspaceId      String
+  title            String
+  content          String     @default("")
+  parentId         String?
+  spaceId          String?
+  folderId         String?
+  type             String     @default("document") // "space", "folder", "document"
+  status           String     @default("DRAFT") // "DRAFT", "REVIEW", "APPROVED", "ARCHIVED"
+  isFavorite       Boolean    @default(false)
+  views            Int        @default(0)
+  tags             String     @default("[]") // JSON string of tags: e.g. ["#backend", "#architecture"]
+  linkedResources  String     @default("[]") // JSON string of linked board/task/goals: e.g. [{"type":"TASK","id":"...","name":"..."}]
+  comments         String     @default("[]") // JSON string of comments: e.g. [{"id":"...","userId":"...","userName":"...","avatarUrl":"...","content":"...","createdAt":"..."}]
+  suggestions      String     @default("[]") // JSON string of suggestions: e.g. [{"id":"...","userId":"...","originalText":"...","suggestedText":"...","status":"pending"}]
+  revisions        String     @default("[]") // JSON string of revisions: e.g. [{"id":"...","userId":"...","content":"...","updatedAt":"..."}]
+  authorId         String?
+  authorName       String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent      Document?  @relation("SubDocs", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Document[] @relation("SubDocs")
+}
+
+
+model WorkspaceMember {
+  id          String    @id @default(uuid())
+  workspaceId String
+  userId      String
+  role        String    // "OWNER", "ADMIN", "MEMBER", "VIEWER"
+  createdAt   DateTime  @default(now())
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+}
+
+model WorkspaceInvitation {
+  id             String    @id @default(uuid())
+  workspaceId    String
+  email          String
+  role           String    @default("MEMBER") // "ADMIN", "MEMBER", "VIEWER"
+  token          String    @unique
+  invitedById    String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Status and Tracking
+  status         String    @default("PENDING") // "PENDING", "ACCEPTED", "EXPIRED", "REVOKED"
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+
+  // Resend and Delivery details
+  resentCount    Int       @default(0)
+  lastResentAt   DateTime?
+  deliveryStatus String    @default("PENDING") // "PENDING", "DELIVERED", "FAILED"
+  deliveryError  String?
+
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, email])
+}
+
+// ── Boards ───────────────────────────────────────────────
+model Board {
+  id           String            @id @default(uuid())
+  name         String
+  description  String?
+  background   String            @default("indigo")
+  workspaceId  String
+  isArchived   Boolean           @default(false)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  workspace    Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  lists        List[]
+  automations  AutomationRule[]
+  savedFilters SavedFilter[]
+  milestones   Milestone[]
+  logs         ActivityLog[]
+  sprints      Sprint[]
+}
+
+// ── Lists / Columns ──────────────────────────────────────
+model List {
+  id        String    @id @default(uuid())
+  name      String
+  position  Float
+  boardId   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  board     Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards     Card[]
+}
+
+// ── Cards ────────────────────────────────────────────────
+model Card {
+  id            String           @id @default(uuid())
+  title         String
+  description   String           @default("")
+  position      Float
+  listId        String
+  isArchived    Boolean          @default(false)
+
+  // Scheduling
+  dueDate       DateTime?
+  priority      String           @default("MEDIUM") // "LOW", "MEDIUM", "HIGH", "URGENT"
+  coverImage    String?
+
+  // Time tracking
+  estimatedTime Int              @default(0) // minutes
+  loggedTime    Int              @default(0) // minutes
+
+  // Recurring tasks (cron expression, e.g. "0 9 * * 1" = every Monday 9am)
+  recurringCron String?
+
+  // Custom fields stored as JSON string: [{ name, type, value }]
+  customFields  String           @default("[]")
+
+  // GitHub integration
+  githubPrUrl   String?          // linked PR URL
+  githubCommits String           @default("[]") // JSON array of { sha, message, url }
+
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  list          List             @relation(fields: [listId], references: [id], onDelete: Cascade)
+  assignees     CardAssignee[]
+  checklists    ChecklistItem[]
+  comments      Comment[]
+  attachments   CardAttachment[]
+  dependencies  TaskDependency[] @relation("DependentCard")
+  dependents    TaskDependency[] @relation("PrerequisiteCard")
+  logs          ActivityLog[]
+  milestoneId   String?
+  milestone     Milestone?       @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  sprintId      String?
+  sprint        Sprint?          @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+}
+
+model CardAssignee {
+  id        String   @id @default(uuid())
+  cardId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, userId])
+}
+
+// ── Checklists ───────────────────────────────────────────
+model ChecklistItem {
+  id          String   @id @default(uuid())
+  cardId      String
+  content     String
+  isCompleted Boolean  @default(false)
+  position    Float    @default(0)
+  createdAt   DateTime @default(now())
+
+  card        Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+}
+
+// ── Attachments ──────────────────────────────────────────
+model CardAttachment {
+  id         String   @id @default(uuid())
+  cardId     String
+  uploadedBy String
+  filename   String
+  storagePath String  // relative path in uploads/ directory
+  mimeType   String?
+  size       Int?     // bytes
+  createdAt  DateTime @default(now())
+
+  card       Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+}
+
+// ── Task Dependencies ────────────────────────────────────
+model TaskDependency {
+  id              String   @id @default(uuid())
+  cardId          String   // the blocked card
+  dependsOnCardId String   // the blocking card
+  createdAt       DateTime @default(now())
+
+  card            Card     @relation("DependentCard", fields: [cardId], references: [id], onDelete: Cascade)
+  dependsOnCard   Card     @relation("PrerequisiteCard", fields: [dependsOnCardId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, dependsOnCardId])
+}
+
+// ── Comments ─────────────────────────────────────────────
+model Comment {
+  id        String   @id @default(uuid())
+  cardId    String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ── Activity Log ─────────────────────────────────────────
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String
+  boardId   String
+  cardId    String?
+  action    String   // "CREATE_CARD", "MOVE_CARD", "ADD_COMMENT", "CLOSE_PR", etc.
+  details   String   // descriptive text or JSON
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  card      Card?    @relation(fields: [cardId], references: [id], onDelete: SetNull)
+}
+
+// ── Notifications ────────────────────────────────────────
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  content   String
+  link      String?  // optional deep link to card/board
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ── Goals ────────────────────────────────────────────────
+model Goal {
+  id           String     @id @default(uuid())
+  workspaceId  String
+  title        String
+  description  String?
+  targetDate   DateTime?
+  status       String     @default("NOT_STARTED")
+  progress     Int        @default(0)
+  category     String     @default("GENERAL")
+  priority     String     @default("MEDIUM")
+  ownerId      String?
+  keyResults   String     @default("[]")
+  milestones   String     @default("[]")
+  linkedBoards String     @default("[]")
+  linkedCards  String     @default("[]")
+  linkedDocs   String     @default("[]")
+  activities   String     @default("[]")
+  milestoneId  String?    // optionally linked to a board milestone
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+// ── Milestones ───────────────────────────────────────────
+model Milestone {
+  id          String   @id @default(uuid())
+  boardId     String
+  title       String
+  description String?
+  dueDate     DateTime?
+  isCompleted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards       Card[]
+}
+
+// ── Sprints ──────────────────────────────────────────────
+model Sprint {
+  id        String    @id @default(uuid())
+  boardId   String
+  name      String    // e.g. "Sprint 12"
+  startDate DateTime
+  endDate   DateTime
+  goal      String?
+  isActive  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  board     Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards     Card[]
+}
+
+// ── Automation Rules ─────────────────────────────────────
+model AutomationRule {
+  id          String   @id @default(uuid())
+  boardId     String
+  name        String   @default("Untitled Rule")
+  isEnabled   Boolean  @default(true)
+  triggerType String   // "CARD_MOVED", "CARD_CREATED", "DUE_DATE_NEAR", "PR_MERGED"
+  triggerVal  String?  // column ID, hours, etc.
+  actionType  String   // "SET_PRIORITY", "MOVE_CARD", "ASSIGN_USER", "SEND_NOTIFICATION"
+  actionVal   String?
+  createdAt   DateTime @default(now())
+
+  board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+}
+
+// ── Saved Filters ────────────────────────────────────────
+model SavedFilter {
+  id        String   @id @default(uuid())
+  boardId   String
+  name      String
+  query     String   // JSON: { assignees, priorities, labels, dueDateRange }
+  createdAt DateTime @default(now())
+
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+}
+
+// ── Integrations ─────────────────────────────────────────
+// Stores webhook URLs and tokens per workspace, per integration type
+model IntegrationConfig {
+  id          String    @id @default(uuid())
+  workspaceId String
+  type        String    // "SLACK", "DISCORD", "GITHUB", "GOOGLE_CALENDAR"
+  config      String    // JSON: { webhookUrl?, channelId?, repoOwner?, repoName?, secret? }
+  isEnabled   Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, type])
+}
+
+// ── Inbox Items ──────────────────────────────────────────
+model InboxItem {
+  id            String    @id @default(uuid())
+  title         String
+  description   String    @default("")
+  source        String    @default("QUICK") // "GMAIL", "SLACK", "DISCORD", "GITHUB", "CALENDAR", "QUICK"
+  sourceDetails String    @default("{}") // JSON string containing sender, subject, link, channel, etc.
+  status        String    @default("NEW") // "NEW", "PROCESSING", "CONVERTED", "ARCHIVED"
+  priority      String    @default("MEDIUM") // "LOW", "MEDIUM", "HIGH", "URGENT"
+  dueDate       DateTime?
+  workspaceId   String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+// ── Gmail Activity Log ────────────────────────────────────
+model GmailActivity {
+  id          String   @id @default(uuid())
+  userId      String
+  type        String   // "SYNC", "CONVERT", "NOTIFICATION_SENT", "DAILY_SUMMARY"
+  details     String
+  createdAt   DateTime @default(now())
+}
+
+// ── Workspace Email & Branding Customization ──────────────────
+model WorkspaceEmailSettings {
+  id                 String    @id @default(uuid())
+  workspaceId        String    @unique
+  
+  // SMTP Configuration
+  smtpHost           String?
+  smtpPort           Int?
+  smtpUser           String?
+  smtpPass           String?
+  smtpSecure         Boolean   @default(false)
+  smtpFrom           String?
+
+  // Branding Customization
+  logoUrl            String?
+  accentColor        String?   @default("#0052cc")
+  buttonColor        String?   @default("#0052cc")
+  footer             String?   @default("Frankloo Team")
+  senderName         String?   @default("Frankloo")
+  replyTo            String?
+
+  // HTML/Text custom templates
+  subject            String?   @default("You're invited to join {{workspace_name}} on Frankloo")
+  bodyHtml           String?
+  bodyText           String?
+
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+// ── Invitation Audit Trail ────────────────────────────────────
+model InvitationAuditLog {
+  id           String    @id @default(uuid())
+  workspaceId  String
+  invitationId String?
+  email        String
+  actorId      String?   // Inviter user ID
+  action       String    // "INVITE_SENT", "INVITE_RESENT", "INVITE_ACCEPTED", "INVITE_REVOKED", "DELIVERY_SUCCESS", "DELIVERY_FAILURE", "INVITE_EXPIRED"
+  details      String?
+  createdAt    DateTime  @default(now())
+}
+

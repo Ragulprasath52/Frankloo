@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none">
+  <defs>
+    <linearGradient id="brand-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8" />
+      <stop offset="35%" stop-color="#6366f1" />
+      <stop offset="70%" stop-color="#4f46e5" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+  </defs>
+  <!-- Top-left tile with rounded corner -->
+  <path d="M 3,15 H 15 V 3 C 8.373,3 3,8.373 3,15 Z" fill="url(#brand-grad)" />
+  
+  <!-- Top-right tile (square with slight rounding) -->
+  <rect x="17" y="3" width="12" height="12" rx="2.5" fill="url(#brand-grad)" />
+  
+  <!-- Bottom-left tile (square with slight rounding) -->
+  <rect x="3" y="17" width="12" height="12" rx="2.5" fill="url(#brand-grad)" />
+  
+  <!-- Bottom-right tile with rounded corner -->
+  <path d="M 17,29 V 17 H 29 C 29,23.627 23.627,29 17,29 Z" fill="url(#brand-grad)" />
+</svg>
