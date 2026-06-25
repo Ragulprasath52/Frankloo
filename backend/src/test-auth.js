@@ -1,4 +1,6 @@
-const BASE_URL = 'http://localhost:5000/api/auth';
+import { env } from './config/env.js';
+
+const BASE_URL = `${env.backendBaseUrl}/api/auth`;
 
 async function runTests() {
   console.log('--- STARTING AUTHENTICATION VERIFICATION TESTS ---');

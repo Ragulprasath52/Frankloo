@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AlertCircle, CheckCircle, KeyRound } from 'lucide-react';
 import logoImg from '../assets/logo.png';
+import { apiUrl } from '../config/api';
 
 export default function ResetPassword() {
   const [email, setEmail] = useState('');
@@ -20,7 +21,7 @@ export default function ResetPassword() {
     }
     setLoading(true); setError(''); setSuccess('');
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/auth/reset-password', {
+      const res = await fetch(apiUrl('/auth/reset-password'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, username, newPassword }),

@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { prisma } from '../db.js';
+import { env } from '../config/env.js';
 
 /**
  * Replace variables in a template string
@@ -140,7 +141,7 @@ export async function sendWorkspaceEmail({
   const senderName = settings?.senderName || 'Frankloo';
   const replyTo = settings?.replyTo || null;
   // Permanently use the default logo.png
-  const logoUrl = `http://localhost:5000/uploads/logo.png`;
+  const logoUrl = `${env.backendBaseUrl}/uploads/logo.png`;
   const workspaceInitial = workspaceName[0]?.toUpperCase() || 'W';
 
   // 2. Prepare Variables Map

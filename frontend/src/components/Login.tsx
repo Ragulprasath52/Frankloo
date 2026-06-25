@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { AlertCircle, Zap } from 'lucide-react';
 import logoImg from '../assets/logo.png';
+import { apiUrl } from '../config/api';
 
 export default function Login() {
   const { setAuth } = useStore();
@@ -19,7 +20,7 @@ export default function Login() {
   useEffect(() => {
     const fetchClientId = async () => {
       try {
-        const res = await fetch('http://127.0.0.1:5000/api/auth/google/client-id');
+        const res = await fetch(apiUrl('/auth/google/client-id'));
         const data = await res.json();
         if (data.clientId) {
           setGoogleClientId(data.clientId);
@@ -35,7 +36,7 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/auth/google', {
+      const res = await fetch(apiUrl('/auth/google'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credential: response.credential }),
@@ -89,7 +90,7 @@ export default function Login() {
     e.preventDefault();
     setError(''); setLoading(true);
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/auth/login', {
+      const res = await fetch(apiUrl('/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), password }),

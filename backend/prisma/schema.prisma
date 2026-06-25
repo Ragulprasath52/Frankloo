@@ -1,6 +1,6 @@
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "mysql"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -16,7 +16,7 @@ model User {
   name         String?
   avatarUrl    String?
   googleId     String?           @unique
-  googleToken  String?           // JSON string of OAuth token details
+  googleToken  String?           @db.Text // JSON string of OAuth token details
   googleEmail  String?           // Connected Gmail email address
   authProvider String            @default("local") // Authentication provider ("local", "google")
   gmailSandboxMode Boolean       @default(true) // Sandbox mode toggle
@@ -38,7 +38,7 @@ model User {
 model Workspace {
   id                       String              @id @default(uuid())
   name                     String
-  description              String?
+  description              String?             @db.Text
   shortName                String?
   website                  String?
   visibility               String              @default("PRIVATE") // "PRIVATE", "PUBLIC"
@@ -61,7 +61,7 @@ model Document {
   id               String     @id @default(uuid())
   workspaceId      String
   title            String
-  content          String     @default("")
+  content          String     @default("") @db.LongText
   parentId         String?
   spaceId          String?
   folderId         String?
@@ -69,11 +69,11 @@ model Document {
   status           String     @default("DRAFT") // "DRAFT", "REVIEW", "APPROVED", "ARCHIVED"
   isFavorite       Boolean    @default(false)
   views            Int        @default(0)
-  tags             String     @default("[]") // JSON string of tags: e.g. ["#backend", "#architecture"]
-  linkedResources  String     @default("[]") // JSON string of linked board/task/goals: e.g. [{"type":"TASK","id":"...","name":"..."}]
-  comments         String     @default("[]") // JSON string of comments: e.g. [{"id":"...","userId":"...","userName":"...","avatarUrl":"...","content":"...","createdAt":"..."}]
-  suggestions      String     @default("[]") // JSON string of suggestions: e.g. [{"id":"...","userId":"...","originalText":"...","suggestedText":"...","status":"pending"}]
-  revisions        String     @default("[]") // JSON string of revisions: e.g. [{"id":"...","userId":"...","content":"...","updatedAt":"..."}]
+  tags             String     @default("[]") @db.Text // JSON string of tags: e.g. ["#backend", "#architecture"]
+  linkedResources  String     @default("[]") @db.Text // JSON string of linked board/task/goals: e.g. [{"type":"TASK","id":"...","name":"..."}]
+  comments         String     @default("[]") @db.Text // JSON string of comments: e.g. [{"id":"...","userId":"...","userName":"...","avatarUrl":"...","content":"...","createdAt":"..."}]
+  suggestions      String     @default("[]") @db.Text // JSON string of suggestions: e.g. [{"id":"...","userId":"...","originalText":"...","suggestedText":"...","status":"pending"}]
+  revisions        String     @default("[]") @db.Text // JSON string of revisions: e.g. [{"id":"...","userId":"...","content":"...","updatedAt":"..."}]
   authorId         String?
   authorName       String?
   createdAt        DateTime   @default(now())
@@ -129,7 +129,7 @@ model WorkspaceInvitation {
 model Board {
   id           String            @id @default(uuid())
   name         String
-  description  String?
+  description  String?           @db.Text
   background   String            @default("indigo")
   workspaceId  String
   isArchived   Boolean           @default(false)
@@ -162,7 +162,7 @@ model List {
 model Card {
   id            String           @id @default(uuid())
   title         String
-  description   String           @default("")
+  description   String           @default("") @db.Text
   position      Float
   listId        String
   isArchived    Boolean          @default(false)
@@ -180,11 +180,11 @@ model Card {
   recurringCron String?
 
   // Custom fields stored as JSON string: [{ name, type, value }]
-  customFields  String           @default("[]")
+  customFields  String           @default("[]") @db.Text
 
   // GitHub integration
   githubPrUrl   String?          // linked PR URL
-  githubCommits String           @default("[]") // JSON array of { sha, message, url }
+  githubCommits String           @default("[]") @db.Text // JSON array of { sha, message, url }
 
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
@@ -260,7 +260,7 @@ model Comment {
   id        String   @id @default(uuid())
   cardId    String
   userId    String
-  content   String
+  content   String   @db.Text
   createdAt DateTime @default(now())
 
   card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
@@ -274,7 +274,7 @@ model ActivityLog {
   boardId   String
   cardId    String?
   action    String   // "CREATE_CARD", "MOVE_CARD", "ADD_COMMENT", "CLOSE_PR", etc.
-  details   String   // descriptive text or JSON
+  details   String   @db.Text // descriptive text or JSON
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -286,7 +286,7 @@ model ActivityLog {
 model Notification {
   id        String   @id @default(uuid())
   userId    String
-  content   String
+  content   String   @db.Text
   link      String?  // optional deep link to card/board
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -299,19 +299,19 @@ model Goal {
   id           String     @id @default(uuid())
   workspaceId  String
   title        String
-  description  String?
+  description  String?    @db.Text
   targetDate   DateTime?
   status       String     @default("NOT_STARTED")
   progress     Int        @default(0)
   category     String     @default("GENERAL")
   priority     String     @default("MEDIUM")
   ownerId      String?
-  keyResults   String     @default("[]")
-  milestones   String     @default("[]")
-  linkedBoards String     @default("[]")
-  linkedCards  String     @default("[]")
-  linkedDocs   String     @default("[]")
-  activities   String     @default("[]")
+  keyResults   String     @default("[]") @db.Text
+  milestones   String     @default("[]") @db.Text
+  linkedBoards String     @default("[]") @db.Text
+  linkedCards  String     @default("[]") @db.Text
+  linkedDocs   String     @default("[]") @db.Text
+  activities   String     @default("[]") @db.Text
   milestoneId  String?    // optionally linked to a board milestone
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
@@ -324,7 +324,7 @@ model Milestone {
   id          String   @id @default(uuid())
   boardId     String
   title       String
-  description String?
+  description String?  @db.Text
   dueDate     DateTime?
   isCompleted Boolean  @default(false)
   createdAt   DateTime @default(now())
@@ -357,9 +357,9 @@ model AutomationRule {
   name        String   @default("Untitled Rule")
   isEnabled   Boolean  @default(true)
   triggerType String   // "CARD_MOVED", "CARD_CREATED", "DUE_DATE_NEAR", "PR_MERGED"
-  triggerVal  String?  // column ID, hours, etc.
+  triggerVal  String?  @db.Text // column ID, hours, etc.
   actionType  String   // "SET_PRIORITY", "MOVE_CARD", "ASSIGN_USER", "SEND_NOTIFICATION"
-  actionVal   String?
+  actionVal   String?  @db.Text
   createdAt   DateTime @default(now())
 
   board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
@@ -370,7 +370,7 @@ model SavedFilter {
   id        String   @id @default(uuid())
   boardId   String
   name      String
-  query     String   // JSON: { assignees, priorities, labels, dueDateRange }
+  query     String   @db.Text // JSON: { assignees, priorities, labels, dueDateRange }
   createdAt DateTime @default(now())
 
   board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
@@ -382,7 +382,7 @@ model IntegrationConfig {
   id          String    @id @default(uuid())
   workspaceId String
   type        String    // "SLACK", "DISCORD", "GITHUB", "GOOGLE_CALENDAR"
-  config      String    // JSON: { webhookUrl?, channelId?, repoOwner?, repoName?, secret? }
+  config      String    @db.Text // JSON: { webhookUrl?, channelId?, repoOwner?, repoName?, secret? }
   isEnabled   Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -396,9 +396,9 @@ model IntegrationConfig {
 model InboxItem {
   id            String    @id @default(uuid())
   title         String
-  description   String    @default("")
+  description   String    @default("") @db.Text
   source        String    @default("QUICK") // "GMAIL", "SLACK", "DISCORD", "GITHUB", "CALENDAR", "QUICK"
-  sourceDetails String    @default("{}") // JSON string containing sender, subject, link, channel, etc.
+  sourceDetails String    @default("{}") @db.Text // JSON string containing sender, subject, link, channel, etc.
   status        String    @default("NEW") // "NEW", "PROCESSING", "CONVERTED", "ARCHIVED"
   priority      String    @default("MEDIUM") // "LOW", "MEDIUM", "HIGH", "URGENT"
   dueDate       DateTime?
@@ -414,7 +414,7 @@ model GmailActivity {
   id          String   @id @default(uuid())
   userId      String
   type        String   // "SYNC", "CONVERT", "NOTIFICATION_SENT", "DAILY_SUMMARY"
-  details     String
+  details     String   @db.Text
   createdAt   DateTime @default(now())
 }
 
@@ -441,8 +441,8 @@ model WorkspaceEmailSettings {
 
   // HTML/Text custom templates
   subject            String?   @default("You're invited to join {{workspace_name}} on Frankloo")
-  bodyHtml           String?
-  bodyText           String?
+  bodyHtml           String?   @db.Text
+  bodyText           String?   @db.Text
 
   workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
@@ -455,7 +455,7 @@ model InvitationAuditLog {
   email        String
   actorId      String?   // Inviter user ID
   action       String    // "INVITE_SENT", "INVITE_RESENT", "INVITE_ACCEPTED", "INVITE_REVOKED", "DELIVERY_SUCCESS", "DELIVERY_FAILURE", "INVITE_EXPIRED"
-  details      String?
+  details      String?   @db.Text
   createdAt    DateTime  @default(now())
 }
 

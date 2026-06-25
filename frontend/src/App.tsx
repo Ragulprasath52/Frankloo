@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { useStore } from './store/useStore';
 import type { Card } from './store/useStore';
 import { useThemeStore } from './store/useThemeStore';
+import { apiUrl } from './config/api';
 
 // Components
 import Login from './components/Login';
@@ -50,7 +51,7 @@ function DashboardLayout() {
 
   const { updateWorkspace, deleteWorkspace } = useStore((state) => ({
     updateWorkspace: async (id: string, updates: any) => {
-      const res = await fetch(`http://127.0.0.1:5000/api/workspaces/${id}`, {
+      const res = await fetch(apiUrl(`/workspaces/${id}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -61,7 +62,7 @@ function DashboardLayout() {
       if (!res.ok) throw new Error('Failed to update workspace');
     },
     deleteWorkspace: state.deleteWorkspace || (async (id: string) => {
-      const res = await fetch(`http://127.0.0.1:5000/api/workspaces/${id}`, {
+      const res = await fetch(apiUrl(`/workspaces/${id}`), {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });

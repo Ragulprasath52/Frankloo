@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useStore, getAvatarUrl } from '../store/useStore';
 import type { Card } from '../store/useStore';
+import { apiUrl } from '../config/api';
+
 import { 
   Columns, Calendar as CalendarIcon, 
   BarChart3, UserCheck, Play, ArrowLeft, Plus, X, Trash2, 
@@ -746,12 +748,12 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                       <input
                         type="text"
                         readOnly
-                        value={`http://127.0.0.1:5000/api/integrations/${currentWorkspace.id}/calendar/export.ics?token=${token}`}
+                        value={apiUrl(`/integrations/${currentWorkspace.id}/calendar/export.ics?token=${token}`)}
                         className="tf-input font-mono text-xs flex-1 select-all bg-white dark:bg-slate-850"
                       />
                       <button
                         onClick={() => {
-                          navigator.clipboard.writeText(`http://127.0.0.1:5000/api/integrations/${currentWorkspace.id}/calendar/export.ics?token=${token}`);
+                          navigator.clipboard.writeText(apiUrl(`/integrations/${currentWorkspace.id}/calendar/export.ics?token=${token}`));
                           setCopied(true);
                           setTimeout(() => setCopied(false), 2000);
                         }}

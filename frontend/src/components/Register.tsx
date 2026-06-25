@@ -3,6 +3,7 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { AlertCircle, Sparkles } from 'lucide-react';
 import logoImg from '../assets/logo.png';
+import { apiUrl } from '../config/api';
 
 export default function Register() {
   const [searchParams] = useSearchParams();
@@ -23,7 +24,7 @@ export default function Register() {
   useEffect(() => {
     const fetchClientId = async () => {
       try {
-        const res = await fetch('http://127.0.0.1:5000/api/auth/google/client-id');
+        const res = await fetch(apiUrl('/auth/google/client-id'));
         const data = await res.json();
         if (data.clientId) {
           setGoogleClientId(data.clientId);
@@ -39,7 +40,7 @@ export default function Register() {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/auth/google', {
+      const res = await fetch(apiUrl('/auth/google'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credential: response.credential }),
@@ -101,7 +102,7 @@ export default function Register() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/auth/register', {
+      const res = await fetch(apiUrl('/auth/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

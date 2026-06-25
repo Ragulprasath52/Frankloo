@@ -10,6 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
+import { env } from '../config/env.js';
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1084,7 +1085,7 @@ router.post('/:id/invitations', authenticate, checkWorkspaceRole(['OWNER', 'ADMI
       }
 
       // Send Email invitation asynchronously
-      const acceptLink = `http://localhost:5173/accept-invite?token=${encodeURIComponent(signedToken)}`;
+      const acceptLink = `${env.frontendBaseUrl}/accept-invite?token=${encodeURIComponent(signedToken)}`;
       
       sendWorkspaceEmail({
         workspaceId,
@@ -1231,7 +1232,7 @@ router.post('/:id/invitations/:invitationId/resend', authenticate, checkWorkspac
       }
     });
 
-    const acceptLink = `http://localhost:5173/accept-invite?token=${encodeURIComponent(signedToken)}`;
+    const acceptLink = `${env.frontendBaseUrl}/accept-invite?token=${encodeURIComponent(signedToken)}`;
 
     sendWorkspaceEmail({
       workspaceId: id,

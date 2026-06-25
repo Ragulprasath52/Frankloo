@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { env } from './config/env.js';
 
 import authRoutes from './routes/auth.js';
 import workspaceRoutes from './routes/workspaces.js';
@@ -50,9 +51,7 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`===========================================`);
-  console.log(`🚀 Frankloo running on port ${PORT}`);
-  console.log(`===========================================`);
+const PORT = env.port;
+server.listen(env.port, env.host, () => {
+  console.log(`🚀 Frankloo running on ${env.backendBaseUrl}`);
 });

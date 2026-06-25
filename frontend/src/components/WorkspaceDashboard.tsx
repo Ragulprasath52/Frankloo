@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
+import { apiUrl } from '../config/api';
+
 import {
   Plus, PlusCircle,
   Trash2, Copy, X,
@@ -568,7 +570,7 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
                     <div className="mt-1.5 space-y-1">
                       <span className="block text-[0.625rem] text-slate-500 font-medium">Payload URL:</span>
                       <code className="block text-[0.625rem] font-mono select-all bg-white dark:bg-[#1d2125] border border-slate-200 dark:border-slate-800 px-2 py-1 rounded break-all">
-                        http://127.0.0.1:5000/api/integrations/github/webhook
+                        {apiUrl('/integrations/github/webhook')}
                       </code>
                       <span className="block text-[0.625rem] text-slate-500 font-medium mt-1">Content type:</span>
                       <span className="text-[0.625rem] font-mono bg-white dark:bg-[#1d2125] border border-slate-200 dark:border-slate-800 px-1.5 py-0.5 rounded">application/json</span>
@@ -652,12 +654,12 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
                     <input
                       type="text"
                       readOnly
-                      value={`http://127.0.0.1:5000/api/integrations/${currentWorkspace.id}/calendar/export.ics?token=${token}`}
+                      value={apiUrl(`/integrations/${currentWorkspace.id}/calendar/export.ics?token=${token}`)}
                       className="tf-input font-mono text-xs flex-1 select-all bg-white dark:bg-[#1d2125] border-slate-200 dark:border-slate-800"
                     />
                     <button
                       onClick={() => {
-                        navigator.clipboard.writeText(`http://127.0.0.1:5000/api/integrations/${currentWorkspace.id}/calendar/export.ics?token=${token}`);
+                        navigator.clipboard.writeText(apiUrl(`/integrations/${currentWorkspace.id}/calendar/export.ics?token=${token}`));
                         addToast('URL Copied', 'Subscription feed URL copied to clipboard!', 'success');
                       }}
                       className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 whitespace-nowrap"
