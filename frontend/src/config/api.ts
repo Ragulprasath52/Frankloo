@@ -3,15 +3,15 @@ const removeTrailingSlash = (value: string) => {
 };
 
 export const API_BASE_URL = removeTrailingSlash(
-  import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000/api'
+  import.meta.env.VITE_API_BASE_URL || 'https://frankloo.mccmrfip.in/api'
 );
 
 export const BACKEND_BASE_URL = removeTrailingSlash(
-  import.meta.env.VITE_BACKEND_BASE_URL || 'http://127.0.0.1:5000'
+  import.meta.env.VITE_BACKEND_BASE_URL || 'https://frankloo.mccmrfip.in'
 );
 
 export const SOCKET_URL = removeTrailingSlash(
-  import.meta.env.VITE_SOCKET_URL || 'http://127.0.0.1:5000'
+  import.meta.env.VITE_SOCKET_URL || 'https://frankloo.mccmrfip.in'
 );
 
 export const apiUrl = (path: string) => {
