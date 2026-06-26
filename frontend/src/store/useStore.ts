@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { io, Socket } from 'socket.io-client';
+import { API_BASE_URL as API_URL, BACKEND_BASE_URL, SOCKET_URL } from '../config/api';
 
 export interface ToastItem {
   id: string;
@@ -17,10 +18,6 @@ export interface ConfirmModalState {
   onConfirm: () => void;
   onCancel: () => void;
 }
-
-
-const API_URL = 'http://127.0.0.1:5000/api';
-const SOCKET_URL = 'http://127.0.0.1:5000';
 
 export interface User {
   id: string;
@@ -1527,5 +1524,5 @@ export const getAvatarUrl = (url: string | null | undefined, nameOrUsername?: st
   }
   // Remove leading slash if present
   const cleanPath = url.startsWith('/') ? url.slice(1) : url;
-  return `http://127.0.0.1:5000/${cleanPath}`;
+  return `${BACKEND_BASE_URL}/${cleanPath}`;
 };
