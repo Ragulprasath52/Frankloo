@@ -301,18 +301,18 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
     <div className="flex-1 overflow-y-auto overflow-x-hidden">
       {/* ── Boards Tab ─────────────────────── */}
       {activeTab === 'boards' && (
-        <div className="p-4 sm:p-8 animate-fade-in">
+        <div className="p-4 md:p-8 animate-fade-in">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-8">
             <div>
-              <h2 className="text-xl sm:text-2xl font-bold mb-1 truncate" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+              <h2 className="text-xl md:text-2xl font-bold mb-1 truncate" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
                 {currentWorkspace?.name || 'Workspace'}
               </h2>
-              <p className="text-xs sm:text-sm" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-xs md:text-sm" style={{ color: 'var(--text-muted)' }}>
                 {currentWorkspace?.boards?.length || 0} board{(currentWorkspace?.boards?.length ?? 0) !== 1 ? 's' : ''}
               </p>
             </div>
-            <button onClick={() => setBoardModalOpen(true)} className="btn-primary" style={{ padding: '9px 18px', fontSize: '0.875rem' }}>
+            <button onClick={() => setBoardModalOpen(true)} className="btn-primary w-full md:w-auto justify-center" style={{ padding: '9px 18px', fontSize: '0.875rem' }}>
               <Plus className="w-4 h-4" /> Create board
             </button>
           </div>
@@ -675,9 +675,9 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
             </div>
 
             {/* ── Gmail Integration Testing Center ── */}
-            <div className="bg-white dark:bg-[#22272b] border border-[#dfe1e6] dark:border-[#a6c5e229] rounded-[12px] p-5 sm:p-6 shadow-sm space-y-6 md:col-span-2">
-              {/* Card Header — stacks on mobile, row on sm+ */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#dfe1e6] dark:border-[#a6c5e229] pb-4">
+            <div className="bg-white dark:bg-[#22272b] border border-[#dfe1e6] dark:border-[#a6c5e229] rounded-[12px] p-5 md:p-6 shadow-sm space-y-6 md:col-span-2">
+              {/* Card Header — stacks on mobile, row on md+ */}
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-[#dfe1e6] dark:border-[#a6c5e229] pb-4">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-9 h-9 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
                     <Mail className="w-5 h-5" />

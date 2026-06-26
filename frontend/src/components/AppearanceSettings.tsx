@@ -77,7 +77,7 @@ export default function AppearanceSettings() {
         <h3 className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: 'var(--text-muted)' }}>
           Color Mode
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {themes.map((t) => {
             const Icon = t.icon;
             const active = theme === t.id;
@@ -169,7 +169,7 @@ export default function AppearanceSettings() {
             Frankloo uses a modern Kanban visual language — colorful board covers, rounded cards with elevation,
             clean spacing, and smooth interactions. This design layer is always active and works with both Light and Dark modes.
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {features.map((f) => {
               const FIcon = f.icon;
               return (

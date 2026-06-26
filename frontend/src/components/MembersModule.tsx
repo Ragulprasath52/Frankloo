@@ -185,43 +185,43 @@ export default function MembersModule({ workspaceId, isEditor, onSelectBoard }: 
 
       {/* KPI Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-[#22272b] border border-[#dfe1e6] dark:border-[#a6c5e229] rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+        <div className="bg-white dark:bg-[#22272b] border border-[#dfe1e6] dark:border-[#a6c5e229] rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
+          <div className="p-2.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0">
             <Users className="w-5 h-5" />
           </div>
-          <div>
+          <div className="flex flex-col items-center sm:items-start min-w-0">
             <p className="text-xs font-semibold text-[#44546f] dark:text-[#9fadbc] uppercase tracking-wider">Total Members</p>
             <p className="text-xl font-bold text-[#172b4d] dark:text-[#b6c2cf]">{totalCount}</p>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#22272b] border border-[#dfe1e6] dark:border-[#a6c5e229] rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+        <div className="bg-white dark:bg-[#22272b] border border-[#dfe1e6] dark:border-[#a6c5e229] rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
+          <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
             <div className="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center font-bold text-[10px]">
               🟢
             </div>
           </div>
-          <div>
+          <div className="flex flex-col items-center sm:items-start min-w-0">
             <p className="text-xs font-semibold text-[#44546f] dark:text-[#9fadbc] uppercase tracking-wider">Active Now</p>
             <p className="text-xl font-bold text-[#172b4d] dark:text-[#b6c2cf]">{activeCount}</p>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#22272b] border border-[#dfe1e6] dark:border-[#a6c5e229] rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
+        <div className="bg-white dark:bg-[#22272b] border border-[#dfe1e6] dark:border-[#a6c5e229] rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
+          <div className="p-2.5 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 shrink-0">
             <Shield className="w-5 h-5" />
           </div>
-          <div>
+          <div className="flex flex-col items-center sm:items-start min-w-0">
             <p className="text-xs font-semibold text-[#44546f] dark:text-[#9fadbc] uppercase tracking-wider">Admins / Owners</p>
             <p className="text-xl font-bold text-[#172b4d] dark:text-[#b6c2cf]">{adminCount + ownerCount}</p>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#22272b] border border-[#dfe1e6] dark:border-[#a6c5e229] rounded-xl p-4 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+        <div className="bg-white dark:bg-[#22272b] border border-[#dfe1e6] dark:border-[#a6c5e229] rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
+          <div className="p-2.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
             <Mail className="w-5 h-5" />
           </div>
-          <div>
+          <div className="flex flex-col items-center sm:items-start min-w-0">
             <p className="text-xs font-semibold text-[#44546f] dark:text-[#9fadbc] uppercase tracking-wider">Pending Invites</p>
             <p className="text-xl font-bold text-[#172b4d] dark:text-[#b6c2cf]">{pendingCount}</p>
           </div>

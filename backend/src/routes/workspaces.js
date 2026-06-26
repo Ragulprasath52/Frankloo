@@ -1107,7 +1107,11 @@ router.post('/:id/invitations', authenticate, checkWorkspaceRole(['OWNER', 'ADMI
     res.status(201).json({ results });
   } catch (error) {
     console.error('Batch create invitations error:', error);
-    res.status(500).json({ error: 'Server error creating invitations' });
+    res.status(500).json({ 
+      error: 'Server error creating invitations',
+      message: error.message,
+      stack: error.stack
+    });
   }
 });
 
