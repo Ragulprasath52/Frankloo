@@ -10,7 +10,7 @@ export default function GlobalOverlays() {
   return (
     <>
       {/* Toast Stacking Container */}
-      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-3 pointer-events-none w-full max-w-sm">
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 md:left-auto md:right-4 md:translate-x-0 md:bottom-auto md:top-4 z-[9999] flex flex-col gap-3 pointer-events-none w-full max-w-sm px-4 md:px-0">
         {toasts.map((toast) => (
           <ToastCard key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
         ))}
