@@ -535,6 +535,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                                   src={card.coverImage}
                                   alt="cover"
                                   className="w-full h-24 object-cover"
+                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                 />
                               )}
                             </div>

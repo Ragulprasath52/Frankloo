@@ -28,6 +28,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
   const [priority, setPriority] = useState(card.priority);
   const [dueDate, setDueDate] = useState(card.dueDate ? card.dueDate.split('T')[0] : '');
   const [coverImage, setCoverImage] = useState(card.coverImage || '');
+  const [imageError, setImageError] = useState(false);
   const [estTime, setEstTime] = useState(card.estimatedTime || 0);
   const [newChecklistVal, setNewChecklistVal] = useState('');
   
@@ -81,6 +82,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
     setPriority(card.priority);
     setDueDate(card.dueDate ? card.dueDate.split('T')[0] : '');
     setCoverImage(card.coverImage || '');
+    setImageError(false);
     setEstTime(card.estimatedTime || 0);
 
     // Parse customFields
@@ -176,8 +178,17 @@ export default function CardModal({ card, onClose }: CardModalProps) {
           <div className="relative h-28 w-full overflow-hidden border-b border-[#dfe1e6] dark:border-[#a6c5e229] shrink-0">
             {coverImage.startsWith('linear-gradient') || coverImage.startsWith('radial-gradient') || coverImage.startsWith('#') ? (
               <div className="w-full h-full" style={{ background: coverImage }} />
+            ) : imageError ? (
+              <div className="w-full h-full bg-gradient-to-br from-indigo-500/10 to-purple-500/10 dark:from-indigo-950/20 dark:to-purple-950/20 flex items-center justify-center">
+                <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Preview Unavailable</span>
+              </div>
             ) : (
-              <img src={coverImage} alt="cover" className="w-full h-full object-cover" />
+              <img 
+                src={coverImage} 
+                alt="cover" 
+                className="w-full h-full object-cover" 
+                onError={() => setImageError(true)}
+              />
             )}
             <button
               onClick={async () => { setCoverImage(''); if (currentBoard) await updateCard(currentBoard.id, card.id, { coverImage: null }); }}
