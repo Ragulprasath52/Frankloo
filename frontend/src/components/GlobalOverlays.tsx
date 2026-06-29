@@ -54,7 +54,7 @@ function ToastCard({ toast, onClose }: { toast: any; onClose: () => void }) {
 
   return (
     <div
-      className="pointer-events-auto flex gap-3 p-4 rounded-xl border shadow-xl animate-slide-in-right backdrop-blur-md transition-all duration-300"
+      className="pointer-events-auto flex items-start gap-3 p-4 rounded-xl border shadow-xl animate-slide-in-right backdrop-blur-md transition-all duration-300"
       style={{
         background: 'var(--bg-surface-glass, rgba(23, 27, 31, 0.85))',
         borderColor: getBorderColor(),
@@ -62,9 +62,9 @@ function ToastCard({ toast, onClose }: { toast: any; onClose: () => void }) {
         boxShadow: '0 12px 32px rgba(0, 0, 0, 0.25)',
       }}
     >
-      <div className="pt-0.5">{getIcon()}</div>
+      <div className="shrink-0">{getIcon()}</div>
       <div className="flex-1 min-w-0">
-        <h4 className="text-xs font-bold leading-none tracking-wide text-white">{title}</h4>
+        <h4 className="text-xs font-bold leading-5 tracking-wide text-white">{title}</h4>
         {message && (
           <p className="text-[11px] font-medium leading-normal mt-1.5" style={{ color: 'var(--text-muted)' }}>
             {message}
