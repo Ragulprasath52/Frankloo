@@ -311,7 +311,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
             </div>
             
             <div className="min-w-0">
-              <div className="hidden sm:flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-indigo-600 dark:text-indigo-400">
+              <div className="hidden md:flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-indigo-600 dark:text-indigo-400">
                 <span>{currentWorkspace?.name || 'Workspace'}</span>
                 <ChevronRight className="w-3 h-3" />
                 <span style={{ color: 'var(--text-muted)' }}>Board</span>
@@ -319,13 +319,13 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
               <h2 className="text-sm sm:text-base font-bold leading-tight flex items-center gap-2 truncate" style={{ color: 'var(--text-primary)' }}>
                 <span className="truncate">{currentBoard.name}</span>
                 {totalTasks > 0 && (
-                  <span className="hidden sm:inline text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0" style={{ background: 'var(--accent-muted)', color: 'var(--accent)' }}>
+                  <span className="hidden md:inline text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0" style={{ background: 'var(--accent-muted)', color: 'var(--accent)' }}>
                     {totalTasks} Tasks
                   </span>
                 )}
               </h2>
               {currentBoard.description && (
-                <p className="hidden sm:block text-xs mt-0.5 line-clamp-1 max-w-[24rem]" style={{ color: 'var(--text-muted)' }}>
+                <p className="hidden md:block text-xs mt-0.5 line-clamp-1 max-w-[24rem]" style={{ color: 'var(--text-muted)' }}>
                   {currentBoard.description}
                 </p>
               )}
@@ -1048,11 +1048,11 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
       {customizerOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
           <div 
-            className="w-full max-w-[32rem] bg-white dark:bg-[#161a22] border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl animate-scale-in overflow-hidden"
+            className="w-full max-w-[32rem] bg-white dark:bg-[#161a22] border border-gray-200 dark:border-gray-800 rounded-2xl shadow-2xl animate-scale-in overflow-hidden mx-auto"
             onClick={e => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-gray-800">
               <h3 className="font-bold text-sm text-[#172b4d] dark:text-[#b6c2cf] flex items-center gap-2">
                 <Paintbrush className="w-4 h-4 text-indigo-500" /> Customize Board Styling
               </h3>
@@ -1061,10 +1061,10 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
               </button>
             </div>
 
-            <form onSubmit={handleSaveCustomization} className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+            <form onSubmit={handleSaveCustomization} className="p-4 sm:p-6 space-y-4 sm:space-y-5 max-h-[75vh] overflow-y-auto">
               
               {/* Board Emoji & Cover Image URL */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="tf-label">Board Emoji Icon</label>
                   <input
@@ -1133,7 +1133,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                 {/* Grid of preset gradients */}
                 <div className="space-y-2">
                   <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Gradients</span>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {[
                       { name: 'Northern Lights', val: 'linear-gradient(135deg, #06b6d4, #0f766e, #1e1b4b)' },
                       { name: 'Sunset Glow', val: 'linear-gradient(135deg, #f59e0b, #ef4444, #ec4899)' },
@@ -1164,7 +1164,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                 {/* Grid of preset wallpaper images */}
                 <div className="space-y-2 pt-1">
                   <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Wallpapers</span>
-                  <div className="grid grid-cols-5 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                     {[
                       { name: 'Desk', val: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=400&q=80' },
                       { name: 'Forest', val: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=400&q=80' },
