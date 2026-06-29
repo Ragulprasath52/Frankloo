@@ -1040,7 +1040,7 @@ router.post('/:id/invitations', authenticate, checkWorkspaceRole(['OWNER', 'ADMI
             workspaceId,
             email,
             role: role || 'MEMBER',
-            token: crypto.randomUUID(), // Temp unique placeholder
+            token: crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex'), // Temp unique placeholder
             invitedById: req.user.id,
             expiresAt: expiryDate
           }
