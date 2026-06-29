@@ -284,10 +284,10 @@ export default function CalendarModule({ board, onOpenCardDetails, onOpenSyncMod
           </div>
  
           {/* Quick Stats & View Mode Selectors */}
-          <div className="flex items-center flex-wrap gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
             
             {/* counters */}
-            <div className="flex items-center gap-3 text-[11px] font-semibold text-slate-500 dark:text-[#8d96a0]">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-500 dark:text-[#8d96a0]">
               {overdueCount > 0 && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 rounded-lg">
                   <AlertTriangle className="w-3.5 h-3.5" />

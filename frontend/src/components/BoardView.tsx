@@ -357,7 +357,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
             </button>
             <button
               onClick={() => setCustomizerOpen(true)}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all shadow-sm hover:scale-105 active:scale-95"
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all shadow-sm hover:scale-105 active:scale-95"
               style={{ 
                 background: 'var(--bg-surface)', 
                 borderColor: 'var(--border)',
@@ -369,7 +369,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
             </button>
             <button
               onClick={onOpenGuide}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all shadow-sm hover:scale-105 active:scale-95 text-[#6366f1] dark:text-[#579dff]"
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all shadow-sm hover:scale-105 active:scale-95 text-[#6366f1] dark:text-[#579dff]"
               style={{ 
                 background: 'var(--bg-surface)', 
                 borderColor: 'var(--border)',
@@ -382,7 +382,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
             {/* Mobile appearance button (icon only) */}
             <button
               onClick={() => setCustomizerOpen(true)}
-              className="sm:hidden btn-icon rounded-lg"
+              className="md:hidden btn-icon rounded-lg"
               title="Appearance"
             >
               <Paintbrush className="w-4 h-4 text-indigo-500" />
@@ -390,7 +390,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
             {/* Mobile help button (icon only) */}
             <button
               onClick={onOpenGuide}
-              className="sm:hidden btn-icon rounded-lg text-[#6366f1] dark:text-[#579dff]"
+              className="md:hidden btn-icon rounded-lg text-[#6366f1] dark:text-[#579dff]"
               title="Help Guide"
             >
               <HelpCircle className="w-4.5 h-4.5" />
