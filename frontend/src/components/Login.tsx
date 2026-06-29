@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../store/useStore';
-import { AlertCircle, Zap } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 import { apiUrl } from '../config/api';
 
@@ -164,13 +164,6 @@ export default function Login() {
             Welcome back
           </h1>
           <p className="text-sm mb-7" style={{ color: 'var(--text-muted)' }}>Sign in to your workspace</p>
-
-          {/* Demo hint */}
-          <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs mb-5"
-            style={{ background: 'var(--accent-muted)', border: '1px solid var(--accent-subtle)', color: 'var(--accent)' }}>
-            <Zap className="w-3.5 h-3.5 shrink-0" />
-            <span><strong>Demo:</strong> demo@frankloo.pro / password123</span>
-          </div>
 
           {error && (
             <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm mb-5"
