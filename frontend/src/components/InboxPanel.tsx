@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { 
   Inbox, ChevronRight, Mail, Slack, Github, 
-  Calendar, Zap, Archive, CheckSquare, Search, Plus, Info, Clock
+  Calendar, Zap, Archive, CheckSquare, Search, Plus, Info, Clock, Send, ArrowLeft
 } from 'lucide-react';
 
 export default function InboxPanel() {
   const { 
     currentWorkspace, inboxItems, fetchInboxItems, createInboxItem, 
-    updateInboxItem, convertInboxItem, mockIncomingInboxItems,
+    updateInboxItem, convertInboxItem, mockIncomingInboxItems, replyToGmail,
     isInboxOpen, setInboxOpen, addToast
   } = useStore();
   
@@ -24,10 +24,19 @@ export default function InboxPanel() {
   const [filterSource, setFilterSource] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('NEW_PROCESSING'); // NEW or PROCESSING by default
 
-  // Convert to Task selectors
+  // Advanced Convert States
   const [activeConvertId, setActiveConvertId] = useState<string | null>(null);
-  const [selectedBoardId, setSelectedBoardId] = useState<string>('');
-  const [selectedListId, setSelectedListId] = useState<string>('');
+  const [selectedBoardId, setSelectedBoardId] = useState('');
+  const [selectedListId, setSelectedListId] = useState('');
+  const [selectedPriority, setSelectedPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'>('MEDIUM');
+  const [selectedDueDate, setSelectedDueDate] = useState('');
+  const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<string[]>([]);
+  const [selectedLabelsText, setSelectedLabelsText] = useState('');
+
+  // Email Details States
+  const [activeGmailDetailsItem, setActiveGmailDetailsItem] = useState<any | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
 
   useEffect(() => {
     if (currentWorkspace) {
@@ -75,13 +84,44 @@ export default function InboxPanel() {
   const handleConvertItem = async (itemId: string) => {
     if (!selectedBoardId || !selectedListId) return;
     try {
-      await convertInboxItem(currentWorkspace.id, itemId, selectedBoardId, selectedListId);
+      const labelsArray = selectedLabelsText.split(',')
+        .map(l => l.trim())
+        .filter(Boolean)
+        .map(name => ({ name, color: '#36b37e' }));
+
+      await convertInboxItem(currentWorkspace.id, itemId, {
+        boardId: selectedBoardId,
+        listId: selectedListId,
+        priority: selectedPriority,
+        dueDate: selectedDueDate || null,
+        assigneeIds: selectedAssigneeIds,
+        labels: labelsArray
+      });
+
       setActiveConvertId(null);
       setSelectedBoardId('');
       setSelectedListId('');
+      setSelectedPriority('MEDIUM');
+      setSelectedDueDate('');
+      setSelectedAssigneeIds([]);
+      setSelectedLabelsText('');
       addToast('Task Created', 'Inbox item successfully converted into a board task.', 'success');
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      addToast('Convert Error', err.message || 'Failed to convert item.', 'error');
+    }
+  };
+
+  const handleSendReply = async () => {
+    if (!activeGmailDetailsItem || !replyText.trim()) return;
+    setSendingReply(true);
+    try {
+      await replyToGmail(activeGmailDetailsItem.id, replyText);
+      addToast('Reply Sent', 'Your reply email has been successfully sent.', 'success');
+      setReplyText('');
+    } catch (err: any) {
+      addToast('Error sending reply', err.message || 'Could not send email reply.', 'error');
+    } finally {
+      setSendingReply(false);
     }
   };
 
@@ -390,8 +430,18 @@ export default function InboxPanel() {
                     </div>
 
                     {/* Title & Description */}
-                    <div>
-                      <h4 className="font-semibold text-xs text-slate-800 dark:text-white leading-snug">{item.title}</h4>
+                    <div 
+                      onClick={() => {
+                        if (item.source === 'GMAIL') {
+                          setActiveGmailDetailsItem(item);
+                        }
+                      }}
+                      className={item.source === 'GMAIL' ? 'cursor-pointer hover:opacity-80 transition-all' : ''}
+                    >
+                      <h4 className="font-semibold text-xs text-slate-800 dark:text-white leading-snug">
+                        {item.source === 'GMAIL' && <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 mr-1 animate-pulse"></span>}
+                        {item.title}
+                      </h4>
                       {item.description && (
                         <p className="text-[0.6875rem] text-slate-600 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
                           {item.description}
@@ -487,18 +537,79 @@ export default function InboxPanel() {
                           </select>
                         </div>
                         {selectedBoardId && (
-                          <div>
-                            <label className="block text-[0.5625rem] font-bold text-slate-500 uppercase tracking-wider mb-1">Select Column</label>
-                            <select
-                              value={selectedListId}
-                              onChange={e => setSelectedListId(e.target.value)}
-                              className="w-full bg-white dark:bg-[#101214] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-1.5 rounded focus:outline-none"
-                            >
-                              <option value="">-- Choose Column --</option>
-                              {currentWorkspace.boards?.find(b => b.id === selectedBoardId)?.lists?.map(l => (
-                                <option key={l.id} value={l.id}>{l.name}</option>
-                              ))}
-                            </select>
+                          <div className="space-y-2.5">
+                            <div>
+                              <label className="block text-[0.5625rem] font-bold text-slate-500 uppercase tracking-wider mb-1">Select Column</label>
+                              <select
+                                value={selectedListId}
+                                onChange={e => setSelectedListId(e.target.value)}
+                                className="w-full bg-white dark:bg-[#101214] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-1.5 rounded focus:outline-none"
+                              >
+                                <option value="">-- Choose Column --</option>
+                                {currentWorkspace.boards?.find(b => b.id === selectedBoardId)?.lists?.map(l => (
+                                  <option key={l.id} value={l.id}>{l.name}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[0.5625rem] font-bold text-slate-500 uppercase tracking-wider mb-1">Priority</label>
+                                <select
+                                  value={selectedPriority}
+                                  onChange={e => setSelectedPriority(e.target.value as any)}
+                                  className="w-full bg-white dark:bg-[#101214] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-1.5 rounded focus:outline-none"
+                                >
+                                  <option value="LOW">Low</option>
+                                  <option value="MEDIUM">Medium</option>
+                                  <option value="HIGH">High</option>
+                                  <option value="URGENT">Urgent</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[0.5625rem] font-bold text-slate-500 uppercase tracking-wider mb-1">Due Date</label>
+                                <input
+                                  type="date"
+                                  value={selectedDueDate}
+                                  onChange={e => setSelectedDueDate(e.target.value)}
+                                  className="w-full bg-white dark:bg-[#101214] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-1 rounded focus:outline-none"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-[0.5625rem] font-bold text-slate-500 uppercase tracking-wider mb-1">Labels (Comma-separated)</label>
+                              <input
+                                type="text"
+                                value={selectedLabelsText}
+                                onChange={e => setSelectedLabelsText(e.target.value)}
+                                placeholder="e.g. Bug, Support"
+                                className="w-full bg-white dark:bg-[#101214] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-1.5 rounded focus:outline-none"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[0.5625rem] font-bold text-slate-500 uppercase tracking-wider mb-1">Assign Members</label>
+                              <div className="max-h-20 overflow-y-auto border border-slate-200 dark:border-slate-850 p-1.5 rounded bg-white dark:bg-[#101214] space-y-1">
+                                {currentWorkspace.members?.map(m => (
+                                  <label key={m.user.id} className="flex items-center gap-1.5 text-[10px] cursor-pointer text-slate-650 dark:text-slate-400">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedAssigneeIds.includes(m.user.id)}
+                                      onChange={e => {
+                                        if (e.target.checked) {
+                                          setSelectedAssigneeIds([...selectedAssigneeIds, m.user.id]);
+                                        } else {
+                                          setSelectedAssigneeIds(selectedAssigneeIds.filter(id => id !== m.user.id));
+                                        }
+                                      }}
+                                      className="rounded text-indigo-600 focus:ring-indigo-500 border-slate-355 w-3 h-3"
+                                    />
+                                    <span>{m.user.name || m.user.username}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
                           </div>
                         )}
                         <div className="flex justify-end gap-1.5 pt-1.5">
@@ -508,6 +619,10 @@ export default function InboxPanel() {
                               setActiveConvertId(null);
                               setSelectedBoardId('');
                               setSelectedListId('');
+                              setSelectedPriority('MEDIUM');
+                              setSelectedDueDate('');
+                              setSelectedAssigneeIds([]);
+                              setSelectedLabelsText('');
                             }}
                             className="px-2 py-1 text-slate-550 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
                           >
@@ -517,7 +632,7 @@ export default function InboxPanel() {
                             type="button"
                             onClick={() => handleConvertItem(item.id)}
                             disabled={!selectedBoardId || !selectedListId}
-                            className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-3 py-1 bg-indigo-650 hover:bg-indigo-700 text-white font-bold rounded disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Convert
                           </button>
@@ -530,8 +645,123 @@ export default function InboxPanel() {
             )}
           </div>
 
-        </div>
+        {/* Email Details Sub-Drawer Overlay */}
+        {activeGmailDetailsItem && (
+          <div className="absolute inset-0 bg-white dark:bg-[#101214] flex flex-col z-50 animate-slide-in">
+            {/* Header */}
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 shrink-0 flex items-center justify-between bg-slate-50 dark:bg-[#161a1d] gap-2">
+              <button 
+                onClick={() => {
+                  setActiveGmailDetailsItem(null);
+                  setReplyText('');
+                }}
+                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-white font-semibold transition"
+              >
+                <ArrowLeft className="w-4 h-4 text-indigo-500" /> Back to Inbox
+              </button>
+              
+              <div className="flex gap-2">
+                {activeGmailDetailsItem.status !== 'ARCHIVED' && (
+                  <button
+                    onClick={() => {
+                      handleStatusChange(activeGmailDetailsItem.id, 'ARCHIVED');
+                      setActiveGmailDetailsItem(null);
+                    }}
+                    className="text-[10px] sm:text-xs font-semibold py-1.5 px-3 bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg flex items-center gap-1.5"
+                  >
+                    <Archive className="w-3.5 h-3.5" /> Archive
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setActiveConvertId(activeGmailDetailsItem.id);
+                    if (currentWorkspace?.boards?.length > 0) {
+                      setSelectedBoardId(currentWorkspace.boards[0].id);
+                    }
+                    setActiveGmailDetailsItem(null);
+                  }}
+                  className="text-[10px] sm:text-xs font-semibold py-1.5 px-3 bg-indigo-650 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-1.5"
+                >
+                  <CheckSquare className="w-3.5 h-3.5" /> Convert
+                </button>
+              </div>
+            </div>
+
+            {/* Content body */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="space-y-1">
+                <span className="text-[10px] bg-red-500/10 text-red-500 border border-red-500/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider inline-block">
+                  Gmail Message
+                </span>
+                <h3 className="font-bold text-sm text-slate-850 dark:text-[#f0f6fc] leading-snug pt-1">
+                  {activeGmailDetailsItem.title}
+                </h3>
+                
+                {/* Meta details */}
+                <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl text-[10px] text-slate-500 dark:text-slate-400 space-y-1">
+                  <div><b>From:</b> {JSON.parse(activeGmailDetailsItem.sourceDetails || '{}').sender || 'Unknown'}</div>
+                  <div><b>Date:</b> {new Date(activeGmailDetailsItem.dueDate || Date.now()).toLocaleString()}</div>
+                </div>
+              </div>
+
+              {/* Message text */}
+              <div className="space-y-1.5">
+                <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">Email Body</span>
+                <div className="border border-slate-250 dark:border-slate-800 rounded-xl p-3 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-750 dark:text-slate-350 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">
+                  {activeGmailDetailsItem.description || 'No email content.'}
+                </div>
+              </div>
+
+              {/* Synchronized Attachments */}
+              {JSON.parse(activeGmailDetailsItem.sourceDetails || '{}').attachments?.length > 0 && (
+                <div className="space-y-2">
+                  <span className="font-bold text-[10px] text-slate-400 uppercase tracking-wider block">Synced Attachments ({JSON.parse(activeGmailDetailsItem.sourceDetails || '{}').attachments.length})</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {JSON.parse(activeGmailDetailsItem.sourceDetails || '{}').attachments.map((att: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-xl">
+                        <div className="min-w-0">
+                          <span className="block text-[10px] font-semibold text-slate-750 dark:text-slate-300 truncate" title={att.filename}>
+                            {att.filename}
+                          </span>
+                          <span className="text-[9px] text-slate-400">
+                            {(att.size / 1024).toFixed(0)} KB
+                          </span>
+                        </div>
+                        <span className="text-[9px] font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap shrink-0">
+                          Synced
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Reply Form */}
+              <div className="border-t border-slate-200 dark:border-slate-800 pt-4 space-y-3">
+                <span className="font-bold text-[10px] text-slate-400 uppercase tracking-wider block">Write Email Reply</span>
+                <textarea
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder="Type your reply message..."
+                  rows={4}
+                  className="w-full bg-white dark:bg-[#161a22] border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 resize-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleSendReply}
+                  disabled={!replyText.trim() || sendingReply}
+                  className="btn-primary py-2 w-full justify-center text-xs font-semibold rounded-xl flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  {sendingReply ? 'Sending Reply...' : 'Send Reply'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
-    </>
+    </div>
+  </>
   );
 }

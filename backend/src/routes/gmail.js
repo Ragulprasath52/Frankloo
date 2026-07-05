@@ -8,6 +8,8 @@ import {
   fetchRecentEmails, 
   sendEmail 
 } from '../utils/gmailService.js';
+import { parseEmailBody } from '../utils/emailParser.js';
+import { notifyBoardUpdate } from '../socket.js';
 
 const router = Router();
 
@@ -240,12 +242,18 @@ router.post('/sync', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'No connected Gmail account found' });
     }
 
+    const rules = await prisma.gmailAutoRule.findMany({
+      where: { userId: req.user.id }
+    });
+
     const emails = await fetchRecentEmails(user, 10);
     let importedCount = 0;
+    let autoCardCount = 0;
+    let threadMatchCount = 0;
 
     for (const email of emails) {
-      // Check if already sync-imported
-      const existing = await prisma.inboxItem.findFirst({
+      // Check if already processed
+      const existingInbox = await prisma.inboxItem.findFirst({
         where: {
           workspaceId,
           source: 'GMAIL',
@@ -255,7 +263,159 @@ router.post('/sync', authenticate, async (req, res) => {
         }
       });
 
-      if (!existing) {
+      const existingCardDetails = await prisma.cardEmailDetails.findFirst({
+        where: { messageId: email.id }
+      });
+
+      if (existingInbox || existingCardDetails) {
+        continue;
+      }
+
+      // Check rules
+      let matchedRule = null;
+      for (const rule of rules) {
+        if (rule.triggerType === 'SENDER') {
+          if (email.sender.toLowerCase().includes(rule.triggerVal.toLowerCase())) {
+            matchedRule = rule;
+            break;
+          }
+        } else if (rule.triggerType === 'LABEL') {
+          if (email.labelIds && email.labelIds.some(lbl => lbl.toLowerCase() === rule.triggerVal.toLowerCase())) {
+            matchedRule = rule;
+            break;
+          }
+        } else if (rule.triggerType === 'KEYWORD') {
+          if (email.subject.toLowerCase().includes(rule.triggerVal.toLowerCase()) || 
+              email.body.toLowerCase().includes(rule.triggerVal.toLowerCase())) {
+            matchedRule = rule;
+            break;
+          }
+        }
+      }
+
+      if (matchedRule) {
+        // Find existing thread card
+        const existingThreadCard = await prisma.card.findFirst({
+          where: {
+            list: { boardId: matchedRule.targetBoardId },
+            emailDetails: { threadId: email.threadId }
+          },
+          include: { list: true }
+        });
+
+        if (existingThreadCard) {
+          const board = await prisma.board.findUnique({
+            where: { id: matchedRule.targetBoardId }
+          });
+          const threadAction = board?.incomingEmailThreadAction || 'COMMENT';
+
+          if (threadAction === 'COMMENT') {
+            await prisma.comment.create({
+              data: {
+                cardId: existingThreadCard.id,
+                userId: req.user.id,
+                content: `[Auto-sync Thread Update from ${email.sender}]\n\n${email.body.substring(0, 1000)}`
+              }
+            });
+            notifyBoardUpdate(matchedRule.targetBoardId, 'COMMENT_CREATE', { cardId: existingThreadCard.id });
+          } else {
+            await prisma.activityLog.create({
+              data: {
+                userId: req.user.id,
+                boardId: matchedRule.targetBoardId,
+                cardId: existingThreadCard.id,
+                action: 'THREAD_REPLY',
+                details: `Received threaded email from ${email.sender}: "${email.subject}"`
+              }
+            });
+          }
+          threadMatchCount++;
+        } else {
+          // Create new card
+          let listId = matchedRule.targetListId;
+          if (!listId) {
+            const firstList = await prisma.list.findFirst({
+              where: { boardId: matchedRule.targetBoardId },
+              orderBy: { position: 'asc' }
+            });
+            listId = firstList?.id;
+          }
+
+          if (!listId) {
+            const defaultList = await prisma.list.create({
+              data: { name: 'Inbox', position: 1000.0, boardId: matchedRule.targetBoardId }
+            });
+            listId = defaultList.id;
+          }
+
+          const parsed = parseEmailBody(email.body, '');
+
+          const card = await prisma.card.create({
+            data: {
+              title: email.subject,
+              description: parsed.cleanDescription,
+              position: 1000.0,
+              priority: email.subject.toLowerCase().includes('urgent') ? 'URGENT' : 'MEDIUM',
+              listId
+            }
+          });
+
+          await prisma.cardEmailDetails.create({
+            data: {
+              cardId: card.id,
+              sender: email.sender,
+              subject: email.subject,
+              messageId: email.id,
+              threadId: email.threadId,
+              bodyHtml: email.body,
+              bodyText: parsed.cleanDescription,
+              replyLink: `https://mail.google.com/mail/u/0/#inbox/${email.threadId || email.id}`,
+              hasAttachments: email.attachments && email.attachments.length > 0
+            }
+          });
+
+          if (parsed.checklists && parsed.checklists.length > 0) {
+            for (let idx = 0; idx < parsed.checklists.length; idx++) {
+              await prisma.checklistItem.create({
+                data: {
+                  cardId: card.id,
+                  content: parsed.checklists[idx],
+                  position: idx * 100.0
+                }
+              });
+            }
+          }
+
+          if (email.attachments && email.attachments.length > 0) {
+            for (const att of email.attachments) {
+              await prisma.cardAttachment.create({
+                data: {
+                  cardId: card.id,
+                  uploadedBy: req.user.id,
+                  filename: att.filename,
+                  storagePath: 'uploads/gmail-dummy',
+                  mimeType: att.mimeType,
+                  size: att.size
+                }
+              });
+            }
+          }
+
+          await prisma.activityLog.create({
+            data: {
+              userId: req.user.id,
+              boardId: matchedRule.targetBoardId,
+              cardId: card.id,
+              action: 'CREATE_CARD',
+              details: `Card automatically created from email rule match: "${email.subject}"`
+            }
+          });
+
+          autoCardCount++;
+          notifyBoardUpdate(matchedRule.targetBoardId, 'CARD_CREATE', card);
+        }
+      } else {
+        // General sync to Inbox
         const detailsObj = {
           id: email.id,
           threadId: email.threadId,
@@ -284,14 +444,16 @@ router.post('/sync', authenticate, async (req, res) => {
       data: {
         userId: req.user.id,
         type: 'SYNC',
-        details: `Inbox Sync - Fetched ${emails.length} emails, imported ${importedCount} new tasks`
+        details: `Sync summary: Fetched ${emails.length} emails. Rules auto-created ${autoCardCount} cards, updated ${threadMatchCount} threads, imported ${importedCount} items to Inbox.`
       }
     });
 
     res.json({ 
       message: 'Inbox sync completed', 
       syncedCount: emails.length, 
-      importedCount 
+      importedCount,
+      autoCardCount,
+      threadMatchCount
     });
   } catch (error) {
     console.error('Sync Error:', error);
@@ -494,6 +656,140 @@ router.post('/trigger-reminder', authenticate, async (req, res) => {
     res.json({ message: `Successfully sent ${type} email to ${user.googleEmail}` });
   } catch (error) {
     res.status(500).json({ error: error.message || 'Failed to trigger reminder email' });
+  }
+});
+
+// GET Gmail Auto Rules
+router.get('/rules', authenticate, async (req, res) => {
+  try {
+    const rules = await prisma.gmailAutoRule.findMany({
+      where: { userId: req.user.id },
+      include: {
+        board: {
+          select: { name: true }
+        }
+      }
+    });
+    res.json(rules);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch rules' });
+  }
+});
+
+// POST Create Gmail Auto Rule
+router.post('/rules', authenticate, async (req, res) => {
+  try {
+    const { triggerType, triggerVal, targetBoardId, targetListId } = req.body;
+    if (!triggerType || !triggerVal || !targetBoardId) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+
+    const rule = await prisma.gmailAutoRule.create({
+      data: {
+        userId: req.user.id,
+        triggerType,
+        triggerVal,
+        targetBoardId,
+        targetListId: targetListId || null
+      },
+      include: {
+        board: { select: { name: true } }
+      }
+    });
+    res.json(rule);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create rule' });
+  }
+});
+
+// DELETE Gmail Auto Rule
+router.delete('/rules/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.gmailAutoRule.delete({
+      where: { id, userId: req.user.id }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete rule' });
+  }
+});
+
+// POST Send Threaded Reply
+router.post('/reply', authenticate, async (req, res) => {
+  try {
+    const { itemId, replyText } = req.body; // itemId can be InboxItem ID or Card ID
+    if (!itemId || !replyText) {
+      return res.status(400).json({ error: 'Item ID and reply content are required' });
+    }
+
+    // Attempt to look up original details in InboxItem or CardEmailDetails
+    let originalDetails = null;
+    const inboxItem = await prisma.inboxItem.findUnique({ where: { id: itemId } });
+
+    if (inboxItem && inboxItem.source === 'GMAIL') {
+      originalDetails = JSON.parse(inboxItem.sourceDetails || '{}');
+    } else {
+      // Look up CardEmailDetails
+      const cardDetails = await prisma.cardEmailDetails.findUnique({
+        where: { cardId: itemId } // cardId as key
+      });
+      if (cardDetails) {
+        originalDetails = {
+          id: cardDetails.messageId,
+          threadId: cardDetails.threadId,
+          sender: cardDetails.sender,
+          subject: cardDetails.subject
+        };
+      }
+    }
+
+    if (!originalDetails) {
+      return res.status(404).json({ error: 'Original email details not found' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user || !user.googleEmail) {
+      return res.status(400).json({ error: 'No connected Gmail account found' });
+    }
+
+    // Extract sender email address from string (e.g. "John Doe <john@example.com>")
+    const emailMatch = originalDetails.sender.match(/<([^>]+)>/) || [null, originalDetails.sender];
+    const targetRecipient = emailMatch[1] || originalDetails.sender;
+
+    const replySubject = originalDetails.subject.toLowerCase().startsWith('re:') 
+      ? originalDetails.subject 
+      : `Re: ${originalDetails.subject}`;
+
+    await sendEmail({
+      userId: user.id,
+      to: targetRecipient,
+      subject: replySubject,
+      text: replyText,
+      htmlText: `<div style="font-family: sans-serif; font-size: 14px;">
+        <p>${replyText.replace(/\n/g, '<br />')}</p>
+        <br />
+        <hr style="border: 0; border-top: 1px solid #dfe1e6; margin: 20px 0;" />
+        <span style="font-size: 11px; color: #8590a2;">Reply sent from Frankloo Task Manager.</span>
+      </div>`,
+      threadId: originalDetails.threadId,
+      inReplyTo: originalDetails.id,
+      references: originalDetails.id
+    });
+
+    // Record reply activity log
+    await prisma.gmailActivity.create({
+      data: {
+        userId: user.id,
+        type: 'NOTIFICATION_SENT',
+        details: `Sent threaded reply to ${targetRecipient}: "${replySubject}"`
+      }
+    });
+
+    res.json({ success: true, message: 'Reply sent successfully' });
+  } catch (error) {
+    console.error('Email Reply Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to send reply' });
   }
 });
 

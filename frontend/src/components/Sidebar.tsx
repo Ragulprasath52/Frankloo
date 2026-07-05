@@ -144,6 +144,7 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenWorkspaceSettin
 
   const navItems = [
     { id: 'boards',       label: 'Boards',             icon: LayoutDashboard },
+    { id: 'board-inbox',  label: 'Board Inbox',         icon: Inbox },
     { id: 'members',      label: 'Members',             icon: Users },
     { id: 'goals',        label: 'Goals',               icon: Target },
     { id: 'documents',    label: 'Wiki & Docs',          icon: BookOpen },

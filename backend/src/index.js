@@ -14,6 +14,7 @@ import integrationRoutes from './routes/integrations.js';
 import documentRoutes from './routes/documents.js';
 import inboxRoutes from './routes/inbox.js';
 import gmailRoutes from './routes/gmail.js';
+import cloudmailinRoutes from './routes/cloudmailin.js';
 
 import { initSocket } from './socket.js';
 
@@ -45,6 +46,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/integrations', integrationRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/inbox', inboxRoutes);
+app.use('/api/cloudmailin', cloudmailinRoutes);
 app.use('/api/gmail', gmailRoutes);
 
 app.get('/health', (_req, res) => {

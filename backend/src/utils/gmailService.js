@@ -43,7 +43,8 @@ John`,
     date: new Date().toISOString(),
     attachments: [
       { filename: 'branding_specs.pdf', mimeType: 'application/pdf', size: 102400 }
-    ]
+    ],
+    labelIds: ['INBOX', 'UNREAD']
   },
   {
     id: 'msg-sandbox-102',
@@ -66,7 +67,8 @@ Please fix as soon as possible.
 Regards,
 QA Team`,
     date: new Date(Date.now() - 3600000).toISOString(),
-    attachments: []
+    attachments: [],
+    labelIds: ['INBOX', 'UNREAD', 'Bug']
   },
   {
     id: 'msg-sandbox-103',
@@ -85,7 +87,8 @@ Finance Team`,
     date: new Date(Date.now() - 3600000 * 2).toISOString(),
     attachments: [
       { filename: 'invoice_2991.pdf', mimeType: 'application/pdf', size: 45000 }
-    ]
+    ],
+    labelIds: ['INBOX', 'UNREAD', 'Invoices']
   }
 ];
 
@@ -179,7 +182,8 @@ export const fetchRecentEmails = async (user, count = 10) => {
         snippet: details.data.snippet || '',
         body,
         date,
-        attachments
+        attachments,
+        labelIds: details.data.labelIds || []
       });
     } catch (err) {
       console.error(`Error fetching details for message ${msg.id}:`, err);
@@ -190,7 +194,7 @@ export const fetchRecentEmails = async (user, count = 10) => {
 };
 
 // Send an email (via Real Gmail API OAuth2 or Sandbox SMTP/console log)
-export const sendEmail = async ({ userId, to, subject, htmlText, text }) => {
+export const sendEmail = async ({ userId, to, subject, htmlText, text, threadId, messageId, inReplyTo, references }) => {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return;
 
@@ -208,6 +212,7 @@ export const sendEmail = async ({ userId, to, subject, htmlText, text }) => {
     console.log(`[GMAIL SANDBOX EMAIL]
 To: ${to}
 Subject: ${subject}
+ThreadId: ${threadId || 'N/A'}
 Content: ${text || htmlText}`);
 
     // If SMTP credentials are set in .env, optionally try to send real test mail
@@ -229,7 +234,11 @@ Content: ${text || htmlText}`);
           to,
           subject: `[Sandbox] ${subject}`,
           text,
-          html: htmlText
+          html: htmlText,
+          headers: {
+            ...(inReplyTo ? { 'In-Reply-To': inReplyTo } : {}),
+            ...(references ? { 'References': references } : {})
+          }
         });
         console.log(`Successfully sent sandbox SMTP email to ${to}`);
       } catch (err) {
@@ -268,7 +277,12 @@ Content: ${text || htmlText}`);
       to,
       subject,
       text,
-      html: htmlText
+      html: htmlText,
+      threadId,
+      headers: {
+        ...(inReplyTo ? { 'In-Reply-To': inReplyTo } : {}),
+        ...(references ? { 'References': references } : {})
+      }
     });
 
     console.log(`Successfully sent OAuth2 email to ${to}`);

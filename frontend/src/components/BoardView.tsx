@@ -5,7 +5,7 @@ import { apiUrl } from '../config/api';
 
 import { 
   Columns, Calendar as CalendarIcon, 
-  BarChart3, UserCheck, Play, ArrowLeft, Plus, X, Trash2, 
+  BarChart3, UserCheck, Play, ArrowLeft, Plus, X, Trash2, Archive,
   CalendarCheck, Clock, CheckCircle, PlusCircle, Copy, Check, Info, Lock, Paintbrush,
   MessageSquare, AlertCircle, Sparkles, ChevronRight, Flame, Upload, HelpCircle, Users
 } from 'lucide-react';
@@ -34,14 +34,17 @@ const ROLE_BADGES: Record<string, { label: string; bg: string; text: string }> =
 
 export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGuide }: BoardViewProps) {
   const { 
-    user, currentBoard, fetchBoardDetails,
-    createList, deleteList, createCard, updateCard,
+    user, currentBoard, fetchBoardDetails, deleteBoard,
+    createList, archiveList, createCard, updateCard, updateBoard,
     createAutomationRule, deleteAutomationRule, currentWorkspace, convertInboxItem, token,
-    addToast
+    addToast, showConfirm
   } = useStore();
 
   const themeStore = useThemeStore();
   const boardOverride = themeStore.boardOverrides[boardId];
+
+  const currentMember = currentWorkspace?.members.find(m => m.user.id === user?.id);
+  const isOwnerOrAdmin = currentMember?.role === 'OWNER' || currentMember?.role === 'ADMIN';
 
   const [activeTab, setActiveTab] = useState<TabType>('kanban');
   const [newListOpen, setNewListOpen] = useState(false);
@@ -58,6 +61,17 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
   const [overrideAccentColor, setOverrideAccentColor] = useState('');
   const [overrideBackgroundValue, setOverrideBackgroundValue] = useState('');
 
+  // Email-to-Board States
+  const [activeCustomizerTab, setActiveCustomizerTab] = useState<'style' | 'email' | 'danger'>('style');
+  const [emailEnabled, setEmailEnabled] = useState(true);
+  const [emailAddress, setEmailAddress] = useState('');
+  const [emailListId, setEmailListId] = useState('');
+  const [emailPriority, setEmailPriority] = useState('MEDIUM');
+  const [emailAllowedSenders, setEmailAllowedSenders] = useState('ANY');
+  const [emailDefaultLabels, setEmailDefaultLabels] = useState('');
+  const [emailAutoAssignees, setEmailAutoAssignees] = useState<string[]>([]);
+  const [emailThreadAction, setEmailThreadAction] = useState('COMMENT');
+
   // Sync state values when Customizer opens
   useEffect(() => {
     if (customizerOpen) {
@@ -66,8 +80,56 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
       setOverrideCoverColor(boardOverride?.coverColor || '#6366f1');
       setOverrideAccentColor(boardOverride?.accentColor || '#6366f1');
       setOverrideBackgroundValue(boardOverride?.backgroundValue || '');
+      setActiveCustomizerTab('style');
     }
   }, [customizerOpen, boardOverride]);
+
+  useEffect(() => {
+    if (customizerOpen && currentBoard) {
+      setEmailEnabled(currentBoard.incomingEmailEnabled ?? true);
+      setEmailAddress(currentBoard.incomingEmailAddress || '');
+      setEmailListId(currentBoard.incomingEmailListId || '');
+      setEmailPriority(currentBoard.incomingEmailDefaultPriority || 'MEDIUM');
+      setEmailAllowedSenders(currentBoard.incomingEmailAllowedSenders || 'ANY');
+      setEmailDefaultLabels(currentBoard.incomingEmailDefaultLabelIds || '');
+      setEmailAutoAssignees(currentBoard.incomingEmailAutoAssigneeIds ? currentBoard.incomingEmailAutoAssigneeIds.split(',').filter(Boolean) : []);
+      setEmailThreadAction(currentBoard.incomingEmailThreadAction || 'COMMENT');
+    }
+  }, [customizerOpen, currentBoard]);
+
+  const handleSaveEmailSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentBoard) return;
+    try {
+      await updateBoard(currentBoard.id, {
+        incomingEmailEnabled: emailEnabled,
+        incomingEmailAddress: emailAddress || null,
+        incomingEmailListId: emailListId || null,
+        incomingEmailDefaultPriority: emailPriority,
+        incomingEmailAllowedSenders: emailAllowedSenders,
+        incomingEmailDefaultLabelIds: emailDefaultLabels,
+        incomingEmailAutoAssigneeIds: emailAutoAssignees.join(','),
+        incomingEmailThreadAction: emailThreadAction
+      });
+      addToast('Settings Saved', 'Email-to-Board settings successfully updated.', 'success');
+      setCustomizerOpen(false);
+    } catch (err: any) {
+      addToast('Error', err.message || 'Failed to save settings', 'error');
+    }
+  };
+
+  const handleRegenerateAddress = async () => {
+    if (!currentBoard) return;
+    const prefix = Math.random().toString(36).substring(2, 10);
+    const newAddr = `${prefix}@boards.frankloo.app`;
+    setEmailAddress(newAddr);
+    try {
+      await updateBoard(currentBoard.id, { incomingEmailAddress: newAddr });
+      addToast('Address Regenerated', 'A new incoming email address has been generated and saved.', 'success');
+    } catch (err: any) {
+      addToast('Error', err.message || 'Failed to regenerate address', 'error');
+    }
+  };
 
   const handleSaveCustomization = (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,6 +142,25 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
       backgroundValue: overrideBackgroundValue || undefined,
     });
     setCustomizerOpen(false);
+  };
+
+  const handleDeleteBoardFromInside = async () => {
+    if (!currentBoard) return;
+    const confirmed = await showConfirm(
+      '🗑️ Delete Board',
+      `Are you sure you want to permanently delete "${currentBoard.name}"? This will delete all lists, cards, and data inside it. This action cannot be undone.`,
+      'Yes, Delete Board',
+      'Cancel'
+    );
+    if (!confirmed) return;
+    try {
+      setCustomizerOpen(false);
+      await deleteBoard(currentBoard.id);
+      addToast('Board Deleted', `"${currentBoard.name}" has been permanently deleted.`, 'success');
+      onBack();
+    } catch (err: any) {
+      addToast('Error', err.message || 'Failed to delete board. Please try again.', 'error');
+    }
   };
 
   const handleClearCustomization = () => {
@@ -158,7 +239,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
 
     if (inboxItemId && currentWorkspace) {
       try {
-        await convertInboxItem(currentWorkspace.id, inboxItemId, boardId, targetListId);
+        await convertInboxItem(currentWorkspace.id, inboxItemId, { boardId, listId: targetListId });
       } catch (err) {
         console.error(err);
       }
@@ -474,11 +555,25 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                     </span>
                   </div>
                   <button
-                    onClick={() => deleteList(boardId, list.id)}
-                    className="btn-icon w-6 h-6 rounded-md hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
-                    title="Delete list"
+                    onClick={async () => {
+                      const confirmed = await showConfirm(
+                        'Archive List',
+                        `Archive "${list.name}"? All its cards will also be archived. You can restore them later from the board settings.`,
+                        'Archive',
+                        'Cancel'
+                      );
+                      if (!confirmed) return;
+                      try {
+                        await archiveList(boardId, list.id);
+                        addToast('List Archived', `"${list.name}" has been archived successfully.`, 'success');
+                      } catch (err: any) {
+                        addToast('Error', err.message || 'Failed to archive list. Please try again.', 'error');
+                      }
+                    }}
+                    className="btn-icon w-6 h-6 rounded-md hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
+                    title="Archive list"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Archive className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
@@ -1044,8 +1139,6 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
           </div>
         )}
       </div>
-
-      {/* Redesigned Customizer Modal Panel */}
       {customizerOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
           <div 
@@ -1055,210 +1148,443 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
             {/* Modal Header */}
             <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-gray-100 dark:border-gray-800">
               <h3 className="font-bold text-sm text-[#172b4d] dark:text-[#b6c2cf] flex items-center gap-2">
-                <Paintbrush className="w-4 h-4 text-indigo-500" /> Customize Board Styling
+                <Paintbrush className="w-4 h-4 text-indigo-500" /> Board Customizer
               </h3>
               <button onClick={() => setCustomizerOpen(false)} className="btn-icon rounded-lg">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveCustomization} className="p-4 md:p-6 space-y-4 md:space-y-5 max-h-[75vh] overflow-y-auto">
-              
-              {/* Board Emoji & Cover Image URL */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="tf-label">Board Emoji Icon</label>
-                  <input
-                    type="text"
-                    value={overrideIcon}
-                    onChange={(e) => setOverrideIcon(e.target.value)}
-                    placeholder="e.g. 🚀, 📚, 💼"
-                    className="tf-input text-center text-lg rounded-xl py-2"
-                    maxLength={2}
-                  />
-                  <div className="flex gap-1.5 justify-center mt-2">
-                    {['🚀', '📚', '💪', '💼', '💻', '🎨'].map(emoji => (
-                      <button 
-                        key={emoji}
-                        type="button" 
-                        onClick={() => setOverrideIcon(emoji)}
-                        className="p-1 text-sm hover:scale-120 transition-transform"
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="tf-label">Cover Banner Image URL</label>
-                  <input
-                    type="text"
-                    value={overrideCover}
-                    onChange={(e) => setOverrideCover(e.target.value)}
-                    placeholder="https://unsplash.com/..."
-                    className="tf-input text-xs rounded-xl py-2"
-                  />
-                  <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1 max-w-[14rem]">
-                    {[
-                      { name: 'Study', url: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=1920&q=85' },
-                      { name: 'Forest', url: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1920&q=85' },
-                      { name: 'Alpine', url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1920&q=85' },
-                      { name: 'Starry', url: 'https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?auto=format&fit=crop&w=1920&q=85' }
-                    ].map(p => (
-                      <button
-                        key={p.name}
-                        type="button"
-                        onClick={() => setOverrideCover(p.url)}
-                        className="text-[9px] font-bold px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md whitespace-nowrap hover:bg-indigo-50 dark:hover:bg-indigo-950"
-                      >
-                        {p.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Wallpaper & Custom Background choices */}
-              <div className="space-y-3 border-t border-gray-100 dark:border-gray-800 pt-4">
-                <label className="tf-label font-bold">Board Wallpaper Background</label>
-                
-                <input
-                  type="text"
-                  value={overrideBackgroundValue}
-                  onChange={(e) => setOverrideBackgroundValue(e.target.value)}
-                  placeholder="Paste linear-gradient(), color HEX, or Unsplash URL"
-                  className="tf-input text-xs font-mono rounded-xl py-2"
-                />
-
-                {/* Grid of preset gradients */}
-                <div className="space-y-2">
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Gradients</span>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    {[
-                      { name: 'Northern Lights', val: 'linear-gradient(135deg, #06b6d4, #0f766e, #1e1b4b)' },
-                      { name: 'Sunset Glow', val: 'linear-gradient(135deg, #f59e0b, #ef4444, #ec4899)' },
-                      { name: 'Lavender Dusk', val: 'linear-gradient(135deg, #6366f1, #a855f7, #ec4899)' },
-                      { name: 'Deep Ocean', val: 'linear-gradient(135deg, #0f172a, #1e3a8a, #0d9488)' },
-                      { name: 'Cyber Neon', val: 'linear-gradient(135deg, #111827, #06b6d4, #10b981)' },
-                      { name: 'Charcoal Slate', val: '#1e293b' },
-                      { name: 'Dark Purple', val: '#12071a' },
-                      { name: 'Notion White', val: '#ffffff' }
-                    ].map((bg) => (
-                      <button
-                        key={bg.name}
-                        type="button"
-                        onClick={() => setOverrideBackgroundValue(bg.val)}
-                        className={`h-9 rounded-xl border relative overflow-hidden text-[9px] font-bold flex items-center justify-center text-white ${
-                          overrideBackgroundValue === bg.val ? 'border-indigo-600 ring-2 ring-indigo-500/20' : 'border-gray-200 dark:border-gray-800'
-                        }`}
-                        style={{ background: bg.val.startsWith('linear-gradient') ? bg.val : bg.val }}
-                      >
-                        <span className="bg-black/35 px-1.5 py-0.5 rounded filter drop-shadow">
-                          {bg.name}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Grid of preset wallpaper images */}
-                <div className="space-y-2 pt-1">
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Wallpapers</span>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                    {[
-                      { name: 'Desk', val: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=400&q=80' },
-                      { name: 'Forest', val: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=400&q=80' },
-                      { name: 'Peaks', val: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=400&q=80' },
-                      { name: 'Starry', val: 'https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?auto=format&fit=crop&w=400&q=80' },
-                      { name: 'Sunset', val: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80' },
-                      { name: 'Cabin', val: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=400&q=80' },
-                      { name: 'Aurora', val: 'https://images.unsplash.com/photo-1483168527879-c66136b56105?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1483168527879-c66136b56105?auto=format&fit=crop&w=400&q=80' },
-                      { name: 'Neon', val: 'https://images.unsplash.com/photo-1515621061946-eff1c2a352bd?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1515621061946-eff1c2a352bd?auto=format&fit=crop&w=400&q=80' },
-                      { name: 'Dunes', val: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=400&q=80' },
-                      { name: 'Abstract', val: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80' }
-                    ].map((bg) => (
-                      <button
-                        key={bg.name}
-                        type="button"
-                        onClick={() => setOverrideBackgroundValue(bg.val)}
-                        className={`h-9 rounded-xl border relative overflow-hidden text-[9px] font-bold flex items-center justify-center text-white bg-cover bg-center transition-all ${
-                          overrideBackgroundValue === bg.val ? 'border-indigo-600 ring-2 ring-indigo-500/20 scale-[1.02]' : 'border-gray-200 dark:border-gray-800 hover:scale-[1.02]'
-                        }`}
-                        style={{ backgroundImage: `url(${bg.preview})` }}
-                      >
-                        <span className="bg-black/35 px-1.5 py-0.5 rounded filter drop-shadow">
-                          {bg.name}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Custom Wallpaper Section */}
-                <div className="space-y-2 pt-1">
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Custom Wallpaper</span>
-                  {overrideBackgroundValue.startsWith('data:image/') ? (
-                    <div className="flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-xl">
-                      <div 
-                        className="w-12 h-9 rounded-lg bg-cover bg-center border border-gray-200 dark:border-gray-800"
-                        style={{ backgroundImage: `url(${overrideBackgroundValue})` }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-300 truncate">Your Custom Wallpaper</p>
-                        <p className="text-[9px] text-gray-400">Saved in board storage</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setOverrideBackgroundValue('')}
-                        className="text-[10px] font-bold text-red-500 hover:text-red-600 px-2 py-1 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ) : (
-                    <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl py-3 px-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-all duration-300 hover:border-indigo-400 dark:hover:border-indigo-600 group text-center">
-                      <div className="flex items-center gap-2">
-                        <Upload size={14} className="text-gray-400 group-hover:text-indigo-500 group-hover:-translate-y-0.5 transition-all duration-300" />
-                        <span className="text-xs text-gray-600 dark:text-gray-400 font-medium group-hover:text-gray-900 dark:group-hover:text-gray-200 transition-colors">Upload image file</span>
-                      </div>
-                      <span className="text-[9px] text-gray-400 dark:text-gray-500 mt-0.5">Supports PNG, JPG (auto-compressed to HD)</span>
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        className="hidden" 
-                        onChange={handleImageUpload}
-                      />
-                    </label>
-                  )}
-                </div>
-
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-2.5 pt-3 border-t border-gray-100 dark:border-gray-800">
-                <button type="submit" className="btn-primary flex-1 justify-center text-xs py-2.5 rounded-xl">
-                  Save Changes
+            {/* Modal Tabs */}
+            {isOwnerOrAdmin && (
+              <div className="flex border-b border-gray-100 dark:border-gray-800 px-4 md:px-6">
+                <button 
+                  type="button"
+                  onClick={() => setActiveCustomizerTab('style')}
+                  className={`py-2.5 px-4 font-semibold text-xs border-b-2 transition-colors ${
+                    activeCustomizerTab === 'style' 
+                      ? 'border-indigo-500 text-indigo-650 dark:text-indigo-400' 
+                      : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
+                  }`}
+                >
+                  Styling
                 </button>
-                {boardOverride && (
+                <button 
+                  type="button"
+                  onClick={() => setActiveCustomizerTab('email')}
+                  className={`py-2.5 px-4 font-semibold text-xs border-b-2 transition-colors ${
+                    activeCustomizerTab === 'email' 
+                      ? 'border-indigo-500 text-indigo-650 dark:text-indigo-400' 
+                      : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
+                  }`}
+                >
+                  Email-to-Board
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setActiveCustomizerTab('danger')}
+                  className={`py-2.5 px-4 font-semibold text-xs border-b-2 transition-colors ${
+                    activeCustomizerTab === 'danger' 
+                      ? 'border-red-500 text-red-650 dark:text-red-400' 
+                      : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
+                  }`}
+                >
+                  Danger Zone
+                </button>
+              </div>
+            )}
+
+            {activeCustomizerTab === 'style' ? (
+              <form onSubmit={handleSaveCustomization} className="p-4 md:p-6 space-y-4 md:space-y-5 max-h-[70vh] overflow-y-auto">
+                {/* Board Emoji & Cover Image URL */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="tf-label">Board Emoji Icon</label>
+                    <input
+                      type="text"
+                      value={overrideIcon}
+                      onChange={(e) => setOverrideIcon(e.target.value)}
+                      placeholder="e.g. 🚀, 📚, 💼"
+                      className="tf-input text-center text-lg rounded-xl py-2"
+                      maxLength={2}
+                    />
+                    <div className="flex gap-1.5 justify-center mt-2">
+                      {['🚀', '📚', '💪', '💼', '💻', '🎨'].map(emoji => (
+                        <button 
+                          key={emoji}
+                          type="button" 
+                          onClick={() => setOverrideIcon(emoji)}
+                          className="p-1 text-sm hover:scale-120 transition-transform"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="tf-label">Cover Banner Image URL</label>
+                    <input
+                      type="text"
+                      value={overrideCover}
+                      onChange={(e) => setOverrideCover(e.target.value)}
+                      placeholder="https://unsplash.com/..."
+                      className="tf-input text-xs rounded-xl py-2"
+                    />
+                    <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1 max-w-[14rem]">
+                      {[
+                        { name: 'Study', url: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=1920&q=85' },
+                        { name: 'Forest', url: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1920&q=85' },
+                        { name: 'Alpine', url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1920&q=85' },
+                        { name: 'Starry', url: 'https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?auto=format&fit=crop&w=1920&q=85' }
+                      ].map(p => (
+                        <button
+                          key={p.name}
+                          type="button"
+                          onClick={() => setOverrideCover(p.url)}
+                          className="text-[9px] font-bold px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md whitespace-nowrap hover:bg-indigo-50 dark:hover:bg-indigo-950"
+                        >
+                          {p.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Wallpaper & Custom Background choices */}
+                <div className="space-y-3 border-t border-gray-100 dark:border-gray-800 pt-4">
+                  <label className="tf-label font-bold">Board Wallpaper Background</label>
+                  
+                  <input
+                    type="text"
+                    value={overrideBackgroundValue}
+                    onChange={(e) => setOverrideBackgroundValue(e.target.value)}
+                    placeholder="Paste linear-gradient(), color HEX, or Unsplash URL"
+                    className="tf-input text-xs font-mono rounded-xl py-2"
+                  />
+
+                  {/* Grid of preset gradients */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Gradients</span>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {[
+                        { name: 'Northern Lights', val: 'linear-gradient(135deg, #06b6d4, #0f766e, #1e1b4b)' },
+                        { name: 'Sunset Glow', val: 'linear-gradient(135deg, #f59e0b, #ef4444, #ec4899)' },
+                        { name: 'Lavender Dusk', val: 'linear-gradient(135deg, #6366f1, #a855f7, #ec4899)' },
+                        { name: 'Deep Ocean', val: 'linear-gradient(135deg, #0f172a, #1e3a8a, #0d9488)' },
+                        { name: 'Cyber Neon', val: 'linear-gradient(135deg, #111827, #06b6d4, #10b981)' },
+                        { name: 'Charcoal Slate', val: '#1e293b' },
+                        { name: 'Dark Purple', val: '#12071a' },
+                        { name: 'Notion White', val: '#ffffff' }
+                      ].map((bg) => (
+                        <button
+                          key={bg.name}
+                          type="button"
+                          onClick={() => setOverrideBackgroundValue(bg.val)}
+                          className={`h-9 rounded-xl border relative overflow-hidden text-[9px] font-bold flex items-center justify-center text-white ${
+                            overrideBackgroundValue === bg.val ? 'border-indigo-600 ring-2 ring-indigo-500/20' : 'border-gray-200 dark:border-gray-800'
+                          }`}
+                          style={{ background: bg.val.startsWith('linear-gradient') ? bg.val : bg.val }}
+                        >
+                          <span className="bg-black/35 px-1.5 py-0.5 rounded filter drop-shadow">
+                            {bg.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Grid of preset wallpaper images */}
+                  <div className="space-y-2 pt-1">
+                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Wallpapers</span>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                      {[
+                        { name: 'Desk', val: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=400&q=80' },
+                        { name: 'Forest', val: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=400&q=80' },
+                        { name: 'Peaks', val: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=400&q=80' },
+                        { name: 'Starry', val: 'https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?auto=format&fit=crop&w=400&q=80' },
+                        { name: 'Sunset', val: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80' },
+                        { name: 'Cabin', val: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=400&q=80' },
+                        { name: 'Aurora', val: 'https://images.unsplash.com/photo-1483168527879-c66136b56105?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1483168527879-c66136b56105?auto=format&fit=crop&w=400&q=80' },
+                        { name: 'Neon', val: 'https://images.unsplash.com/photo-1515621061946-eff1c2a352bd?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1515621061946-eff1c2a352bd?auto=format&fit=crop&w=400&q=80' },
+                        { name: 'Dunes', val: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=400&q=80' },
+                        { name: 'Abstract', val: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=2560&q=85', preview: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80' }
+                      ].map((bg) => (
+                        <button
+                          key={bg.name}
+                          type="button"
+                          onClick={() => setOverrideBackgroundValue(bg.val)}
+                          className={`h-9 rounded-xl border relative overflow-hidden text-[9px] font-bold flex items-center justify-center text-white bg-cover bg-center transition-all ${
+                            overrideBackgroundValue === bg.val ? 'border-indigo-600 ring-2 ring-indigo-500/20 scale-[1.02]' : 'border-gray-200 dark:border-gray-800 hover:scale-[1.02]'
+                          }`}
+                          style={{ backgroundImage: `url(${bg.preview})` }}
+                        >
+                          <span className="bg-black/35 px-1.5 py-0.5 rounded filter drop-shadow">
+                            {bg.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Custom Wallpaper Section */}
+                  <div className="space-y-2 pt-1">
+                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Custom Wallpaper</span>
+                    {overrideBackgroundValue.startsWith('data:image/') ? (
+                      <div className="flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-xl">
+                        <div 
+                          className="w-12 h-9 rounded-lg bg-cover bg-center border border-gray-200 dark:border-gray-800"
+                          style={{ backgroundImage: `url(${overrideBackgroundValue})` }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-300 truncate">Your Custom Wallpaper</p>
+                          <p className="text-[9px] text-gray-400">Saved in board storage</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setOverrideBackgroundValue('')}
+                          className="text-[10px] font-bold text-red-500 hover:text-red-600 px-2 py-1 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl py-3 px-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-all duration-300 hover:border-indigo-400 dark:hover:border-indigo-600 group text-center">
+                        <div className="flex items-center gap-2">
+                          <Upload size={14} className="text-gray-400 group-hover:text-indigo-500 group-hover:-translate-y-0.5 transition-all duration-300" />
+                          <span className="text-xs text-gray-600 dark:text-gray-400 font-medium group-hover:text-gray-900 dark:group-hover:text-gray-200 transition-colors">Upload image file</span>
+                        </div>
+                        <span className="text-[9px] text-gray-400 dark:text-gray-500 mt-0.5">Supports PNG, JPG (auto-compressed to HD)</span>
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={handleImageUpload}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2.5 pt-3 border-t border-gray-100 dark:border-gray-800">
+                  <button type="submit" className="btn-primary flex-1 justify-center text-xs py-2.5 rounded-xl">
+                    Save Changes
+                  </button>
+                  {boardOverride && (
+                    <button 
+                      type="button" 
+                      onClick={handleClearCustomization} 
+                      className="btn-danger justify-center text-xs py-2.5 px-4 rounded-xl"
+                    >
+                      Reset
+                    </button>
+                  )}
                   <button 
                     type="button" 
-                    onClick={handleClearCustomization} 
-                    className="btn-danger justify-center text-xs py-2.5 px-4 rounded-xl"
+                    onClick={() => setCustomizerOpen(false)} 
+                    className="btn-secondary justify-center text-xs py-2.5 px-4 rounded-xl"
                   >
-                    Reset
+                    Cancel
                   </button>
-                )}
-                <button 
-                  type="button" 
-                  onClick={() => setCustomizerOpen(false)} 
-                  className="btn-secondary justify-center text-xs py-2.5 px-4 rounded-xl"
-                >
-                  Cancel
-                </button>
-              </div>
+                </div>
+              </form>
+            ) : activeCustomizerTab === 'email' ? (
+              <form onSubmit={handleSaveEmailSettings} className="p-4 md:p-6 space-y-4 md:space-y-5 max-h-[70vh] overflow-y-auto">
+                {/* Active Incoming Email status toggle */}
+                <label className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-xl cursor-pointer">
+                  <div>
+                    <span className="text-xs font-bold text-[#172b4d] dark:text-[#b6c2cf] block">Enable Email-to-Board</span>
+                    <span className="text-[10px] text-gray-400">Allow creating cards by forwarding emails to this board</span>
+                  </div>
+                  <input 
+                    type="checkbox" 
+                    checked={emailEnabled} 
+                    onChange={(e) => setEmailEnabled(e.target.checked)}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                </label>
 
-            </form>
+                {/* Email Address block */}
+                {emailEnabled && (
+                  <div className="space-y-2.5">
+                    <div className="bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-3 rounded-xl space-y-2">
+                      <span className="block text-[10px] text-gray-400 uppercase tracking-wider font-bold">Unique Incoming Board Email</span>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={emailAddress || 'No email generated yet'}
+                          className="tf-input font-mono text-[11px] flex-1 select-all bg-white dark:bg-[#1d2125] border-gray-200 dark:border-gray-800"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (emailAddress) {
+                              navigator.clipboard.writeText(emailAddress);
+                              addToast('Address Copied', 'Incoming board email address copied to clipboard.', 'success');
+                            }
+                          }}
+                          disabled={!emailAddress}
+                          className="btn-secondary py-1 px-3 text-xs flex items-center gap-1 shrink-0 rounded-xl disabled:opacity-55"
+                        >
+                          <Copy className="w-3.5 h-3.5" /> Copy
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-gray-150 dark:border-gray-800/80">
+                        <span className="text-[9px] text-gray-400">Forward any email to this address to convert it to a card.</span>
+                        <button
+                          type="button"
+                          onClick={handleRegenerateAddress}
+                          className="text-[10px] text-indigo-650 dark:text-indigo-400 hover:underline font-bold"
+                        >
+                          Regenerate
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Target list */}
+                    <div>
+                      <label className="tf-label font-semibold">Default Column Target</label>
+                      <select 
+                        value={emailListId} 
+                        onChange={(e) => setEmailListId(e.target.value)}
+                        className="tf-input text-xs rounded-xl"
+                      >
+                        <option value="">-- Choose Column (Defaults to First) --</option>
+                        {currentBoard.lists?.map(l => (
+                          <option key={l.id} value={l.id}>{l.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Default Priority */}
+                    <div>
+                      <label className="tf-label font-semibold">Default Card Priority</label>
+                      <select 
+                        value={emailPriority} 
+                        onChange={(e) => setEmailPriority(e.target.value)}
+                        className="tf-input text-xs rounded-xl"
+                      >
+                        <option value="LOW">Low</option>
+                        <option value="MEDIUM">Medium</option>
+                        <option value="HIGH">High</option>
+                        <option value="URGENT">Urgent</option>
+                      </select>
+                    </div>
+
+                    {/* Thread matching action */}
+                    <div>
+                      <label className="tf-label font-semibold">When email matches an existing thread</label>
+                      <select 
+                        value={emailThreadAction} 
+                        onChange={(e) => setEmailThreadAction(e.target.value)}
+                        className="tf-input text-xs rounded-xl"
+                      >
+                        <option value="COMMENT">Post reply as Card Comment</option>
+                        <option value="ACTIVITY">Log reply in Card Activity Log</option>
+                      </select>
+                    </div>
+
+                    {/* Allowed Senders input */}
+                    <div>
+                      <label className="tf-label font-semibold flex items-center gap-1.5">
+                        Allowed Senders
+                        <span title="Enter 'ANY' for no restrictions, or enter comma-separated domains (e.g. client.com, work.org) / email addresses.">
+                          <HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-help" />
+                        </span>
+                      </label>
+                      <input 
+                        type="text" 
+                        value={emailAllowedSenders} 
+                        onChange={(e) => setEmailAllowedSenders(e.target.value)}
+                        placeholder="ANY, or domains (e.g. gmail.com, corporate.com)"
+                        className="tf-input text-xs rounded-xl"
+                      />
+                    </div>
+
+                    {/* Default Labels */}
+                    <div>
+                      <label className="tf-label font-semibold">Default Card Labels (Comma-separated)</label>
+                      <input 
+                        type="text" 
+                        value={emailDefaultLabels} 
+                        onChange={(e) => setEmailDefaultLabels(e.target.value)}
+                        placeholder="e.g. Support, Client Request, Bug"
+                        className="tf-input text-xs rounded-xl"
+                      />
+                    </div>
+
+                    {/* Auto Assignees */}
+                    <div>
+                      <label className="tf-label font-semibold">Auto-Assign Workspace Members</label>
+                      <div className="max-h-24 overflow-y-auto border border-gray-200 dark:border-gray-800 rounded-xl p-2.5 space-y-1.5 bg-slate-50 dark:bg-slate-900/60">
+                        {currentWorkspace?.members.map(m => (
+                          <label key={m.user.id} className="flex items-center gap-2 text-xs cursor-pointer text-slate-700 dark:text-slate-350">
+                            <input 
+                              type="checkbox"
+                              checked={emailAutoAssignees.includes(m.user.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setEmailAutoAssignees([...emailAutoAssignees, m.user.id]);
+                                } else {
+                                  setEmailAutoAssignees(emailAutoAssignees.filter(id => id !== m.user.id));
+                                }
+                              }}
+                              className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <span>{m.user.name || m.user.username}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Built-in Documentation panel */}
+                <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 rounded-xl p-3 text-[11px] text-blue-700 dark:text-blue-400 space-y-1.5">
+                  <strong className="block font-bold">ℹ️ How Email-to-Board Works</strong>
+                  <ul className="list-disc pl-4 space-y-1">
+                    <li>Forward emails to the unique board address to instantly create Kanban cards.</li>
+                    <li><b>Title:</b> The email subject will become the card title.</li>
+                    <li><b>Description:</b> Cleaned email body text (signatures and reply history are automatically stripped).</li>
+                    <li><b>Checklists:</b> Include checklist syntaxes like <code>- [ ] Item name</code> in the body to auto-populate card checklist items.</li>
+                    <li><b>Thread support:</b> Replies to the same email chain won't duplicate cards; they append as comments or logs.</li>
+                  </ul>
+                </div>
+
+                {/* Save Buttons */}
+                <div className="flex gap-2.5 pt-3 border-t border-gray-100 dark:border-gray-800">
+                  <button type="submit" className="btn-primary flex-1 justify-center text-xs py-2.5 rounded-xl">
+                    Save settings
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setCustomizerOpen(false)} 
+                    className="btn-secondary justify-center text-xs py-2.5 px-4 rounded-xl"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="p-4 md:p-6 space-y-4 md:space-y-5 max-h-[70vh] overflow-y-auto">
+                <div className="p-4 border border-red-200/60 dark:border-red-900/40 rounded-xl bg-red-50/10 dark:bg-red-950/5 space-y-3">
+                  <h4 className="font-bold text-sm text-red-650 dark:text-red-400">Permanently Delete Board</h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    This will permanently delete the board, including all cards, lists, attachments, dependencies, automations, and milestones. This action is irreversible.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleDeleteBoardFromInside}
+                    className="w-full py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm focus:outline-none flex items-center justify-center gap-1.5"
+                  >
+                    <Trash2 className="w-4 h-4" /> Delete Board
+                  </button>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       )}

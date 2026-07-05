@@ -4,8 +4,8 @@ import { apiUrl } from '../config/api';
 
 import {
   Plus, PlusCircle,
-  Trash2, Copy, X,
-  Slack, Github, Calendar, Cpu, Lock, Info,
+  Trash2, Copy, X, MoreVertical,
+  Slack, Github, Calendar, Cpu, Lock, Info, Zap,
   Mail, RefreshCw, Activity, CheckSquare, ExternalLink, AlertCircle
 } from 'lucide-react';
 import AppearanceSettings from './AppearanceSettings';
@@ -14,6 +14,7 @@ import GoalsModule from './GoalsModule';
 import MembersModule from './MembersModule';
 import InsightsModule from './InsightsModule';
 import WorkspaceInvitationPortal from './WorkspaceInvitationPortal';
+import BoardInboxModule from './BoardInboxModule';
 
 interface WorkspaceDashboardProps {
   activeTab: string;
@@ -44,12 +45,14 @@ export const COLORS: Record<string, string> = {
 
 export default function WorkspaceDashboard({ activeTab, onSelectBoard }: WorkspaceDashboardProps) {
   const {
-    currentWorkspace, createBoard, duplicateBoard,
+    user,
+    currentWorkspace, createBoard, duplicateBoard, deleteBoard,
     fetchDocuments,
     integrations, fetchIntegrations, updateIntegration, deleteIntegration, token,
     gmailProfile, gmailLogs, fetchGmailProfile, updateGmailSettings,
     connectGmail, disconnectGmail, syncGmailInbox,
-    fetchGmailLogs, isInboxOpen, addToast, showConfirm
+    fetchGmailLogs, isInboxOpen, addToast, showConfirm,
+    gmailRules, fetchGmailRules, createGmailRule, deleteGmailRule
   } = useStore();
 
   const [gmailSyncing, setGmailSyncing] = useState(false);
@@ -68,6 +71,15 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
   const [boardName, setBoardName] = useState('');
   const [boardDesc, setBoardDesc] = useState('');
   const [boardBg, setBoardBg] = useState('indigo');
+  const [activeDropdownBoardId, setActiveDropdownBoardId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      setActiveDropdownBoardId(null);
+    };
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, []);
 
   // Integrations state
   const [slackWebhookUrl, setSlackWebhookUrl] = useState('');
@@ -81,6 +93,43 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
   const [githubSecret, setGithubSecret] = useState('');
   const [isGithubEnabled, setIsGithubEnabled] = useState(true);
 
+  // Gmail Auto Rules States
+  const [ruleTriggerType, setRuleTriggerType] = useState('SENDER');
+  const [ruleTriggerVal, setRuleTriggerVal] = useState('');
+  const [ruleTargetBoardId, setRuleTargetBoardId] = useState('');
+  const [ruleTargetListId, setRuleTargetListId] = useState('');
+
+  const handleCreateGmailRule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ruleTriggerVal.trim() || !ruleTargetBoardId) {
+      addToast('Validation Error', 'Trigger match value and target board are required.', 'error');
+      return;
+    }
+    try {
+      await createGmailRule({
+        triggerType: ruleTriggerType,
+        triggerVal: ruleTriggerVal.trim(),
+        targetBoardId: ruleTargetBoardId,
+        targetListId: ruleTargetListId || undefined
+      });
+      addToast('Rule Created', 'Gmail Auto Routing Rule successfully added.', 'success');
+      setRuleTriggerVal('');
+      setRuleTargetBoardId('');
+      setRuleTargetListId('');
+    } catch (err: any) {
+      addToast('Error', err.message || 'Failed to create rule', 'error');
+    }
+  };
+
+  const handleDeleteGmailRule = async (ruleId: string) => {
+    try {
+      await deleteGmailRule(ruleId);
+      addToast('Rule Deleted', 'Gmail Auto Routing Rule successfully deleted.', 'success');
+    } catch (err: any) {
+      addToast('Error', err.message || 'Failed to delete rule', 'error');
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'documents' && currentWorkspace) {
       fetchDocuments(currentWorkspace.id);
@@ -89,6 +138,7 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
       fetchIntegrations(currentWorkspace.id);
       fetchGmailProfile();
       fetchGmailLogs();
+      fetchGmailRules();
     }
   }, [activeTab, currentWorkspace]);
 
@@ -139,6 +189,23 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
   const handleDuplicateBoard = async (boardId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try { await duplicateBoard(boardId); } catch { }
+  };
+
+  const handleDeleteBoard = async (boardId: string, boardName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const confirmed = await showConfirm(
+      '🗑️ Delete Board',
+      `Are you sure you want to permanently delete "${boardName}"? This will delete all lists, cards, and data inside it. This action cannot be undone.`,
+      'Yes, Delete Board',
+      'Cancel'
+    );
+    if (!confirmed) return;
+    try {
+      await deleteBoard(boardId);
+      addToast('Board Deleted', `"${boardName}" has been permanently deleted.`, 'success');
+    } catch (err: any) {
+      addToast('Error', err.message || 'Failed to delete board. Please try again.', 'error');
+    }
   };
 
   // Gmail Action Handlers
@@ -279,7 +346,8 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
 
 
 
-  const isEditor = currentWorkspace?.myRole === 'OWNER' || currentWorkspace?.myRole === 'ADMIN';
+  const currentMember = currentWorkspace?.members?.find(m => m.user?.id === user?.id);
+  const isEditor = currentWorkspace?.myRole === 'OWNER' || currentWorkspace?.myRole === 'ADMIN' || currentMember?.role === 'OWNER' || currentMember?.role === 'ADMIN';
 
   if (!currentWorkspace) {
     return (
@@ -341,18 +409,52 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
                   {/* Board name */}
                   <div className="absolute inset-0 p-3 flex flex-col justify-between">
                     <p className="font-bold text-sm text-white leading-snug line-clamp-2 drop-shadow">{b.name}</p>
-                    {/* Actions */}
-                    <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    
+                    {/* Actions Menu */}
+                    <div className="absolute top-2 right-2 z-10">
                       <button
-                        onClick={e => handleDuplicateBoard(b.id, e)}
-                        className="p-1.5 rounded-lg transition-colors"
-                        style={{ background: 'rgba(0,0,0,0.30)', color: '#fff' }}
-                        title="Duplicate board"
-                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.50)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.30)')}
+                        onClick={e => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setActiveDropdownBoardId(activeDropdownBoardId === b.id ? null : b.id);
+                        }}
+                        className="p-1 rounded-md bg-black/40 hover:bg-black/60 text-white transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        title="Board options"
                       >
-                        <Copy className="w-3 h-3" />
+                        <MoreVertical className="w-3.5 h-3.5" />
                       </button>
+
+                      {activeDropdownBoardId === b.id && (
+                        <div
+                          className="absolute right-0 mt-1 w-32 bg-white dark:bg-[#21262d] border border-gray-200 dark:border-gray-800 rounded-lg shadow-xl py-1 z-[100] animate-fade-in text-left"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <button
+                            onClick={e => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setActiveDropdownBoardId(null);
+                              handleDuplicateBoard(b.id, e);
+                            }}
+                            className="w-full px-3 py-1.5 text-xs text-[#172b4d] dark:text-[#c9d1d9] hover:bg-gray-100 dark:hover:bg-white/5 flex items-center gap-2 font-medium"
+                          >
+                            <Copy className="w-3.5 h-3.5" /> Duplicate
+                          </button>
+                          {isEditor && (
+                            <button
+                              onClick={e => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setActiveDropdownBoardId(null);
+                                handleDeleteBoard(b.id, b.name, e);
+                              }}
+                              className="w-full px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/10 flex items-center gap-2 font-medium"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Delete
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -377,6 +479,15 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
             </div>
           )}
         </div>
+      )}
+
+      {/* ── Board Inbox Tab ─────────────────────────── */}
+      {activeTab === 'board-inbox' && currentWorkspace && (
+        <BoardInboxModule
+          workspaceId={currentWorkspace.id}
+          isEditor={isEditor}
+          onSelectBoard={onSelectBoard}
+        />
       )}
 
       {/* ── Members Tab ─────────────────────────────── */}
@@ -884,6 +995,132 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
                 </div>
 
               </div>
+
+              {/* Divider */}
+              <div className="border-t border-[#dfe1e6] dark:border-[#a6c5e229] my-6"></div>
+
+              {/* Gmail Auto Routing Rules section */}
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-bold text-xs text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <Zap className="w-4 h-4 text-indigo-500" /> Gmail Auto-Routing Rules
+                  </h4>
+                  <p className="text-xs text-[#44546f] dark:text-[#9fadbc] mt-1">
+                    Configure rules to automatically parse incoming emails and create corresponding Kanban cards.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Create Rule Form */}
+                  <form onSubmit={handleCreateGmailRule} className="lg:col-span-1 bg-slate-50 dark:bg-slate-900/10 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
+                    <span className="block text-xs font-bold text-slate-700 dark:text-slate-350">Create New Auto Rule</span>
+                    
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">When email matches</label>
+                      <select
+                        value={ruleTriggerType}
+                        onChange={e => setRuleTriggerType(e.target.value)}
+                        className="w-full bg-white dark:bg-[#101214] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-1.5 rounded text-xs focus:outline-none"
+                      >
+                        <option value="SENDER">Sender contains email/domain</option>
+                        <option value="LABEL">Gmail Label is equal to</option>
+                        <option value="KEYWORD">Subject/Body contains keyword</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Match Value</label>
+                      <input
+                        type="text"
+                        value={ruleTriggerVal}
+                        onChange={e => setRuleTriggerVal(e.target.value)}
+                        placeholder={ruleTriggerType === 'SENDER' ? 'e.g. client@domain.com or domain.com' : ruleTriggerType === 'LABEL' ? 'e.g. IMPORTANT' : 'e.g. feedback, urgent'}
+                        className="w-full bg-white dark:bg-[#101214] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-1.5 rounded text-xs focus:outline-none"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Target Board</label>
+                      <select
+                        value={ruleTargetBoardId}
+                        onChange={e => {
+                          setRuleTargetBoardId(e.target.value);
+                          setRuleTargetListId('');
+                        }}
+                        className="w-full bg-white dark:bg-[#101214] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-1.5 rounded text-xs focus:outline-none"
+                        required
+                      >
+                        <option value="">-- Choose Board --</option>
+                        {currentWorkspace.boards?.map(b => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {ruleTargetBoardId && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Target Column (Optional)</label>
+                        <select
+                          value={ruleTargetListId}
+                          onChange={e => setRuleTargetListId(e.target.value)}
+                          className="w-full bg-white dark:bg-[#101214] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-1.5 rounded text-xs focus:outline-none"
+                        >
+                          <option value="">-- Defaults to First Column --</option>
+                          {currentWorkspace.boards?.find(b => b.id === ruleTargetBoardId)?.lists?.map(l => (
+                            <option key={l.id} value={l.id}>{l.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={!gmailProfile?.googleEmail}
+                      className="btn-primary w-full justify-center py-2 text-xs font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Add Rule
+                    </button>
+                  </form>
+
+                  {/* Active Rules List */}
+                  <div className="lg:col-span-2 bg-slate-50 dark:bg-slate-900/10 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col h-[270px]">
+                    <span className="block text-xs font-bold text-slate-700 dark:text-slate-350 mb-3">Active Rules ({gmailRules?.length || 0})</span>
+                    
+                    <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 text-xs">
+                      {!gmailRules || gmailRules.length === 0 ? (
+                        <div className="text-slate-450 italic text-center pt-10 text-slate-500 dark:text-slate-400">
+                          No auto routing rules created yet.
+                        </div>
+                      ) : (
+                        gmailRules.map((rule: any) => (
+                          <div key={rule.id} className="p-3 bg-white dark:bg-[#161a22] border border-slate-200 dark:border-slate-850 rounded-xl flex items-center justify-between gap-3 shadow-sm">
+                            <div className="leading-relaxed">
+                              <p className="text-slate-850 dark:text-[#f0f6fc]">
+                                <span className="font-bold text-indigo-600 dark:text-indigo-400">WHEN</span> email {rule.triggerType === 'SENDER' ? 'sender contains' : rule.triggerType === 'LABEL' ? 'has label' : 'subject/body contains'}{' '}
+                                <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded font-mono text-[11px] text-slate-800 dark:text-slate-300">"{rule.triggerVal}"</code>
+                              </p>
+                              <p className="text-slate-500 dark:text-slate-400 mt-1">
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400">ROUTE TO BOARD</span>{' '}
+                                <span className="font-semibold text-slate-700 dark:text-slate-300">{rule.board?.name || 'Unknown Board'}</span>
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteGmailRule(rule.id)}
+                              className="btn-icon p-1.5 hover:text-red-500 rounded-lg text-slate-400 shrink-0"
+                              title="Delete Rule"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>

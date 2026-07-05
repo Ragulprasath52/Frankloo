@@ -32,6 +32,7 @@ model User {
   logs         ActivityLog[]
   notifications Notification[]
   attachments  CardAttachment[]
+  gmailAutoRules GmailAutoRule[]
 }
 
 // ── Workspaces ───────────────────────────────────────────
@@ -142,20 +143,38 @@ model Board {
   savedFilters SavedFilter[]
   milestones   Milestone[]
   logs         ActivityLog[]
-  sprints      Sprint[]
+  sprints                      Sprint[]
+
+  // Email-to-Card configuration
+  incomingEmailAddress         String?            @unique
+  incomingEmailEnabled         Boolean            @default(true)
+  incomingEmailListId          String?
+  incomingEmailDefaultPriority String             @default("MEDIUM")
+  incomingEmailAllowedSenders  String?            @db.Text
+  incomingEmailDefaultLabelIds String?            @db.Text
+  incomingEmailAutoAssigneeIds String?            @db.Text
+  incomingEmailThreadAction    String             @default("COMMENT") // "COMMENT" or "ACTIVITY"
+  incomingEmailAttachmentLimit Int                @default(10) // MB
+  incomingEmailSpamFilter      Boolean            @default(true)
+  incomingEmailAutomationEnabled Boolean          @default(false)
+
+  gmailAutoRules               GmailAutoRule[]
+  inboxItems                   InboxItem[]
+  emailLogs                    EmailLog[]
 }
 
 // ── Lists / Columns ──────────────────────────────────────
 model List {
-  id        String    @id @default(uuid())
-  name      String
-  position  Float
-  boardId   String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id         String    @id @default(uuid())
+  name       String
+  position   Float
+  boardId    String
+  isArchived Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
-  board     Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  cards     Card[]
+  board      Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards      Card[]
 }
 
 // ── Cards ────────────────────────────────────────────────
@@ -199,6 +218,7 @@ model Card {
   logs          ActivityLog[]
   milestoneId   String?
   milestone     Milestone?       @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  emailDetails  CardEmailDetails?
   sprintId      String?
   sprint        Sprint?          @relation(fields: [sprintId], references: [id], onDelete: SetNull)
 }
@@ -403,10 +423,12 @@ model InboxItem {
   priority      String    @default("MEDIUM") // "LOW", "MEDIUM", "HIGH", "URGENT"
   dueDate       DateTime?
   workspaceId   String
+  boardId       String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  board         Board?    @relation(fields: [boardId], references: [id], onDelete: SetNull)
 }
 
 // ── Gmail Activity Log ────────────────────────────────────
@@ -457,5 +479,49 @@ model InvitationAuditLog {
   action       String    // "INVITE_SENT", "INVITE_RESENT", "INVITE_ACCEPTED", "INVITE_REVOKED", "DELIVERY_SUCCESS", "DELIVERY_FAILURE", "INVITE_EXPIRED"
   details      String?   @db.Text
   createdAt    DateTime  @default(now())
+}
+
+// ── Gmail Auto Rules ──────────────────────────────────────────
+model GmailAutoRule {
+  id            String   @id @default(uuid())
+  userId        String
+  triggerType   String   // "SENDER", "LABEL", "KEYWORD"
+  triggerVal    String   // Value to match
+  targetBoardId String
+  targetListId  String?
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  board         Board    @relation(fields: [targetBoardId], references: [id], onDelete: Cascade)
+}
+
+// ── Card Email Details ────────────────────────────────────────
+model CardEmailDetails {
+  id             String    @id @default(uuid())
+  cardId         String    @unique
+  sender         String
+  subject        String
+  receivedTime   DateTime  @default(now())
+  messageId      String?
+  threadId       String?
+  bodyHtml       String?   @db.Text
+  bodyText       String?   @db.Text
+  replyLink      String?
+  hasAttachments Boolean   @default(false)
+
+  card           Card      @relation(fields: [cardId], references: [id], onDelete: Cascade)
+}
+
+// ── Inbound Email Logs ────────────────────────────────────────
+model EmailLog {
+  id          String   @id @default(uuid())
+  boardId     String
+  sender      String
+  subject     String
+  status      String   // "SUCCESS", "SPAM", "RATE_LIMITED", "SENDER_BLOCKED", "SIZE_EXCEEDED"
+  details     String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
 }
 

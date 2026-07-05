@@ -149,6 +149,7 @@ router.get('/:id', authenticate, checkBoardAccess, async (req, res) => {
       where: { id: req.params.id },
       include: {
         lists: {
+          where: { isArchived: false },
           orderBy: { position: 'asc' },
           include: {
             cards: {
@@ -192,11 +193,31 @@ router.get('/:id', authenticate, checkBoardAccess, async (req, res) => {
 // PUT update board
 router.put('/:id', authenticate, checkBoardAccess, async (req, res) => {
   try {
-    const { name, description, background, isArchived } = req.body;
+    const { 
+      name, description, background, isArchived,
+      incomingEmailAddress, incomingEmailEnabled, incomingEmailListId,
+      incomingEmailDefaultPriority, incomingEmailAllowedSenders,
+      incomingEmailDefaultLabelIds, incomingEmailAutoAssigneeIds,
+      incomingEmailThreadAction
+    } = req.body;
+
+    const dataObj = {};
+    if (name !== undefined) dataObj.name = name;
+    if (description !== undefined) dataObj.description = description;
+    if (background !== undefined) dataObj.background = background;
+    if (isArchived !== undefined) dataObj.isArchived = isArchived;
+    if (incomingEmailAddress !== undefined) dataObj.incomingEmailAddress = incomingEmailAddress;
+    if (incomingEmailEnabled !== undefined) dataObj.incomingEmailEnabled = incomingEmailEnabled;
+    if (incomingEmailListId !== undefined) dataObj.incomingEmailListId = incomingEmailListId;
+    if (incomingEmailDefaultPriority !== undefined) dataObj.incomingEmailDefaultPriority = incomingEmailDefaultPriority;
+    if (incomingEmailAllowedSenders !== undefined) dataObj.incomingEmailAllowedSenders = incomingEmailAllowedSenders;
+    if (incomingEmailDefaultLabelIds !== undefined) dataObj.incomingEmailDefaultLabelIds = incomingEmailDefaultLabelIds;
+    if (incomingEmailAutoAssigneeIds !== undefined) dataObj.incomingEmailAutoAssigneeIds = incomingEmailAutoAssigneeIds;
+    if (incomingEmailThreadAction !== undefined) dataObj.incomingEmailThreadAction = incomingEmailThreadAction;
 
     const updated = await prisma.board.update({
       where: { id: req.params.id },
-      data: { name, description, background, isArchived }
+      data: dataObj
     });
 
     notifyBoardUpdate(updated.id, 'BOARD_UPDATE', updated);
@@ -366,6 +387,30 @@ router.delete('/:boardId/lists/:listId', authenticate, checkBoardAccess, async (
     notifyBoardUpdate(boardId, 'LIST_DELETE', { id: listId });
     res.json({ message: 'List deleted' });
   } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH archive list (soft delete)
+router.patch('/:boardId/lists/:listId/archive', authenticate, checkBoardAccess, async (req, res) => {
+  try {
+    const { listId, boardId } = req.params;
+
+    const list = await prisma.list.update({
+      where: { id: listId },
+      data: { isArchived: true }
+    });
+
+    // Also archive all cards in this list
+    await prisma.card.updateMany({
+      where: { listId },
+      data: { isArchived: true }
+    });
+
+    notifyBoardUpdate(boardId, 'LIST_ARCHIVE', { id: listId });
+    res.json({ message: 'List archived', list });
+  } catch (error) {
+    console.error('Archive list error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });

@@ -86,6 +86,17 @@ export interface Board {
   automations: AutomationRule[];
   milestones: Milestone[];
   savedFilters: SavedFilter[];
+  incomingEmailEnabled?: boolean | null;
+  incomingEmailAddress?: string | null;
+  incomingEmailListId?: string | null;
+  incomingEmailDefaultPriority?: string | null;
+  incomingEmailAllowedSenders?: string | null;
+  incomingEmailDefaultLabelIds?: string | null;
+  incomingEmailAutoAssigneeIds?: string | null;
+  incomingEmailThreadAction?: string | null;
+  incomingEmailSpamFilter?: boolean | null;
+  incomingEmailAutomationEnabled?: boolean | null;
+  incomingEmailAttachmentLimit?: number | null;
 }
 
 export interface List {
@@ -231,12 +242,13 @@ export interface InboxItem {
   id: string;
   title: string;
   description: string;
-  source: 'GMAIL' | 'SLACK' | 'DISCORD' | 'GITHUB' | 'CALENDAR' | 'QUICK';
+  source: 'GMAIL' | 'SLACK' | 'DISCORD' | 'GITHUB' | 'CALENDAR' | 'QUICK' | 'EMAIL';
   sourceDetails: string;
   status: 'NEW' | 'PROCESSING' | 'CONVERTED' | 'ARCHIVED';
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   dueDate: string | null;
   workspaceId: string;
+  boardId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -344,6 +356,7 @@ interface AppState {
   createList: (boardId: string, name: string, position: number) => Promise<void>;
   updateList: (boardId: string, listId: string, name: string, position?: number) => Promise<void>;
   deleteList: (boardId: string, listId: string) => Promise<void>;
+  archiveList: (boardId: string, listId: string) => Promise<void>;
   
   // Cards
   createCard: (boardId: string, listId: string, title: string, position: number, priority?: string) => Promise<Card>;
@@ -382,8 +395,11 @@ interface AppState {
   fetchInboxItems: (workspaceId: string) => Promise<void>;
   createInboxItem: (workspaceId: string, item: Partial<InboxItem>) => Promise<InboxItem>;
   updateInboxItem: (workspaceId: string, itemId: string, updates: Partial<InboxItem>) => Promise<InboxItem>;
-  convertInboxItem: (workspaceId: string, itemId: string, boardId: string, listId: string) => Promise<void>;
+  deleteInboxItem: (workspaceId: string, itemId: string) => Promise<void>;
+  convertInboxItem: (workspaceId: string, itemId: string, payload: { boardId: string; listId: string; assigneeIds?: string[]; labels?: any[]; priority?: string; dueDate?: string | null; checklist?: string[] }) => Promise<void>;
   mockIncomingInboxItems: (workspaceId: string) => Promise<void>;
+  fetchEmailLogs: (workspaceId: string, boardId: string) => Promise<any[]>;
+  sendTestEmail: (workspaceId: string, boardId: string) => Promise<void>;
 
   // Gmail Integration Actions
   fetchGmailProfile: () => Promise<void>;
@@ -394,6 +410,11 @@ interface AppState {
   sendTestGmail: () => Promise<void>;
   fetchGmailLogs: () => Promise<void>;
   triggerGmailReminder: (type: string) => Promise<void>;
+  gmailRules: any[];
+  fetchGmailRules: () => Promise<void>;
+  createGmailRule: (rule: { triggerType: string; triggerVal: string; targetBoardId: string; targetListId?: string }) => Promise<void>;
+  deleteGmailRule: (ruleId: string) => Promise<void>;
+  replyToGmail: (itemId: string, replyText: string) => Promise<void>;
 
   // Centralized Toasts & Confirm Modal
   toasts: ToastItem[];
@@ -429,6 +450,7 @@ export const useStore = create<AppState>((set, get) => ({
   setSidebarCollapsed: (isCollapsed) => set({ isSidebarCollapsed: isCollapsed }),
   gmailProfile: null,
   gmailLogs: [],
+  gmailRules: [],
   workspaceInvitations: [],
   userInvitations: [],
   workspaceEmailSettings: null,
@@ -1046,7 +1068,10 @@ export const useStore = create<AppState>((set, get) => ({
       method: 'DELETE',
       headers: getHeaders(get().token)
     });
-    if (!res.ok) throw new Error('Error deleting board');
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Error deleting board');
+    }
     set({ currentBoard: null });
     // Refresh workspace
     const currentWorkspace = get().currentWorkspace;
@@ -1104,6 +1129,18 @@ export const useStore = create<AppState>((set, get) => ({
       headers: getHeaders(get().token)
     });
     if (!res.ok) throw new Error('Error deleting list');
+    await get().fetchBoardDetails(boardId);
+  },
+
+  archiveList: async (boardId, listId) => {
+    const res = await fetch(`${API_URL}/boards/${boardId}/lists/${listId}/archive`, {
+      method: 'PATCH',
+      headers: getHeaders(get().token)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Error archiving list');
+    }
     await get().fetchBoardDetails(boardId);
   },
 
@@ -1345,11 +1382,22 @@ export const useStore = create<AppState>((set, get) => ({
     return data;
   },
 
-  convertInboxItem: async (workspaceId, itemId, boardId, listId) => {
+  deleteInboxItem: async (workspaceId, itemId) => {
+    const res = await fetch(`${API_URL}/inbox/${workspaceId}/${itemId}`, {
+      method: 'DELETE',
+      headers: getHeaders(get().token)
+    });
+    if (!res.ok) throw new Error('Failed to delete inbox item');
+    set((state) => ({
+      inboxItems: state.inboxItems.filter((i) => i.id !== itemId)
+    }));
+  },
+
+  convertInboxItem: async (workspaceId, itemId, payload) => {
     const res = await fetch(`${API_URL}/inbox/${workspaceId}/${itemId}/convert`, {
       method: 'POST',
       headers: getHeaders(get().token),
-      body: JSON.stringify({ boardId, listId })
+      body: JSON.stringify(payload)
     });
     if (!res.ok) throw new Error('Failed to convert inbox item');
     const { inboxItem } = await res.json();
@@ -1359,6 +1407,75 @@ export const useStore = create<AppState>((set, get) => ({
     const currentWorkspace = get().currentWorkspace;
     if (currentWorkspace) {
       await get().fetchWorkspaceDetails(currentWorkspace.id);
+    }
+  },
+
+  fetchEmailLogs: async (workspaceId, boardId) => {
+    try {
+      const res = await fetch(`${API_URL}/inbox/${workspaceId}/logs/${boardId}`, {
+        headers: getHeaders(get().token)
+      });
+      if (!res.ok) throw new Error('Failed to fetch email logs');
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.error(err);
+      return [];
+    }
+  },
+
+  sendTestEmail: async (workspaceId, boardId) => {
+    const res = await fetch(`${API_URL}/inbox/${workspaceId}/test-email/${boardId}`, {
+      method: 'POST',
+      headers: getHeaders(get().token)
+    });
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.error || 'Failed to trigger test email');
+    }
+  },
+
+  fetchGmailRules: async () => {
+    try {
+      const res = await fetch(`${API_URL}/gmail/rules`, {
+        headers: getHeaders(get().token)
+      });
+      if (!res.ok) throw new Error('Failed to fetch Gmail rules');
+      const data = await res.json();
+      set({ gmailRules: data });
+    } catch (err) {
+      console.error(err);
+    }
+  },
+
+  createGmailRule: async (rule) => {
+    const res = await fetch(`${API_URL}/gmail/rules`, {
+      method: 'POST',
+      headers: getHeaders(get().token),
+      body: JSON.stringify(rule)
+    });
+    if (!res.ok) throw new Error('Failed to create Gmail rule');
+    await get().fetchGmailRules();
+  },
+
+  deleteGmailRule: async (ruleId) => {
+    const res = await fetch(`${API_URL}/gmail/rules/${ruleId}`, {
+      method: 'DELETE',
+      headers: getHeaders(get().token)
+    });
+    if (!res.ok) throw new Error('Failed to delete Gmail rule');
+    await get().fetchGmailRules();
+  },
+
+  replyToGmail: async (itemId, replyText) => {
+    const res = await fetch(`${API_URL}/gmail/reply`, {
+      method: 'POST',
+      headers: getHeaders(get().token),
+      body: JSON.stringify({ itemId, replyText })
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Failed to send reply');
     }
   },
 
