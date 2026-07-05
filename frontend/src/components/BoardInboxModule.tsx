@@ -4,7 +4,7 @@ import {
   Inbox, Trash2, Settings, ShieldAlert, Cpu, Check, Copy, 
   RefreshCw, FileText, Download, CheckSquare, Plus, X, 
   ExternalLink, ShieldCheck, PlayCircle, Paperclip, Clock, 
-  Archive, Eye
+  Archive, Eye, Edit3
 } from 'lucide-react';
 
 interface BoardInboxModuleProps {
@@ -31,6 +31,18 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
   const [selectedEmail, setSelectedEmail] = useState<any | null>(null);
   const [previewTab, setPreviewTab] = useState<'text' | 'html'>('html');
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+
+  const getEmailDomain = () => {
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname)) {
+      return 'mccmrfip.in';
+    }
+    if (hostname.endsWith('.mccmrfip.in')) {
+      return 'mccmrfip.in';
+    }
+    return hostname;
+  };
 
   // Convert Modal States
   const [convertModalOpen, setConvertModalOpen] = useState(false);
@@ -126,19 +138,28 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
       addToast('Address Copied', 'Incoming board email address copied to clipboard.', 'success');
       setTimeout(() => setCopiedAddress(false), 2000);
     }
-  };
-
-  const handleRegenerateAddress = async () => {
+  };  const handleRegenerateAddress = async () => {
     if (!activeBoard) return;
-    const prefix = Math.random().toString(36).substring(2, 10);
-    const newAddr = `${prefix}@boards.frankloo.app`;
+    const cleanBoardName = activeBoard.name.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'board';
+    const randomHex = Math.random().toString(36).substring(2, 6);
+    const newAddr = `${cleanBoardName}-${randomHex}@${getEmailDomain()}`;
     setEmailAddress(newAddr);
     try {
       await updateBoard(activeBoard.id, { incomingEmailAddress: newAddr });
-      addToast('Address Regenerated', 'A new incoming email address has been generated and saved.', 'success');
-      loadLogs();
+      addToast('Address Generated', 'A new incoming email address has been generated and saved.', 'success');
     } catch (err: any) {
-      addToast('Error', err.message || 'Failed to regenerate address', 'error');
+      addToast('Error', err.message || 'Failed to generate address', 'error');
+    }
+  };
+
+  const handleSaveEmailAddress = async () => {
+    if (!activeBoard) return;
+    try {
+      await updateBoard(activeBoard.id, { incomingEmailAddress: emailAddress || null });
+      setIsEditingAddress(false);
+      addToast('Address Updated', 'Incoming board email address updated successfully.', 'success');
+    } catch (err: any) {
+      addToast('Error', err.message || 'Failed to update address', 'error');
     }
   };
 
@@ -179,6 +200,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
     setSavingSettings(true);
     try {
       await updateBoard(activeBoard.id, {
+        incomingEmailAddress: emailAddress || null,
         incomingEmailListId: emailListId || null,
         incomingEmailDefaultPriority: emailPriority,
         incomingEmailAllowedSenders: emailAllowedSenders,
@@ -433,44 +455,86 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
 
             {/* Email Address focal point */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 p-3 px-4 rounded-2xl max-w-xl">
-              <div className="min-w-0">
-                <span className="text-[9px] uppercase tracking-wider font-bold text-gray-400 block mb-0.5">Incoming Board Address</span>
-                <span className="text-sm font-mono font-bold text-indigo-650 dark:text-indigo-400 break-all select-all">
-                  {emailAddress || 'No address generated yet'}
-                </span>
-              </div>
-              <div className="flex gap-2 shrink-0">
-                <button
-                  onClick={handleCopyEmail}
-                  disabled={!emailAddress}
-                  className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1 rounded-xl disabled:opacity-50"
-                  title="Copy to clipboard"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>{copiedAddress ? 'Copied' : 'Copy'}</span>
-                </button>
-                {isEditor && (
-                  <>
+              {isEditingAddress ? (
+                <div className="flex-1 flex flex-col gap-2 min-w-[280px]">
+                  <span className="text-[9px] uppercase tracking-wider font-bold text-gray-400 block">Incoming Board Address</span>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="email"
+                      value={emailAddress}
+                      onChange={(e) => setEmailAddress(e.target.value)}
+                      placeholder={`e.g. board-name@${getEmailDomain()}`}
+                      className="tf-input text-xs font-mono py-1.5 px-2.5 rounded-xl border border-gray-250 dark:border-gray-800 flex-1 bg-white dark:bg-[#1d2125]"
+                    />
                     <button
-                      onClick={handleRegenerateAddress}
-                      className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1 rounded-xl"
-                      title="Regenerate random address"
+                      onClick={handleSaveEmailAddress}
+                      className="text-xs text-emerald-655 bg-emerald-500/10 hover:bg-emerald-500/20 px-2.5 rounded-xl border border-emerald-500/20 font-bold"
+                      title="Save"
                     >
-                      <RefreshCw className="w-3.5 h-3.5" />
+                      <Check className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={handleToggleEmailEnabled}
-                      className={`py-1.5 px-3 text-xs font-bold rounded-xl flex items-center gap-1.5 border transition-all ${
-                        emailEnabled 
-                          ? 'bg-emerald-500/10 text-emerald-650 dark:text-emerald-450 border-emerald-500/20 hover:bg-emerald-500/20' 
-                          : 'bg-rose-500/10 text-rose-600 dark:text-rose-455 border-rose-500/20 hover:bg-rose-500/20'
-                      }`}
+                      onClick={() => {
+                        setEmailAddress(activeBoard.incomingEmailAddress || '');
+                        setIsEditingAddress(false);
+                      }}
+                      className="text-xs text-rose-650 bg-rose-500/10 hover:bg-rose-500/20 px-2.5 rounded-xl border border-rose-500/20 font-bold"
+                      title="Cancel"
                     >
-                      {emailEnabled ? 'Enabled' : 'Disabled'}
+                      <X className="w-3.5 h-3.5" />
                     </button>
-                  </>
-                )}
-              </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="min-w-0 flex-1">
+                  <span className="text-[9px] uppercase tracking-wider font-bold text-gray-400 block mb-0.5">Incoming Board Address</span>
+                  <span className="text-sm font-mono font-bold text-indigo-650 dark:text-indigo-400 break-all select-all">
+                    {emailAddress || 'No address configured yet'}
+                  </span>
+                </div>
+              )}
+              
+              {!isEditingAddress && (
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={handleCopyEmail}
+                    disabled={!emailAddress}
+                    className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1 rounded-xl disabled:opacity-50"
+                    title="Copy to clipboard"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>{copiedAddress ? 'Copied' : 'Copy'}</span>
+                  </button>
+                  {isEditor && (
+                    <>
+                      <button
+                        onClick={() => setIsEditingAddress(true)}
+                        className="btn-secondary py-1.5 px-2.5 text-xs flex items-center gap-1 rounded-xl"
+                        title="Edit custom email address"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={handleRegenerateAddress}
+                        className="btn-secondary py-1.5 px-2.5 text-xs flex items-center gap-1 rounded-xl"
+                        title="Generate auto address"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={handleToggleEmailEnabled}
+                        className={`py-1.5 px-3 text-xs font-bold rounded-xl flex items-center gap-1.5 border transition-all ${
+                          emailEnabled 
+                            ? 'bg-emerald-500/10 text-emerald-650 dark:text-emerald-450 border-emerald-500/20 hover:bg-emerald-500/20' 
+                            : 'bg-rose-500/10 text-rose-600 dark:text-rose-455 border-rose-500/20 hover:bg-rose-500/20'
+                        }`}
+                      >
+                        {emailEnabled ? 'Enabled' : 'Disabled'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           
@@ -539,9 +603,9 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                       <div className="w-16 h-16 rounded-3xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center mb-5 animate-pulse">
                         <Inbox className="w-8 h-8" />
                       </div>
-                      <h3 className="text-lg font-bold text-[#172b4d] dark:text-[#f0f6fc]">Forward your first email</h3>
+                      <h3 className="text-lg font-bold text-[#172b4d] dark:text-[#f0f6fc]">Set up Email-to-Board</h3>
                       <p className="text-xs text-gray-400 max-w-sm mt-2 leading-relaxed">
-                        Copy your board email address and forward any message from Gmail, Outlook, or Apple Mail.
+                        Configure a custom email address for this board. Any email sent to this address will be automatically converted to a task.
                       </p>
                       
                       <div className="w-full max-w-md my-6 p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-150 dark:border-white/5 text-left space-y-3">
@@ -736,6 +800,34 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                         <div className="border-b border-gray-100 dark:border-gray-850 pb-2 mb-3">
                           <h3 className="text-sm font-bold text-slate-800 dark:text-[#f0f6fc]">Board Inbox Configurations</h3>
                           <p className="text-[10px] text-gray-400 mt-0.5">Control default conversion defaults and allowed senders lists.</p>
+                        </div>
+
+                        {/* Custom incoming email address input */}
+                        <div>
+                          <label className="tf-label font-bold">Incoming Board Email Address</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="email"
+                              placeholder={`e.g. board-name@${getEmailDomain()}`}
+                              value={emailAddress}
+                              onChange={e => setEmailAddress(e.target.value)}
+                              className="tf-input rounded-xl font-mono text-xs flex-1 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-slate-800"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const cleanBoardName = activeBoard.name.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'board';
+                                const randomHex = Math.random().toString(36).substring(2, 6);
+                                setEmailAddress(`${cleanBoardName}-${randomHex}@${getEmailDomain()}`);
+                              }}
+                              className="btn-secondary py-1.5 px-3.5 text-xs rounded-xl font-bold shrink-0"
+                            >
+                              Auto-Generate
+                            </button>
+                          </div>
+                          <span className="text-[9px] text-gray-450 mt-1 block">
+                            Define the email address you want to route to this board. Make sure this matches your Cloudflare Email Routing configuration.
+                          </span>
                         </div>
                         
                         {/* Auto conversion toggle */}

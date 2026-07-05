@@ -118,16 +118,28 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
     }
   };
 
+  const getEmailDomain = () => {
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname)) {
+      return 'mccmrfip.in';
+    }
+    if (hostname.endsWith('.mccmrfip.in')) {
+      return 'mccmrfip.in';
+    }
+    return hostname;
+  };
+
   const handleRegenerateAddress = async () => {
     if (!currentBoard) return;
-    const prefix = Math.random().toString(36).substring(2, 10);
-    const newAddr = `${prefix}@boards.frankloo.app`;
+    const cleanBoardName = currentBoard.name.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'board';
+    const randomHex = Math.random().toString(36).substring(2, 6);
+    const newAddr = `${cleanBoardName}-${randomHex}@${getEmailDomain()}`;
     setEmailAddress(newAddr);
     try {
       await updateBoard(currentBoard.id, { incomingEmailAddress: newAddr });
-      addToast('Address Regenerated', 'A new incoming email address has been generated and saved.', 'success');
+      addToast('Address Generated', 'A new incoming email address has been generated and saved.', 'success');
     } catch (err: any) {
-      addToast('Error', err.message || 'Failed to regenerate address', 'error');
+      addToast('Error', err.message || 'Failed to generate address', 'error');
     }
   };
 
@@ -1412,10 +1424,11 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                       <span className="block text-[10px] text-gray-400 uppercase tracking-wider font-bold">Unique Incoming Board Email</span>
                       <div className="flex gap-2">
                         <input
-                          type="text"
-                          readOnly
-                          value={emailAddress || 'No email generated yet'}
-                          className="tf-input font-mono text-[11px] flex-1 select-all bg-white dark:bg-[#1d2125] border-gray-200 dark:border-gray-800"
+                          type="email"
+                          value={emailAddress}
+                          onChange={(e) => setEmailAddress(e.target.value)}
+                          placeholder={`e.g. board-name@${getEmailDomain()}`}
+                          className="tf-input font-mono text-[11px] flex-1 bg-white dark:bg-[#1d2125] border-gray-250 dark:border-gray-800"
                         />
                         <button
                           type="button"
@@ -1432,13 +1445,13 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                         </button>
                       </div>
                       <div className="flex items-center justify-between gap-2 pt-1 border-t border-gray-150 dark:border-gray-800/80">
-                        <span className="text-[9px] text-gray-400">Forward any email to this address to convert it to a card.</span>
+                        <span className="text-[9px] text-gray-400">Define your custom board email address (e.g. support@mccmrfip.in).</span>
                         <button
                           type="button"
                           onClick={handleRegenerateAddress}
                           className="text-[10px] text-indigo-650 dark:text-indigo-400 hover:underline font-bold"
                         >
-                          Regenerate
+                          Auto-Generate Address
                         </button>
                       </div>
                     </div>
