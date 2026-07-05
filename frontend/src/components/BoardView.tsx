@@ -1427,7 +1427,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                           type="email"
                           value={emailAddress}
                           onChange={(e) => setEmailAddress(e.target.value)}
-                          placeholder={`e.g. board-name@${getEmailDomain()}`}
+                          placeholder="inbox@mccmrfip.in"
                           className="tf-input font-mono text-[11px] flex-1 bg-white dark:bg-[#1d2125] border-gray-250 dark:border-gray-800"
                         />
                         <button
@@ -1445,14 +1445,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                         </button>
                       </div>
                       <div className="flex items-center justify-between gap-2 pt-1 border-t border-gray-150 dark:border-gray-800/80">
-                        <span className="text-[9px] text-gray-400">Define your custom board email address (e.g. support@mccmrfip.in).</span>
-                        <button
-                          type="button"
-                          onClick={handleRegenerateAddress}
-                          className="text-[10px] text-indigo-650 dark:text-indigo-400 hover:underline font-bold"
-                        >
-                          Auto-Generate Address
-                        </button>
+                        <span className="text-[9px] text-gray-400">Define your custom board email address (e.g. inbox@mccmrfip.in).</span>
                       </div>
                     </div>
 

@@ -463,7 +463,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                       type="email"
                       value={emailAddress}
                       onChange={(e) => setEmailAddress(e.target.value)}
-                      placeholder={`e.g. board-name@${getEmailDomain()}`}
+                      placeholder="inbox@mccmrfip.in"
                       className="tf-input text-xs font-mono py-1.5 px-2.5 rounded-xl border border-gray-250 dark:border-gray-800 flex-1 bg-white dark:bg-[#1d2125]"
                     />
                     <button
@@ -489,7 +489,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                 <div className="min-w-0 flex-1">
                   <span className="text-[9px] uppercase tracking-wider font-bold text-gray-400 block mb-0.5">Incoming Board Address</span>
                   <span className="text-sm font-mono font-bold text-indigo-650 dark:text-indigo-400 break-all select-all">
-                    {emailAddress || 'No address configured yet'}
+                    {emailAddress || 'inbox@mccmrfip.in'}
                   </span>
                 </div>
               )}
@@ -513,13 +513,6 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                         title="Edit custom email address"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={handleRegenerateAddress}
-                        className="btn-secondary py-1.5 px-2.5 text-xs flex items-center gap-1 rounded-xl"
-                        title="Generate auto address"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={handleToggleEmailEnabled}
@@ -800,35 +793,20 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                         <div className="border-b border-gray-100 dark:border-gray-850 pb-2 mb-3">
                           <h3 className="text-sm font-bold text-slate-800 dark:text-[#f0f6fc]">Board Inbox Configurations</h3>
                           <p className="text-[10px] text-gray-400 mt-0.5">Control default conversion defaults and allowed senders lists.</p>
-                        </div>
-
-                        {/* Custom incoming email address input */}
+                            {/* Custom incoming email address input */}
                         <div>
                           <label className="tf-label font-bold">Incoming Board Email Address</label>
-                          <div className="flex gap-2">
-                            <input
-                              type="email"
-                              placeholder={`e.g. board-name@${getEmailDomain()}`}
-                              value={emailAddress}
-                              onChange={e => setEmailAddress(e.target.value)}
-                              className="tf-input rounded-xl font-mono text-xs flex-1 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-slate-800"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const cleanBoardName = activeBoard.name.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'board';
-                                const randomHex = Math.random().toString(36).substring(2, 6);
-                                setEmailAddress(`${cleanBoardName}-${randomHex}@${getEmailDomain()}`);
-                              }}
-                              className="btn-secondary py-1.5 px-3.5 text-xs rounded-xl font-bold shrink-0"
-                            >
-                              Auto-Generate
-                            </button>
-                          </div>
-                          <span className="text-[9px] text-gray-450 mt-1 block">
-                            Define the email address you want to route to this board. Make sure this matches your Cloudflare Email Routing configuration.
+                          <input
+                            type="email"
+                            placeholder="inbox@mccmrfip.in"
+                            value={emailAddress}
+                            onChange={e => setEmailAddress(e.target.value)}
+                            className="tf-input rounded-xl font-mono text-xs w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-slate-800"
+                          />
+                          <span className="text-[9px] text-gray-455 mt-1 block">
+                            Define the email address you want to route to this board (e.g., inbox@mccmrfip.in). Make sure this matches your Cloudflare Email Routing configuration.
                           </span>
-                        </div>
+                        </div>                      </div>
                         
                         {/* Auto conversion toggle */}
                         <label className="flex items-center justify-between p-3.5 border border-gray-200 dark:border-gray-800 rounded-xl bg-slate-50 dark:bg-white/5 cursor-pointer hover:bg-slate-100/40 dark:hover:bg-white/10 transition-colors">
