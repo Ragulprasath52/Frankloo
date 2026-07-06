@@ -1437,27 +1437,6 @@ router.get('/:id/invitation-dashboard', authenticate, checkWorkspaceRole(['OWNER
       take: 8
     });
 
-    // 3. Compile top active workspaces (Top 5 workspaces based on membership logs counts)
-    const allWorkspaces = await prisma.workspace.findMany({
-      include: {
-        _count: {
-          select: { members: true, boards: true }
-        }
-      }
-    });
-    
-    // Sort by count
-    const mostActive = allWorkspaces
-      .map(w => ({
-        id: w.id,
-        name: w.name,
-        membersCount: w._count.members,
-        boardsCount: w._count.boards,
-        score: w._count.members * 3 + w._count.boards
-      }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5);
-
     res.json({
       stats: {
         pending: pendingCount,
@@ -1465,8 +1444,7 @@ router.get('/:id/invitation-dashboard', authenticate, checkWorkspaceRole(['OWNER
         expired: expiredCount,
         revoked: revokedCount
       },
-      recentActivity: logs,
-      mostActive
+      recentActivity: logs
     });
   } catch (error) {
     console.error('Invitation dashboard error:', error);

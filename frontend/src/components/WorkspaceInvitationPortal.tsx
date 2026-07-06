@@ -32,7 +32,6 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
   // Dashboard Stats States
   const [dashboardStats, setDashboardStats] = useState<any>(null);
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
-  const [activeWorkspaces, setActiveWorkspaces] = useState<any[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
 
   // Send Invitation Form States
@@ -74,7 +73,6 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
       const data = await fetchInvitationDashboard(workspaceId);
       setDashboardStats(data.stats);
       setRecentLogs(data.recentActivity);
-      setActiveWorkspaces(data.mostActive);
     } catch (err) {
       console.error(err);
     } finally {
@@ -444,10 +442,10 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
               </div>
             </div>
 
-            {/* Split layout: Recent Activity Feed & Workspaces stats */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 pt-4 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 dark:divide-slate-800">
-              {/* Left Column: Timeline Activity Feed */}
-              <div className="lg:col-span-2 flex flex-col justify-start pb-8 lg:pb-0 lg:pr-8">
+            {/* Recent Invitation Activity Logs Feed */}
+            <div className="pt-4">
+              {/* Timeline Activity Feed */}
+              <div className="flex flex-col justify-start pb-8">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2 mb-6 pb-2 border-b border-slate-100 dark:border-slate-800">
                   <Activity className="w-4 h-4 text-emerald-500" /> Recent Invitation Activity Logs
                 </h3>
@@ -476,36 +474,6 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
                         </div>
                       );
                     })
-                  )}
-                </div>
-              </div>
-
-              {/* Right Column: Most Active Workspaces & System Stats */}
-              <div className="flex flex-col justify-start pt-8 lg:pt-0 lg:pl-8">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2 mb-6 pb-2 border-b border-slate-100 dark:border-slate-800">
-                  <Sparkles className="w-4 h-4 text-amber-500" /> Most Active Workspaces
-                </h3>
-                <div className="flex-1 flex flex-col gap-4">
-                  {statsLoading ? (
-                    <div className="text-center py-12 text-xs text-slate-400">Loading workspaces...</div>
-                  ) : activeWorkspaces.length === 0 ? (
-                    <div className="text-center py-12 text-xs text-slate-400 italic">No workspaces found.</div>
-                  ) : (
-                    activeWorkspaces.map((ws) => (
-                      <div key={ws.id} className="flex items-center justify-between gap-3 text-xs border-b border-slate-100 dark:border-slate-800 pb-2.5 last:border-0 last:pb-0">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-6 h-6 rounded flex items-center justify-center font-bold text-white shrink-0"
-                            style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)' }}>
-                            {ws.name[0]?.toUpperCase()}
-                          </div>
-                          <span className="font-bold truncate text-slate-800 dark:text-[#f0f6fc]">{ws.name}</span>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <span className="font-semibold text-slate-600 dark:text-slate-400">{ws.membersCount} collaborators</span>
-                          <span className="text-[10px] text-slate-400 block">{ws.boardsCount} active boards</span>
-                        </div>
-                      </div>
-                    ))
                   )}
                 </div>
               </div>
