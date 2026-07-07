@@ -324,7 +324,7 @@ router.post('/:workspaceId/mock-incoming', authenticate, async (req, res) => {
 });
 
 // Helper function to process all incoming emails (from SMTP webhook or test simulator)
-async function processIncomingEmail({ to, from, subject, text, html, attachments, threadId, messageId }) {
+export async function processIncomingEmail({ to, from, subject, text, html, attachments, threadId, messageId }) {
   const cleanTo = to.match(/<([^>]+)>/)?.[1] || to.trim();
   const board = await prisma.board.findUnique({
     where: { incomingEmailAddress: cleanTo },

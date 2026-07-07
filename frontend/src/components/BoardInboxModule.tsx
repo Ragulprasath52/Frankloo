@@ -634,7 +634,9 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                   ) : (
                     /* Premium Inbox Client Layout */
                     <div className="bg-white dark:bg-[#1c2128] border border-gray-200 dark:border-[#30363d] rounded-2xl overflow-hidden shadow-sm flex flex-col">
-                      <div className="overflow-x-auto">
+                      
+                      {/* Desktop Table View */}
+                      <div className="hidden md:block overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                           <thead>
                             <tr className="bg-slate-50 dark:bg-white/5 border-b border-gray-200 dark:border-gray-800 text-[10px] text-gray-400 font-bold uppercase tracking-wider">
@@ -656,36 +658,43 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                               
                               return (
                                 <tr 
-                                  key={item.id}
+                                  key={item.id} 
                                   onClick={() => setSelectedEmail(item)}
-                                  className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors cursor-pointer group/row text-xs"
+                                  className="group/row hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors"
                                 >
-                                  {/* Sender with initials circular avatar */}
-                                  <td className="p-4 max-w-[160px]">
+                                  {/* Sender with initials badge */}
+                                  <td className="p-4 whitespace-nowrap min-w-[150px]">
                                     <div className="flex items-center gap-2.5">
-                                      <div className={`w-7 h-7 rounded-full shrink-0 flex items-center justify-center font-bold text-[10px] ${avatarColor}`}>
+                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0 ${avatarColor}`}>
                                         {initials}
                                       </div>
-                                      <span className="font-semibold text-slate-800 dark:text-[#c9d1d9] truncate block" title={details.sender}>
-                                        {(details.sender || 'Unknown').replace(/<.*>/, '').trim()}
-                                      </span>
+                                      <div className="min-w-0">
+                                        <p className="font-bold text-xs text-[#172b4d] dark:text-[#b6c2cf] truncate">
+                                          {details.sender?.split('<')[0]?.trim() || details.sender || 'Unknown'}
+                                        </p>
+                                        <p className="text-[10px] text-gray-455 truncate">
+                                          {details.sender?.match(/<([^>]+)>/)?.[1] || ''}
+                                        </p>
+                                      </div>
                                     </div>
                                   </td>
                                   
-                                  {/* Subject and Body preview */}
+                                  {/* Subject & body text excerpt */}
                                   <td className="p-4 min-w-[200px]">
-                                    <span className="font-bold text-[#172b4d] dark:text-[#e6edf3] block truncate max-w-[340px]">
-                                      {item.title}
-                                    </span>
-                                    <span className="text-[11px] text-gray-400 block truncate max-w-[340px] mt-0.5 font-medium leading-tight">
-                                      {item.description || 'No message preview available.'}
-                                    </span>
+                                    <div className="min-w-0">
+                                      <p className={`text-xs text-[#172b4d] dark:text-[#f0f6fc] truncate ${isNew ? 'font-bold' : 'font-medium'}`}>
+                                        {item.title}
+                                      </p>
+                                      <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate mt-0.5 max-w-[450px]">
+                                        {item.description}
+                                      </p>
+                                    </div>
                                   </td>
                                   
-                                  {/* Attachment Count Badge */}
+                                  {/* Attachment Indicator */}
                                   <td className="p-4 text-center">
                                     {hasAtts ? (
-                                      <span className="bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full font-bold text-[10px] inline-flex items-center gap-0.5 border border-indigo-500/10">
+                                      <span className="bg-indigo-50 dark:bg-indigo-950/20 text-indigo-650 dark:text-indigo-400 px-2 py-0.5 rounded-full font-bold text-[10px] inline-flex items-center gap-0.5 border border-indigo-500/10">
                                         <Paperclip className="w-3 h-3" /> {details.attachments.length}
                                       </span>
                                     ) : (
@@ -705,7 +714,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                                         New
                                       </span>
                                     ) : (
-                                      <span className="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-650 dark:text-emerald-450 font-bold rounded-full text-[9px] border border-emerald-500/10 inline-flex items-center gap-0.5">
+                                      <span className="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-655 dark:text-emerald-450 font-bold rounded-full text-[9px] border border-emerald-500/10 inline-flex items-center gap-0.5">
                                         <Check className="w-3 h-3" /> Converted
                                       </span>
                                     )}
@@ -754,16 +763,122 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                           </tbody>
                         </table>
                       </div>
+
+                      {/* Mobile Card List View */}
+                      <div className="block md:hidden divide-y divide-gray-150 dark:divide-gray-800">
+                        {boardInboxItems.map((item) => {
+                          const details = JSON.parse(item.sourceDetails || '{}');
+                          const hasAtts = details.attachments && details.attachments.length > 0;
+                          const isNew = item.status === 'NEW';
+                          const initials = getInitials(details.sender || 'Unknown');
+                          const avatarColor = getAvatarColor(details.sender || 'Unknown');
+                          
+                          return (
+                            <div 
+                              key={item.id} 
+                              onClick={() => setSelectedEmail(item)}
+                              className="p-4 space-y-3 hover:bg-slate-50/50 dark:hover:bg-white/5 cursor-pointer active:bg-slate-100/50 dark:active:bg-white/10 transition-colors"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                {/* Sender Avatar & Info */}
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0 ${avatarColor}`}>
+                                    {initials}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-xs text-[#172b4d] dark:text-[#b6c2cf] truncate">
+                                      {details.sender?.split('<')[0]?.trim() || details.sender || 'Unknown'}
+                                    </p>
+                                    <p className="text-[10px] text-gray-450 truncate">
+                                      {details.sender?.match(/<([^>]+)>/)?.[1] || ''}
+                                    </p>
+                                  </div>
+                                </div>
+                                
+                                {/* Status badge */}
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  {isNew ? (
+                                    <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-650 dark:text-indigo-455 font-bold rounded-full text-[9px] border border-indigo-500/10">
+                                      New
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-655 dark:text-emerald-450 font-bold rounded-full text-[9px] border border-emerald-500/10 inline-flex items-center gap-0.5">
+                                      <Check className="w-3 h-3" /> Converted
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Subject & Preview */}
+                              <div>
+                                <h4 className={`text-xs font-bold text-[#172b4d] dark:text-[#f0f6fc] ${isNew ? 'font-black' : 'font-medium'}`}>
+                                  {item.title}
+                                </h4>
+                                <p className="text-[11px] text-gray-400 dark:text-gray-500 line-clamp-2 mt-0.5 leading-relaxed">
+                                  {item.description || 'No text preview available'}
+                                </p>
+                              </div>
+
+                              {/* Footer (Attachments, Time, Actions) */}
+                              <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800/60" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center gap-2.5">
+                                  <span className="text-[10px] text-gray-400 font-medium">
+                                    {formatRelativeTime(item.createdAt)}
+                                  </span>
+                                  {hasAtts && (
+                                    <span className="bg-indigo-50 dark:bg-indigo-950/20 text-indigo-655 dark:text-indigo-400 px-2 py-0.5 rounded-full font-bold text-[9px] inline-flex items-center gap-0.5 border border-indigo-500/10">
+                                      <Paperclip className="w-2.5 h-2.5" /> {details.attachments.length}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => setSelectedEmail(item)}
+                                    className="p-1.5 rounded-lg text-gray-500 hover:bg-slate-100 dark:hover:bg-white/5 active:scale-95 transition-transform"
+                                    title="Preview email"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </button>
+                                  {isNew && (
+                                    <button
+                                      onClick={() => handleOpenConvert(item)}
+                                      className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/25 active:scale-95 transition-transform"
+                                      title="Convert to Card"
+                                    >
+                                      <CheckSquare className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={(e) => handleArchiveInboxItem(item.id, e)}
+                                    className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/25 active:scale-95 transition-transform"
+                                    title="Archive email"
+                                  >
+                                    <Archive className="w-4 h-4" />
+                                  </button>
+                                  {isEditor && (
+                                    <button
+                                      onClick={(e) => handleDeleteInboxItem(item.id, e)}
+                                      className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/25 active:scale-95 transition-transform"
+                                      title="Delete email"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
               )}
 
-              {activeTab === 'settings' && (
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start h-full">
                   {/* Left Side settings subtab menu */}
-                  <div className="space-y-1 md:col-span-1 border-r border-gray-250/40 dark:border-gray-800/40 pr-2">
-                    <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-2 px-2">Settings tab</span>
+                  <div className="flex md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1.5 md:space-y-1 md:col-span-1 md:border-r border-b md:border-b-0 border-gray-250/40 dark:border-gray-800/40 md:pr-4">
                     {[
                       { id: 'advanced', label: 'General Config', icon: Settings },
                       { id: 'automation', label: 'Routing Rules', icon: Cpu },
@@ -774,9 +889,9 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                         <button
                           key={subTab.id}
                           onClick={() => setActiveSettingsTab(subTab.id as SettingsSubTab)}
-                          className={`w-full text-left px-3 py-2 text-xs font-bold flex items-center gap-2 rounded-xl transition-colors ${
+                          className={`px-3 py-2 text-xs font-bold flex items-center gap-2 rounded-xl transition-colors whitespace-nowrap md:w-full shrink-0 ${
                             activeSettingsTab === subTab.id
-                              ? 'bg-indigo-500/10 text-indigo-650 dark:text-indigo-400'
+                              ? 'bg-indigo-500/10 text-indigo-655 dark:text-indigo-400'
                               : 'text-gray-500 hover:bg-gray-150/40 dark:hover:bg-white/5 hover:text-gray-700 dark:hover:text-gray-300'
                           }`}
                         >
@@ -1150,32 +1265,40 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="px-5 py-4 border-b border-gray-150 dark:border-gray-850 flex items-center justify-between shrink-0 bg-slate-50 dark:bg-[#161a22]">
-              <div className="flex items-center gap-3">
-                <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold rounded-full text-[10px]">
-                  Email Preview
-                </span>
-                <span className="text-[10px] text-gray-450 flex items-center gap-1 font-medium">
-                  <Clock className="w-3 h-3" /> {new Date(selectedEmail.createdAt).toLocaleString()}
-                </span>
+            <div className="px-4 py-3.5 border-b border-gray-150 dark:border-gray-850 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 bg-slate-50 dark:bg-[#161a22]">
+              <div className="flex items-center justify-between sm:justify-start gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-655 dark:text-indigo-400 font-bold rounded-full text-[10px]">
+                    Email Preview
+                  </span>
+                  <span className="text-[10px] text-gray-450 flex items-center gap-1 font-medium">
+                    <Clock className="w-3 h-3" /> {new Date(selectedEmail.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setSelectedEmail(null)}
+                  className="btn-icon p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 sm:hidden"
+                >
+                  <X className="w-4 h-4 shrink-0" />
+                </button>
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
                 {selectedEmail.status === 'NEW' ? (
                   <button
                     onClick={() => { handleOpenConvert(selectedEmail); }}
-                    className="btn-primary py-1.5 px-3 text-xs rounded-xl font-bold flex items-center gap-1 shadow-sm"
+                    className="btn-primary py-1.5 px-3 text-xs rounded-xl font-bold flex items-center gap-1 shadow-sm flex-1 sm:flex-initial justify-center"
                   >
-                    <Plus className="w-4 h-4" /> Convert to Card
+                    <Plus className="w-4 h-4" /> Convert
                   </button>
                 ) : (
-                  <span className="px-3 py-1 bg-emerald-500/10 text-emerald-650 dark:text-emerald-450 text-xs font-bold rounded-xl inline-flex items-center gap-1 border border-emerald-500/20">
+                  <span className="px-3 py-1 bg-emerald-500/10 text-emerald-655 dark:text-emerald-450 text-xs font-bold rounded-xl inline-flex items-center gap-1 border border-emerald-500/20">
                     <Check className="w-4 h-4" /> Converted
                   </span>
                 )}
                 <button
                   onClick={(e) => handleArchiveInboxItem(selectedEmail.id, e)}
-                  className="btn-secondary py-1.5 px-2.5 text-xs rounded-xl flex items-center gap-1"
+                  className="btn-secondary py-1.5 px-2.5 text-xs rounded-xl flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                   title="Archive email"
                 >
                   <Archive className="w-3.5 h-3.5" /> Archive
@@ -1183,7 +1306,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                 {isEditor && (
                   <button
                     onClick={(e) => handleDeleteInboxItem(selectedEmail.id, e)}
-                    className="btn-secondary py-1.5 px-2.5 text-xs rounded-xl text-red-500 border-red-500/10 hover:bg-red-500/5 hover:border-red-500/20 flex items-center gap-1"
+                    className="btn-secondary py-1.5 px-2.5 text-xs rounded-xl text-red-500 border-red-500/10 hover:bg-red-500/5 hover:border-red-500/20 flex items-center gap-1 flex-1 sm:flex-initial justify-center"
                     title="Delete permanently"
                   >
                     <Trash2 className="w-3.5 h-3.5" /> Delete
@@ -1191,7 +1314,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                 )}
                 <button
                   onClick={() => setSelectedEmail(null)}
-                  className="btn-icon p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10"
+                  className="btn-icon p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 hidden sm:block"
                 >
                   <X className="w-4.5 h-4.5" />
                 </button>
@@ -1333,7 +1456,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                   <span className="font-bold text-slate-800 dark:text-slate-200 block text-xs truncate leading-snug">{convertItem.title}</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="tf-label font-bold">Target Board</label>
                     <select
@@ -1364,7 +1487,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="tf-label font-bold">Priority</label>
                     <select
