@@ -118,31 +118,6 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
     }
   };
 
-  const getEmailDomain = () => {
-    const hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1' || /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname)) {
-      return 'mccmrfip.in';
-    }
-    if (hostname.endsWith('.mccmrfip.in')) {
-      return 'mccmrfip.in';
-    }
-    return hostname;
-  };
-
-  const handleRegenerateAddress = async () => {
-    if (!currentBoard) return;
-    const cleanBoardName = currentBoard.name.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'board';
-    const randomHex = Math.random().toString(36).substring(2, 6);
-    const newAddr = `${cleanBoardName}-${randomHex}@${getEmailDomain()}`;
-    setEmailAddress(newAddr);
-    try {
-      await updateBoard(currentBoard.id, { incomingEmailAddress: newAddr });
-      addToast('Address Generated', 'A new incoming email address has been generated and saved.', 'success');
-    } catch (err: any) {
-      addToast('Error', err.message || 'Failed to generate address', 'error');
-    }
-  };
-
   const handleSaveCustomization = (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.id) return;

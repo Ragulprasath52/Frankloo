@@ -33,17 +33,6 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [isEditingAddress, setIsEditingAddress] = useState(false);
 
-  const getEmailDomain = () => {
-    const hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1' || /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname)) {
-      return 'mccmrfip.in';
-    }
-    if (hostname.endsWith('.mccmrfip.in')) {
-      return 'mccmrfip.in';
-    }
-    return hostname;
-  };
-
   // Convert Modal States
   const [convertModalOpen, setConvertModalOpen] = useState(false);
   const [convertItem, setConvertItem] = useState<any | null>(null);
@@ -454,9 +443,9 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
             </div>
 
             {/* Email Address focal point */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 p-3 px-4 rounded-2xl max-w-xl">
+            <div className="flex flex-col md:flex-row md:items-center gap-4 bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 p-3 px-4 rounded-2xl max-w-xl w-full">
               {isEditingAddress ? (
-                <div className="flex-1 flex flex-col gap-2 min-w-[280px]">
+                <div className="flex-1 flex flex-col gap-2 w-full md:min-w-[280px]">
                   <span className="text-[9px] uppercase tracking-wider font-bold text-gray-400 block">Incoming Board Address</span>
                   <div className="flex gap-1.5">
                     <input
@@ -531,7 +520,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
             </div>
           </div>
           
-          <div className="max-w-6xl mx-auto flex items-center justify-between mt-4 md:mt-5 pt-3 border-t border-gray-100 dark:border-gray-800">
+          <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 mt-4 md:mt-5 pt-3 border-t border-gray-100 dark:border-gray-800">
             <div className="flex gap-4">
               <button 
                 onClick={() => setActiveTab('inbox')}
@@ -555,20 +544,20 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
               </button>
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto mt-2 md:mt-0">
               <button
                 onClick={handleTestEmail}
-                className="text-[10px] text-emerald-600 dark:text-emerald-450 bg-emerald-500/5 hover:bg-emerald-500/15 border border-emerald-500/20 px-2.5 py-1.5 rounded-lg flex items-center gap-1 font-bold"
+                className="text-[10px] text-emerald-600 dark:text-emerald-450 bg-emerald-500/5 hover:bg-emerald-500/15 border border-emerald-500/20 px-2.5 py-1.5 rounded-lg flex items-center gap-1 font-bold shrink-0"
               >
                 <PlayCircle className="w-3.5 h-3.5" /> Simulate Test Email
               </button>
-              <span className="text-[11px] text-slate-450 dark:text-[#6e7681] hidden sm:inline-block">
+              <span className="text-[11px] text-slate-450 dark:text-[#6e7681] hidden md:inline-block">
                 Board Selector:
               </span>
               <select 
                 value={selectedBoardId} 
                 onChange={(e) => setSelectedBoardId(e.target.value)}
-                className="bg-slate-50 dark:bg-white/5 border border-gray-250 dark:border-[#30363d] text-xs rounded-lg py-1 px-2 pr-7 font-bold text-gray-600 dark:text-[#8d96a0]"
+                className="bg-slate-50 dark:bg-white/5 border border-gray-250 dark:border-[#30363d] text-xs rounded-lg py-1 px-2 pr-7 font-bold text-gray-600 dark:text-[#8d96a0] max-w-[150px] md:max-w-none"
               >
                 {currentWorkspace?.boards?.map(b => (
                   <option key={b.id} value={b.id}>{b.name}</option>
@@ -585,11 +574,11 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
 
       {/* ── CORE VIEWS CONTENT ── */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6">
-        <div className="max-w-6xl mx-auto h-full">
+        <div className="max-w-6xl mx-auto min-h-full flex flex-col">
           {activeBoard ? (
             <>
               {activeTab === 'inbox' && (
-                <div className="h-full flex flex-col">
+                <div className="min-h-full flex flex-col flex-1">
                   {boardInboxItems.length === 0 ? (
                     /* Beautiful Onboarding State */
                     <div className="flex-1 min-h-[380px] bg-white dark:bg-[#1c2128] border border-gray-200 dark:border-gray-800 rounded-3xl p-8 flex flex-col items-center justify-center max-w-xl mx-auto shadow-sm my-6 text-center">
@@ -876,7 +865,8 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                 </div>
               )}
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start h-full">
+              {activeTab === 'settings' && (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start min-h-full">
                   {/* Left Side settings subtab menu */}
                   <div className="flex md:flex-col overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 gap-1.5 md:space-y-1 md:col-span-1 md:border-r border-b md:border-b-0 border-gray-250/40 dark:border-gray-800/40 md:pr-4">
                     {[
