@@ -23,3 +23,7 @@ export const backendUrl = (path: string) => {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   return `${BACKEND_BASE_URL}${cleanPath}`;
 };
+
+export const getEmailDomain = () => {
+  return import.meta.env.VITE_EMAIL_DOMAIN || 'boards.frankloo.app';
+};

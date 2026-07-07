@@ -6,6 +6,7 @@ import {
   ExternalLink, ShieldCheck, PlayCircle, Paperclip, Clock, 
   Archive, Eye, Edit3
 } from 'lucide-react';
+import { getEmailDomain } from '../config/api';
 
 interface BoardInboxModuleProps {
   workspaceId: string;
@@ -502,6 +503,13 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                         title="Edit custom email address"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={handleRegenerateAddress}
+                        className="btn-secondary py-1.5 px-2.5 text-xs flex items-center gap-1 rounded-xl"
+                        title="Regenerate random email address"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={handleToggleEmailEnabled}
