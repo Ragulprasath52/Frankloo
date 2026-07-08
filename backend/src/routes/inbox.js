@@ -7,6 +7,74 @@ import { parseEmailBody } from '../utils/emailParser.js';
 
 const router = Router();
 
+// POST inbound parsed email from SMTP/forward service
+router.post('/incoming-email', async (req, res) => {
+  try {
+    const { to, from, subject, text, html, attachments, threadId, messageId } = req.body;
+    if (!to || !from || !subject) {
+      return res.status(400).json({ error: 'Missing required email fields (to, from, subject)' });
+    }
+
+    const result = await processIncomingEmail({ to, from, subject, text, html, attachments, threadId, messageId });
+    res.json(result);
+  } catch (error) {
+    console.error('Incoming Email Parse Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to process incoming email' });
+  }
+});
+
+// POST inbound parsed email from Cloudflare Email Workers
+router.post('/cloudflare-email', express.text({ type: 'text/plain', limit: '25mb' }), async (req, res) => {
+  try {
+    const secret = process.env.CLOUDFLARE_SECRET;
+    if (secret && req.headers['x-cloudflare-secret'] !== secret) {
+      return res.status(401).json({ error: 'Invalid Cloudflare secret' });
+    }
+
+    let to, from, subject, text, html, attachments, threadId, messageId;
+
+    if (typeof req.body === 'string') {
+      const parser = new PostalMime();
+      const parsedEmail = await parser.parse(req.body);
+
+      to = req.headers['x-envelope-to'] || (parsedEmail.to && parsedEmail.to[0]?.address) || '';
+      from = req.headers['x-envelope-from'] || parsedEmail.from?.address || '';
+      subject = parsedEmail.subject || '(No Subject)';
+      text = parsedEmail.text || '';
+      html = parsedEmail.html || '';
+      messageId = parsedEmail.messageId || null;
+      threadId = null;
+      attachments = (parsedEmail.attachments || []).map(att => ({
+        filename: att.filename,
+        mimeType: att.mimeType,
+        size: att.content ? att.content.byteLength : 0,
+        storagePath: 'uploads/gmail-dummy'
+      }));
+    } else {
+      ({ to, from, subject, text, html, attachments, threadId, messageId } = req.body || {});
+    }
+
+    if (!to || !from) {
+      return res.status(400).json({ error: 'Missing required email fields (to, from)' });
+    }
+
+    const result = await processIncomingEmail({
+      to,
+      from,
+      subject: subject || '(No Subject)',
+      text: text || '',
+      html: html || '',
+      attachments: attachments || [],
+      threadId,
+      messageId
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('Cloudflare Email Route Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to process Cloudflare email' });
+  }
+});
+
 // GET all inbox items for a workspace
 router.get('/:workspaceId', authenticate, async (req, res) => {
   try {
@@ -659,73 +727,7 @@ export async function processIncomingEmail({ to, from, subject, text, html, atta
   return { success: true, action: 'INBOX_DELIVERED', itemId: item.id };
 }
 
-// POST inbound parsed email from SMTP/forward service
-router.post('/incoming-email', async (req, res) => {
-  try {
-    const { to, from, subject, text, html, attachments, threadId, messageId } = req.body;
-    if (!to || !from || !subject) {
-      return res.status(400).json({ error: 'Missing required email fields (to, from, subject)' });
-    }
 
-    const result = await processIncomingEmail({ to, from, subject, text, html, attachments, threadId, messageId });
-    res.json(result);
-  } catch (error) {
-    console.error('Incoming Email Parse Error:', error);
-    res.status(500).json({ error: error.message || 'Failed to process incoming email' });
-  }
-});
-
-// POST inbound parsed email from Cloudflare Email Workers
-router.post('/cloudflare-email', express.text({ type: 'text/plain', limit: '25mb' }), async (req, res) => {
-  try {
-    const secret = process.env.CLOUDFLARE_SECRET;
-    if (secret && req.headers['x-cloudflare-secret'] !== secret) {
-      return res.status(401).json({ error: 'Invalid Cloudflare secret' });
-    }
-
-    let to, from, subject, text, html, attachments, threadId, messageId;
-
-    if (typeof req.body === 'string') {
-      const parser = new PostalMime();
-      const parsedEmail = await parser.parse(req.body);
-
-      to = req.headers['x-envelope-to'] || (parsedEmail.to && parsedEmail.to[0]?.address) || '';
-      from = req.headers['x-envelope-from'] || parsedEmail.from?.address || '';
-      subject = parsedEmail.subject || '(No Subject)';
-      text = parsedEmail.text || '';
-      html = parsedEmail.html || '';
-      messageId = parsedEmail.messageId || null;
-      threadId = null;
-      attachments = (parsedEmail.attachments || []).map(att => ({
-        filename: att.filename,
-        mimeType: att.mimeType,
-        size: att.content ? att.content.byteLength : 0,
-        storagePath: 'uploads/gmail-dummy'
-      }));
-    } else {
-      ({ to, from, subject, text, html, attachments, threadId, messageId } = req.body || {});
-    }
-
-    if (!to || !from) {
-      return res.status(400).json({ error: 'Missing required email fields (to, from)' });
-    }
-
-    const result = await processIncomingEmail({
-      to,
-      from,
-      subject: subject || '(No Subject)',
-      text: text || '',
-      html: html || '',
-      attachments: attachments || [],
-      threadId,
-      messageId
-    });
-    res.json(result);
-  } catch (error) {
-    console.error('Cloudflare Email Route Error:', error);
-    res.status(500).json({ error: error.message || 'Failed to process Cloudflare email' });
-  }
-});
 
 // GET email logs for a board
 router.get('/:workspaceId/logs/:boardId', authenticate, async (req, res) => {
