@@ -322,6 +322,12 @@ export default function WikiDocsModule({ workspaceId, isEditor, onSelectBoard }:
   const [linkType, setLinkType] = useState<'BOARD' | 'TASK' | 'GOAL' | 'MILESTONE'>('TASK');
   const [linkItemId, setLinkItemId] = useState('');
 
+  // Custom Toolbar Insert Modal States
+  const [insertModalOpen, setInsertModalOpen] = useState(false);
+  const [insertType, setInsertType] = useState<'link' | 'image' | 'video'>('link');
+  const [insertUrl, setInsertUrl] = useState('');
+  const [insertText, setInsertText] = useState('');
+
   // Selected active document object
   const activeDoc = documents.find(d => d.id === selectedDocId);
 
@@ -977,8 +983,36 @@ export default function WikiDocsModule({ workspaceId, isEditor, onSelectBoard }:
     }, 50);
   };
 
+  const handleInsertSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!insertUrl.trim()) return;
+
+    const cleanUrl = insertUrl.trim();
+    const cleanText = insertText.trim();
+
+    if (insertType === 'link') {
+      insertTextAtCursor(`[${cleanText || 'Link Text'}](${cleanUrl})`);
+    } else if (insertType === 'image') {
+      insertTextAtCursor(`![${cleanText || 'Image description'}](${cleanUrl})`);
+    } else if (insertType === 'video') {
+      insertTextAtCursor(`![${cleanText || 'Video tutorial'}](${cleanUrl})`);
+    }
+
+    setInsertUrl('');
+    setInsertText('');
+    setInsertModalOpen(false);
+  };
+
   // Template Quick Actions
   const handleToolbarInsert = (type: string) => {
+    const textarea = document.getElementById('wiki-doc-textarea') as HTMLTextAreaElement;
+    let selectedText = '';
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      selectedText = textarea.value.substring(start, end);
+    }
+
     switch (type) {
       case 'h1': insertTextAtCursor('\n# Heading 1\n'); break;
       case 'h2': insertTextAtCursor('\n## Heading 2\n'); break;
@@ -991,9 +1025,27 @@ export default function WikiDocsModule({ workspaceId, isEditor, onSelectBoard }:
       case 'bullet': insertTextAtCursor('\n- Bullet item\n'); break;
       case 'code': insertTextAtCursor('\n\`\`\`javascript\nconsole.log("Hello, world!");\n\`\`\`\n'); break;
       case 'table': insertTextAtCursor('\n| Column 1 | Column 2 |\n|---|---|\n| Item A | Item B |\n'); break;
-      case 'link': insertTextAtCursor('[Frankloo Docs](http://localhost:5173/)'); break;
-      case 'image': insertTextAtCursor('![Alt text](https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=600&q=80)'); break;
-      case 'video': insertTextAtCursor('![Video tutorial](https://www.w3schools.com/html/mov_bbb.mp4)'); break;
+      case 'link': {
+        setInsertType('link');
+        setInsertUrl('https://');
+        setInsertText(selectedText.trim());
+        setInsertModalOpen(true);
+        break;
+      }
+      case 'image': {
+        setInsertType('image');
+        setInsertUrl('https://');
+        setInsertText(selectedText.trim());
+        setInsertModalOpen(true);
+        break;
+      }
+      case 'video': {
+        setInsertType('video');
+        setInsertUrl('https://');
+        setInsertText(selectedText.trim());
+        setInsertModalOpen(true);
+        break;
+      }
     }
   };
 
@@ -2057,6 +2109,76 @@ export default function WikiDocsModule({ workspaceId, isEditor, onSelectBoard }:
                   className="px-4 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white shadow-sm hover:bg-blue-700"
                 >
                   Link Resource
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+      {/* ═════════════════════════════════════════════════════════════
+         CUSTOM TOOLBAR INSERT MODAL
+         ═════════════════════════════════════════════════════════════ */}
+      {insertModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#22272b] rounded-xl border border-[#dfe1e6] dark:border-[#a6c5e229] w-full max-w-sm p-6 space-y-4 shadow-2xl animate-scale-in text-[#172b4d] dark:text-[#b6c2cf]">
+            
+            <div className="flex items-center justify-between border-b pb-3 border-[#dfe1e6] dark:border-[#a6c5e229]">
+              <h3 className="text-base font-bold flex items-center gap-1.5 capitalize">
+                Insert {insertType}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setInsertModalOpen(false)}
+                className="p-1 hover:bg-black/15 dark:hover:bg-white/10 rounded"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleInsertSubmit} className="space-y-4">
+              
+              {/* URL Input */}
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold text-[#8590a2] uppercase tracking-wider">{insertType} URL</label>
+                <input
+                  type="text"
+                  placeholder="https://"
+                  value={insertUrl}
+                  onChange={e => setInsertUrl(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg text-sm bg-slate-50 dark:bg-[#1d2125] border border-[#dfe1e6] dark:border-[#a6c5e229] text-slate-800 dark:text-slate-100"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              {/* Text/Alt Input */}
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold text-[#8590a2] uppercase tracking-wider">
+                  {insertType === 'link' ? 'Link Text' : insertType === 'image' ? 'Image Alt Text' : 'Video Title'}
+                </label>
+                <input
+                  type="text"
+                  placeholder={insertType === 'link' ? 'Enter display text...' : insertType === 'image' ? 'Describe the image...' : 'Enter video title...'}
+                  value={insertText}
+                  onChange={e => setInsertText(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg text-sm bg-slate-50 dark:bg-[#1d2125] border border-[#dfe1e6] dark:border-[#a6c5e229] text-slate-800 dark:text-slate-100"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 justify-end pt-2 border-t border-[#dfe1e6] dark:border-[#a6c5e229]">
+                <button
+                  type="button"
+                  onClick={() => setInsertModalOpen(false)}
+                  className="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-150 hover:bg-slate-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white shadow-sm hover:bg-blue-700"
+                >
+                  Insert
                 </button>
               </div>
 
