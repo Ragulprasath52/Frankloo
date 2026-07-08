@@ -284,10 +284,10 @@ export default function CalendarModule({ board, onOpenCardDetails, onOpenSyncMod
           </div>
  
           {/* Quick Stats & View Mode Selectors */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 w-full sm:w-auto sm:justify-end">
             
             {/* counters */}
-            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-500 dark:text-[#8d96a0]">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-500 dark:text-[#8d96a0] shrink-0">
               {overdueCount > 0 && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 rounded-lg">
                   <AlertTriangle className="w-3.5 h-3.5" />
@@ -305,7 +305,7 @@ export default function CalendarModule({ board, onOpenCardDetails, onOpenSyncMod
             </div>
  
             {/* View Mode Tabs */}
-            <div className="flex bg-slate-100 dark:bg-[#21262d] rounded-xl p-0.5 border border-[#dfe1e6] dark:border-[#30363d]">
+            <div className="flex bg-slate-100 dark:bg-[#21262d] rounded-xl p-0.5 border border-[#dfe1e6] dark:border-[#30363d] shrink-0">
               {(['month', 'week', 'agenda'] as const).map(mode => (
                 <button
                   key={mode}
@@ -323,12 +323,12 @@ export default function CalendarModule({ board, onOpenCardDetails, onOpenSyncMod
             </div>
  
             {/* Add Action */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               {onOpenSyncModal && (
                 <button
                   type="button"
                   onClick={onOpenSyncModal}
-                  className="bg-slate-100 hover:bg-slate-200 dark:bg-[#21262d] dark:hover:bg-[#30363d] border border-[#dfe1e6] dark:border-[#30363d] text-slate-600 dark:text-[#e6edf3] text-xs font-semibold py-1.5 px-3 rounded-xl flex items-center gap-1.5 transition-all"
+                  className="bg-slate-100 hover:bg-slate-200 dark:bg-[#21262d] dark:hover:bg-[#30363d] border border-[#dfe1e6] dark:border-[#30363d] text-slate-600 dark:text-[#e6edf3] text-xs font-semibold py-1.5 px-3 rounded-xl flex items-center gap-1.5 shrink-0 whitespace-nowrap transition-all"
                 >
                   <CalendarIcon className="w-3.5 h-3.5" /> Sync
                 </button>
@@ -339,7 +339,7 @@ export default function CalendarModule({ board, onOpenCardDetails, onOpenSyncMod
                   setQuickAddType('TASK');
                   setQuickAddOpen(true);
                 }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1.5 px-3 rounded-xl flex items-center gap-1.5 shadow-lg shadow-indigo-600/10 active:scale-95 transition-all"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1.5 px-3 rounded-xl flex items-center gap-1.5 shrink-0 whitespace-nowrap shadow-lg shadow-indigo-600/10 active:scale-95 transition-all"
                 style={{ backgroundColor: 'var(--accent)' }}
               >
                 <Plus className="w-3.5 h-3.5" /> Create
