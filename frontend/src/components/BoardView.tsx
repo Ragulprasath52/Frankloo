@@ -1,14 +1,14 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore, getAvatarUrl } from '../store/useStore';
 import type { Card } from '../store/useStore';
 import { apiUrl } from '../config/api';
 
 import { 
   Columns, Calendar as CalendarIcon, 
-  BarChart3, UserCheck, Play, ArrowLeft, Plus, X, Trash2, Archive,
-  CalendarCheck, Clock, CheckCircle, PlusCircle, Copy, Check, Info, Lock, Paintbrush,
-  MessageSquare, AlertCircle, Sparkles, ChevronRight, Flame, Upload, HelpCircle, Users,
-  Pencil
+  BarChart3, UserCheck, Play, ArrowLeft, Plus, X, Trash2, MoreHorizontal,
+  CalendarCheck, CheckCircle, PlusCircle, Copy, Check, Info, Lock, Paintbrush,
+  AlertCircle, Sparkles, ChevronRight, Upload, HelpCircle, Users,
+  Pencil, Inbox, Mail, RotateCw
 } from 'lucide-react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -16,6 +16,9 @@ import {
 } from 'recharts';
 import { useThemeStore } from '../store/useThemeStore';
 import CalendarModule from './CalendarModule';
+
+const transparentDragImg = new Image();
+transparentDragImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
 interface BoardViewProps {
   boardId: string;
@@ -25,6 +28,712 @@ interface BoardViewProps {
 }
 
 type TabType = 'kanban' | 'calendar' | 'dashboard' | 'workload' | 'automations';
+
+interface KanbanCardProps {
+  card: Card;
+  listId: string;
+  onPointerDown: (e: React.PointerEvent<HTMLDivElement>, card: Card, listId: string) => void;
+  editingCardId: string | null;
+  setEditingCardId: (id: string | null) => void;
+  editingCardTitle: string;
+  setEditingCardTitle: (title: string) => void;
+  onOpenCardDetails: (card: Card) => void;
+  saveCardQuickRename: (cardId: string) => void;
+  handleCardQuickRenameKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>, cardId: string) => void;
+}
+
+const KanbanCard = React.memo(({
+  card,
+  listId,
+  onPointerDown,
+  editingCardId,
+  setEditingCardId,
+  editingCardTitle,
+  setEditingCardTitle,
+  onOpenCardDetails,
+  saveCardQuickRename,
+  handleCardQuickRenameKeyDown
+}: KanbanCardProps) => {
+  let customData: any = {};
+  try {
+    if (card.customFields) {
+      customData = JSON.parse(card.customFields);
+    }
+  } catch (e) {}
+  const cardEmoji = customData.emoji || '';
+
+  // Completed checks count
+  const checklistCount = card.checklists?.length || 0;
+  const completedChecklistCount = card.checklists?.filter(i => i.isCompleted).length || 0;
+  const progressPercentage = checklistCount > 0 ? (completedChecklistCount / checklistCount) * 105 : 0;
+
+  return (
+    <div
+      onPointerDown={(e) => onPointerDown(e, card, listId)}
+      onClick={() => {
+        if (editingCardId !== card.id) {
+          onOpenCardDetails(card);
+        }
+      }}
+      className={`kb-card space-y-2 animate-fade-in group/card relative ${
+        card.priority === 'URGENT' ? 'priority-left-urgent' :
+        card.priority === 'HIGH' ? 'priority-left-high' :
+        card.priority === 'MEDIUM' ? 'priority-left-medium' : 'priority-left-low'
+      }`}
+      style={{ touchAction: 'none' }}
+    >
+      {card.coverImage && (
+        <div className="w-full h-3 rounded overflow-hidden pointer-events-none mb-1">
+          {card.coverImage.startsWith('linear-gradient') || card.coverImage.startsWith('radial-gradient') || card.coverImage.startsWith('#') ? (
+            <div
+              className="w-full h-full"
+              style={{ background: card.coverImage }}
+            />
+          ) : (
+            <img
+              src={card.coverImage}
+              alt=""
+              className="w-full h-full object-cover"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Title & Emoji & Edit Button */}
+      {editingCardId === card.id ? (
+        <div 
+          className="space-y-1.5" 
+          onClick={(e) => e.stopPropagation()}
+        >
+          <textarea
+            value={editingCardTitle}
+            onChange={(e) => setEditingCardTitle(e.target.value)}
+            onKeyDown={(e) => handleCardQuickRenameKeyDown(e, card.id)}
+            className="w-full text-xs p-2 border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 resize-none font-semibold"
+            style={{ borderColor: 'var(--border)' }}
+            autoFocus
+            rows={2}
+          />
+          <div className="flex gap-1 justify-end">
+            <button
+              onClick={() => setEditingCardId(null)}
+              className="px-2 py-0.5 text-[9px] bg-slate-150 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded hover:bg-slate-200"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => saveCardQuickRename(card.id)}
+              className="px-2 py-0.5 text-[9px] bg-indigo-600 text-white rounded hover:bg-indigo-700 font-semibold"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-start justify-between gap-1.5">
+          <div className="flex items-start gap-1.5 min-w-0 pointer-events-none">
+            {cardEmoji && <span className="text-xs shrink-0 leading-none mt-0.5">{cardEmoji}</span>}
+            <h4 className="text-xs font-semibold leading-snug break-words" style={{ color: 'var(--text-primary)' }}>
+              {card.title}
+            </h4>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditingCardId(card.id);
+              setEditingCardTitle(card.title);
+            }}
+            className="opacity-0 group-hover/card:opacity-100 p-0.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-slate-600 dark:text-slate-555 transition-opacity shrink-0"
+            title="Rename"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Checklist Progress line (Extremely thin) */}
+      {checklistCount > 0 && (
+        <div className="pointer-events-none space-y-0.5">
+          <div className="flex items-center justify-between text-[8px] font-bold text-slate-450 dark:text-slate-550">
+            <span>Progress</span>
+            <span>{completedChecklistCount}/{checklistCount}</span>
+          </div>
+          <div className="w-full h-1 bg-slate-150 dark:bg-slate-800 rounded-full overflow-hidden">
+            <div 
+              className="h-full rounded-full transition-all duration-300" 
+              style={{ 
+                width: `${Math.min(progressPercentage, 100)}%`,
+                background: progressPercentage >= 100 ? 'var(--success)' : 'var(--accent)'
+              }} 
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Metadata Inline Row: Priority, Due Date, and Assignees */}
+      <div className="flex items-center justify-between pt-1.5 border-t border-slate-100/50 dark:border-slate-800/40 pointer-events-none text-[9px]">
+        <div className="flex items-center gap-1.5">
+          <span className={`font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+            card.priority === 'URGENT' ? 'bg-red-500/10 text-red-650' :
+            card.priority === 'HIGH'   ? 'bg-amber-500/10 text-amber-650'   :
+            card.priority === 'MEDIUM' ? 'bg-indigo-500/10 text-indigo-655' : 
+                                         'bg-slate-500/10 text-slate-550'
+          }`}>
+            {card.priority}
+          </span>
+
+          {card.dueDate && (
+            <span className={`flex items-center gap-0.5 font-bold rounded px-1 py-0.5 ${
+              new Date(card.dueDate) < new Date() && listId !== 'done'
+                ? 'bg-rose-500/10 text-rose-650'
+                : 'bg-slate-100/50 dark:bg-slate-900/50 text-slate-550'
+            }`}>
+              📅 {new Date(card.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+            </span>
+          )}
+        </div>
+
+        {/* Assignees */}
+        <div className="flex -space-x-1 shrink-0">
+          {card.assignees.slice(0, 3).map(a => (
+            <img
+              key={a.id}
+              src={getAvatarUrl(a.user.avatarUrl, a.user.name || a.user.username)}
+              alt=""
+              title={a.user.name || a.user.username}
+              className="w-4 h-4 rounded-full object-cover border border-white dark:border-slate-900"
+            />
+          ))}
+          {card.assignees.length > 3 && (
+            <span className="w-4 h-4 rounded-full bg-slate-150 dark:bg-slate-805 text-slate-500 dark:text-slate-400 flex items-center justify-center font-bold text-[7px] border border-white dark:border-slate-900">
+              +{card.assignees.length - 3}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  return prevProps.card === nextProps.card &&
+         prevProps.editingCardId === nextProps.editingCardId &&
+         prevProps.editingCardTitle === nextProps.editingCardTitle &&
+         prevProps.listId === nextProps.listId;
+});
+
+interface KanbanColumnProps {
+  list: any;
+  draggedEmail: any;
+  editingListId: string | null;
+  setEditingListId: (val: string | null) => void;
+  editingListName: string;
+  setEditingListName: (val: string) => void;
+  saveListName: (listId: string) => void;
+  handleListNameKeyDown: (e: React.KeyboardEvent<HTMLInputElement>, listId: string) => void;
+  showConfirm: any;
+  archiveList: any;
+  boardId: string;
+  addToast: any;
+  handleCreateCardSubmit: (listId: string) => void;
+  cardTitles: Record<string, string>;
+  setCardTitles: (val: Record<string, string>) => void;
+  handleListDragStart: (e: React.DragEvent, listId: string) => void;
+  handleDragOver: (e: React.DragEvent) => void;
+  handleDrop: (e: React.DragEvent, listId: string) => void;
+  editingCardId: string | null;
+  setEditingCardId: (val: string | null) => void;
+  editingCardTitle: string;
+  setEditingCardTitle: (val: string) => void;
+  onOpenCardDetails: (card: Card) => void;
+  saveCardQuickRename: (cardId: string) => void;
+  handleCardQuickRenameKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>, cardId: string) => void;
+  handleCardPointerDown: (e: React.PointerEvent<HTMLDivElement>, card: Card, listId: string) => void;
+  hasCustomBg: boolean;
+}
+
+const KanbanColumn = React.memo(({
+  list,
+  draggedEmail,
+  editingListId,
+  setEditingListId,
+  editingListName,
+  setEditingListName,
+  saveListName,
+  handleListNameKeyDown,
+  showConfirm,
+  archiveList,
+  boardId,
+  addToast,
+  handleCreateCardSubmit,
+  cardTitles,
+  setCardTitles,
+  handleListDragStart,
+  handleDragOver,
+  handleDrop,
+  editingCardId,
+  setEditingCardId,
+  editingCardTitle,
+  setEditingCardTitle,
+  onOpenCardDetails,
+  saveCardQuickRename,
+  handleCardQuickRenameKeyDown,
+  handleCardPointerDown,
+  hasCustomBg
+}: KanbanColumnProps) => {
+  const [isAddingCard, setIsAddingCard] = React.useState(false);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [moveMode, setMoveMode] = React.useState(false);
+  const [sortMode, setSortMode] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  
+  const { deleteList, updateList, updateCard, createCard, token } = useStore();
+
+  React.useEffect(() => {
+    if (!menuOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleEsc);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [menuOpen]);
+
+  const handleCopyList = async () => {
+    try {
+      const newPos = (list.position || 0) + 500;
+      const res = await fetch(apiUrl(`/boards/${boardId}/lists`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ name: `Copy of ${list.name}`, position: newPos })
+      });
+      if (!res.ok) throw new Error('Failed to copy list');
+      const newList = await res.json();
+      
+      for (const card of list.cards) {
+        await createCard(boardId, newList.id, card.title, card.position || 0, card.priority);
+      }
+      addToast('List Copied', `"${list.name}" copied successfully.`, 'success');
+      const fetchBoardDetails = useStore.getState().fetchBoardDetails;
+      await fetchBoardDetails(boardId);
+    } catch (err: any) {
+      addToast('Error', err.message || 'Failed to copy list', 'error');
+    }
+  };
+
+  const handleSortCards = async (criteria: 'title' | 'priority' | 'date') => {
+    const sorted = [...list.cards];
+    if (criteria === 'title') {
+      sorted.sort((a, b) => a.title.localeCompare(b.title));
+    } else if (criteria === 'priority') {
+      const priorityMap: Record<string, number> = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+      sorted.sort((a, b) => (priorityMap[b.priority] || 0) - (priorityMap[a.priority] || 0));
+    } else if (criteria === 'date') {
+      sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    }
+    
+    setMenuOpen(false);
+    setSortMode(false);
+    try {
+      addToast('Sorting Cards', 'Sorting list cards...', 'info');
+      for (let i = 0; i < sorted.length; i++) {
+        await updateCard(boardId, sorted[i].id, { position: (i + 1) * 1000 });
+      }
+      addToast('List Sorted', `Sorted cards by ${criteria}.`, 'success');
+      const fetchBoardDetails = useStore.getState().fetchBoardDetails;
+      await fetchBoardDetails(boardId);
+    } catch (err: any) {
+      addToast('Error', err.message || 'Failed to sort cards', 'error');
+    }
+  };
+
+  const handleMoveListShift = async (direction: 'left' | 'right') => {
+    const currentBoard = useStore.getState().currentBoard;
+    if (!currentBoard) return;
+    const lists = [...currentBoard.lists].sort((a, b) => a.position - b.position);
+    const currentIndex = lists.findIndex(l => l.id === list.id);
+    if (currentIndex === -1) return;
+    
+    let targetIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= lists.length) return;
+    
+    const targetList = lists[targetIndex];
+    const targetPos = targetList.position;
+    
+    let newPosition: number;
+    if (direction === 'left') {
+      const prevPrevPos = targetIndex > 0 ? lists[targetIndex - 1].position : 0;
+      newPosition = (targetPos + prevPrevPos) / 2;
+    } else {
+      const nextNextPos = targetIndex + 1 < lists.length ? lists[targetIndex + 1].position : targetPos + 1000;
+      newPosition = (targetPos + nextNextPos) / 2;
+    }
+    
+    setMenuOpen(false);
+    setMoveMode(false);
+    try {
+      await updateList(boardId, list.id, undefined, newPosition);
+      addToast('Column Moved', `Moved column successfully`, 'success');
+    } catch (err: any) {
+      addToast('Error', err.message || 'Failed to move column', 'error');
+    }
+  };
+
+  const renderMenuItems = () => {
+    if (moveMode) {
+      return (
+        <div className="space-y-2">
+          <div className="text-[10px] font-bold text-slate-450 dark:text-slate-500 uppercase tracking-wider px-2">Move List</div>
+          <div className="flex gap-1.5 px-2">
+            <button 
+              onClick={() => handleMoveListShift('left')}
+              className="flex-1 text-center py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-250 rounded font-bold transition-colors"
+            >
+              ← Left
+            </button>
+            <button 
+              onClick={() => handleMoveListShift('right')}
+              className="flex-1 text-center py-1.5 bg-slate-100 hover:bg-slate-250 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-255 rounded font-bold transition-colors"
+            >
+              Right →
+            </button>
+          </div>
+          <button 
+            onClick={() => setMoveMode(false)}
+            className="w-full text-center py-1 text-[9px] text-indigo-500 hover:underline font-bold"
+          >
+            Back
+          </button>
+        </div>
+      );
+    }
+
+    if (sortMode) {
+      return (
+        <div className="space-y-1">
+          <div className="text-[10px] font-bold text-slate-450 dark:text-slate-500 uppercase tracking-wider px-2 pb-1.5">Sort Cards By</div>
+          <button 
+            onClick={() => handleSortCards('title')}
+            className="w-full text-left px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded font-semibold text-slate-700 dark:text-slate-250"
+          >
+            Card Title (A-Z)
+          </button>
+          <button 
+            onClick={() => handleSortCards('priority')}
+            className="w-full text-left px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded font-semibold text-slate-700 dark:text-slate-250"
+          >
+            Priority (High → Low)
+          </button>
+          <button 
+            onClick={() => handleSortCards('date')}
+            className="w-full text-left px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded font-semibold text-slate-700 dark:text-slate-250"
+          >
+            Date Created
+          </button>
+          <div className="border-t border-slate-150 dark:border-slate-800 my-1" />
+          <button 
+            onClick={() => setSortMode(false)}
+            className="w-full text-center py-1 text-[9px] text-indigo-500 hover:underline font-bold"
+          >
+            Back
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-1">
+        <button
+          onClick={() => {
+            setIsAddingCard(true);
+            setMenuOpen(false);
+          }}
+          className="w-full text-left px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded font-semibold text-slate-750 dark:text-slate-250"
+        >
+          Add Card
+        </button>
+        <button
+          onClick={() => {
+            setEditingListId(list.id);
+            setEditingListName(list.name);
+            setMenuOpen(false);
+          }}
+          className="w-full text-left px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded font-semibold text-slate-750 dark:text-slate-250"
+        >
+          Rename List
+        </button>
+
+        <div className="border-t border-slate-150 dark:border-slate-850 my-1" />
+
+        <button
+          onClick={handleCopyList}
+          className="w-full text-left px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded font-semibold text-slate-750 dark:text-slate-250"
+        >
+          Copy List
+        </button>
+        <button
+          onClick={() => setMoveMode(true)}
+          className="w-full text-left px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded font-semibold text-slate-750 dark:text-slate-250"
+        >
+          Move List
+        </button>
+        <button
+          onClick={() => setSortMode(true)}
+          className="w-full text-left px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded font-semibold text-slate-750 dark:text-slate-250"
+        >
+          Sort Cards
+        </button>
+
+        <div className="border-t border-slate-150 dark:border-slate-850 my-1" />
+
+        <button
+          onClick={async () => {
+            setMenuOpen(false);
+            const confirmed = await showConfirm(
+              'Archive List',
+              `Archive "${list.name}"? All its cards will also be archived. You can restore them later from the board settings.`,
+              'Archive',
+              'Cancel'
+            );
+            if (!confirmed) return;
+            try {
+              await archiveList(boardId, list.id);
+              addToast('List Archived', `"${list.name}" has been archived successfully.`, 'success');
+            } catch (err: any) {
+              addToast('Error', err.message || 'Failed to archive list. Please try again.', 'error');
+            }
+          }}
+          className="w-full text-left px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded font-semibold text-slate-750 dark:text-slate-250"
+        >
+          Archive List
+        </button>
+        <button
+          onClick={async () => {
+            setMenuOpen(false);
+            const confirmed = await showConfirm(
+              'Delete List',
+              `Are you sure you want to permanently delete list "${list.name}"? This action cannot be undone.`,
+              'Delete',
+              'Cancel'
+            );
+            if (!confirmed) return;
+            try {
+              await deleteList(boardId, list.id);
+              addToast('List Deleted', `"${list.name}" has been permanently deleted.`, 'success');
+            } catch (err: any) {
+              addToast('Error', err.message || 'Failed to delete list. Please try again.', 'error');
+            }
+          }}
+          className="w-full text-left px-2.5 py-1.5 hover:bg-rose-500/10 hover:text-rose-500 rounded font-bold text-rose-600 dark:text-rose-400"
+        >
+          Delete List
+        </button>
+      </div>
+    );
+  };
+
+  const isGlow = !!draggedEmail;
+  return (
+    <div
+      data-list-id={list.id}
+      draggable={editingListId !== list.id}
+      onDragStart={(e) => handleListDragStart(e, list.id)}
+      onDragOver={handleDragOver}
+      onDrop={(e) => handleDrop(e, list.id)}
+      className={`kb-column ${hasCustomBg ? 'kb-column-glass' : ''} ${
+        isGlow 
+          ? 'ring-2 ring-indigo-500 ring-offset-1 border-indigo-500 shadow-lg shadow-indigo-500/20 dark:shadow-indigo-550/10' 
+          : ''
+      } transition-all duration-200`}
+    >
+      {/* Column Header */}
+      <div className="flex items-center justify-between px-3 py-1.5 shrink-0 border-b border-gray-200/50 dark:border-gray-800/40 cursor-grab active:cursor-grabbing bg-slate-50/20 dark:bg-black/5">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          {editingListId === list.id ? (
+            <input
+              type="text"
+              value={editingListName}
+              onChange={(e) => setEditingListName(e.target.value)}
+              onBlur={() => saveListName(list.id)}
+              onKeyDown={(e) => handleListNameKeyDown(e, list.id)}
+              className="text-xs font-bold px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
+              style={{ color: 'var(--text-primary)' }}
+              autoFocus
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <span 
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingListId(list.id);
+                setEditingListName(list.name);
+              }}
+              className="text-xs font-bold uppercase tracking-wider text-[#172b4d] dark:text-[#cbd5e1] truncate cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50 px-1 py-0.5 rounded flex items-center gap-1 min-w-0"
+              title="Rename column"
+            >
+              <span className="truncate max-w-[8rem]">{list.name}</span>
+              <Pencil className="w-2.5 h-2.5 opacity-0 group-hover/list:opacity-60 transition-opacity text-slate-550 shrink-0" />
+            </span>
+          )}
+          <span 
+            className="text-[9px] font-bold px-1.5 py-0.25 rounded-full shrink-0"
+            style={{ 
+              background: 'var(--bg-body)', 
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border)' 
+            }}
+          >
+            {list.cards.length}
+          </span>
+        </div>
+        <div className="relative">
+          <button
+            onClick={() => {
+              setMenuOpen(!menuOpen);
+              setMoveMode(false);
+              setSortMode(false);
+            }}
+            className="w-5 h-5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors text-slate-400 shrink-0 cursor-pointer"
+            title="List actions"
+          >
+            <MoreHorizontal className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Floating Dropdown for Desktop */}
+          {menuOpen && (
+            <div 
+              ref={menuRef}
+              className="hidden md:block absolute right-0 top-6 z-50 w-52 bg-white dark:bg-[#161a22] border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-2 animate-scale-in text-left text-xs"
+            >
+              <div className="text-[10px] font-bold text-slate-450 dark:text-slate-550 uppercase tracking-wider px-2 py-1 border-b border-slate-100 dark:border-slate-800 mb-1">
+                List Actions
+              </div>
+              {renderMenuItems()}
+            </div>
+          )}
+        </div>
+
+        {/* Mobile Bottom Sheet Drawer */}
+        {menuOpen && (
+          <div 
+            className="md:hidden fixed inset-0 z-[9999] bg-black/60 flex items-end justify-center" 
+            onClick={() => setMenuOpen(false)}
+          >
+            <div 
+              className="w-full bg-white dark:bg-[#161a22] rounded-t-2xl max-h-[85vh] overflow-y-auto p-4 space-y-3.5 animate-slide-up text-left text-xs"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center pb-2.5 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-200">List Actions</span>
+                <button onClick={() => setMenuOpen(false)} className="text-slate-400 hover:text-slate-200 text-xs font-bold">✕ Close</button>
+              </div>
+              {renderMenuItems()}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Cards Container */}
+      <div className="flex-1 overflow-y-auto px-2 py-2 space-y-2 scrollbar-thin">
+        {list.cards.length === 0 ? (
+          /* Dotted Empty state inside List */
+          <div 
+            className="h-16 rounded-lg border-2 border-dashed flex flex-col items-center justify-center p-2 text-center transition-all hover:border-indigo-400 group"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-gray-400 dark:text-gray-650 mb-0.5 group-hover:animate-bounce" />
+            <p className="text-[10px] font-semibold text-slate-450 dark:text-slate-500">No cards here</p>
+          </div>
+        ) : (
+          list.cards.map((card: Card) => (
+            <KanbanCard
+              key={card.id}
+              card={card}
+              listId={list.id}
+              onPointerDown={handleCardPointerDown}
+              editingCardId={editingCardId}
+              setEditingCardId={setEditingCardId}
+              editingCardTitle={editingCardTitle}
+              setEditingCardTitle={setEditingCardTitle}
+              onOpenCardDetails={onOpenCardDetails}
+              saveCardQuickRename={saveCardQuickRename}
+              handleCardQuickRenameKeyDown={handleCardQuickRenameKeyDown}
+            />
+          ))
+        )}
+      </div>
+
+      {/* Add Card input block */}
+      <div className="px-2 pb-2 shrink-0 border-t border-gray-100/50 dark:border-gray-800/40 pt-1.5">
+        {!isAddingCard ? (
+          <button
+            onClick={() => setIsAddingCard(true)}
+            className="w-full text-left text-xs font-semibold py-1 px-2 rounded-md text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100/50 dark:hover:bg-slate-800/40 transition-colors flex items-center gap-1 cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5 text-slate-450" /> Add a card
+          </button>
+        ) : (
+          <div className="space-y-1.5 animate-scale-in">
+            <textarea
+              placeholder="Enter card title…"
+              value={cardTitles[list.id] || ''}
+              onChange={e => setCardTitles({ ...cardTitles, [list.id]: e.target.value })}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleCreateCardSubmit(list.id);
+                  setIsAddingCard(false);
+                } else if (e.key === 'Escape') {
+                  setIsAddingCard(false);
+                }
+              }}
+              className="w-full text-xs p-1.5 bg-white dark:bg-slate-900 border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-slate-100 resize-none font-semibold leading-normal"
+              style={{ borderColor: 'var(--border)' }}
+              rows={2}
+              autoFocus
+            />
+            <div className="flex gap-1 justify-end">
+              <button
+                onClick={() => setIsAddingCard(false)}
+                className="px-2 py-0.5 text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-350 rounded hover:bg-slate-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  handleCreateCardSubmit(list.id);
+                  setIsAddingCard(false);
+                }}
+                className="px-2.5 py-0.5 text-[9px] bg-indigo-600 text-white rounded font-bold hover:bg-indigo-750"
+              >
+                Add Card
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  return prevProps.list === nextProps.list &&
+         prevProps.draggedEmail === nextProps.draggedEmail &&
+         prevProps.editingListId === nextProps.editingListId &&
+         prevProps.editingListName === nextProps.editingListName &&
+         prevProps.cardTitles[nextProps.list.id] === nextProps.cardTitles[nextProps.list.id] &&
+         prevProps.editingCardId === nextProps.editingCardId &&
+         prevProps.editingCardTitle === nextProps.editingCardTitle &&
+         prevProps.hasCustomBg === nextProps.hasCustomBg;
+});
 
 const ROLE_BADGES: Record<string, { label: string; bg: string; text: string }> = {
   OWNER: { label: 'Owner', bg: 'bg-amber-500/10 dark:bg-amber-500/20', text: 'text-amber-600 dark:text-amber-400' },
@@ -38,7 +747,8 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
     user, currentBoard, fetchBoardDetails, deleteBoard,
     createList, archiveList, createCard, updateCard, updateBoard,
     createAutomationRule, deleteAutomationRule, currentWorkspace, convertInboxItem, token,
-    addToast, showConfirm, fetchArchivedItems, updateList
+    addToast, showConfirm, fetchArchivedItems, updateList,
+    inboxItems, fetchInboxItems, updateInboxItem, draggedEmail, setDraggedEmail, batchConvertInboxItems
   } = useStore();
 
   const themeStore = useThemeStore();
@@ -57,6 +767,110 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
   
   // Board & Card Renaming states
   const [isEditingBoardName, setIsEditingBoardName] = useState(false);
+  
+  // Board Inbox Panel states
+  const [isBoardInboxOpen, setIsBoardInboxOpen] = useState(false);
+
+  const boardInboxStagedItems = inboxItems.filter(item => item.status !== 'ARCHIVED' && item.status !== 'CONVERTED');
+  const boardInboxUnreadCount = boardInboxStagedItems.length;
+
+  const boardScrollRef = useRef<HTMLDivElement>(null);
+  
+  const handleBoardWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('.overflow-y-auto')) {
+      return;
+    }
+    if (boardScrollRef.current) {
+      boardScrollRef.current.scrollLeft += e.deltaY;
+    }
+  };
+
+  const handleBoardPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('.kb-card') || 
+      target.closest('button') || 
+      target.closest('input') || 
+      target.closest('textarea') ||
+      target.closest('.cursor-grab') ||
+      target.closest('a')
+    ) {
+      return;
+    }
+    
+    const container = boardScrollRef.current;
+    if (!container) return;
+    
+    container.classList.add('cursor-grabbing');
+    const startX = e.clientX;
+    const startScrollLeft = container.scrollLeft;
+    
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const walk = moveEvent.clientX - startX;
+      container.scrollLeft = startScrollLeft - walk;
+    };
+    
+    const handlePointerUp = () => {
+      container.classList.remove('cursor-grabbing');
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+    
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+  };
+  
+  const stateRef = useRef({
+    currentBoard,
+    boardId,
+    currentWorkspace,
+  });
+  stateRef.current = { currentBoard, boardId, currentWorkspace };
+
+  const dragRef = useRef<{
+    cardId: string;
+    listId: string;
+    element: HTMLElement | null;
+    clone: HTMLElement | null;
+    placeholder: HTMLElement | null;
+    startX: number;
+    startY: number;
+    offsetX: number;
+    offsetY: number;
+    currentX: number;
+    currentY: number;
+    isDragging: boolean;
+    hasMoved: boolean;
+    longPressTimer: any;
+    targetListId: string | null;
+    targetPosition: number;
+    scrollTimer: any;
+  }>({
+    cardId: '',
+    listId: '',
+    element: null,
+    clone: null,
+    placeholder: null,
+    startX: 0,
+    startY: 0,
+    offsetX: 0,
+    offsetY: 0,
+    currentX: 0,
+    currentY: 0,
+    isDragging: false,
+    hasMoved: false,
+    longPressTimer: null,
+    targetListId: null,
+    targetPosition: 0,
+    scrollTimer: null,
+  });
+
+  // Fetch inbox items on mount if they aren't loaded yet
+  useEffect(() => {
+    if (currentWorkspace) {
+      fetchInboxItems(currentWorkspace.id);
+    }
+  }, [currentWorkspace]);
   const [editedBoardName, setEditedBoardName] = useState(currentBoard?.name || '');
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [editingCardTitle, setEditingCardTitle] = useState('');
@@ -310,6 +1124,315 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
     }
   };
 
+  const handleCardPointerDown = (e: React.PointerEvent<HTMLDivElement>, card: Card, listId: string) => {
+    if (e.button !== 0) return;
+    
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('textarea') || target.closest('input') || target.closest('a')) {
+      return;
+    }
+    
+    const cardEl = e.currentTarget as HTMLElement;
+    const rect = cardEl.getBoundingClientRect();
+    
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+    
+    dragRef.current = {
+      cardId: card.id,
+      listId: listId,
+      element: cardEl,
+      clone: null,
+      placeholder: null,
+      startX,
+      startY,
+      offsetX,
+      offsetY,
+      currentX: startX,
+      currentY: startY,
+      isDragging: false,
+      hasMoved: false,
+      longPressTimer: null,
+      targetListId: listId,
+      targetPosition: card.position,
+      scrollTimer: null,
+    };
+    
+    const isTouch = e.pointerType === 'touch';
+    if (isTouch) {
+      dragRef.current.longPressTimer = setTimeout(() => {
+        if (navigator.vibrate) {
+          navigator.vibrate(10);
+        }
+        startDragging(startX, startY);
+      }, 200);
+    }
+    
+    window.addEventListener('pointermove', onGlobalPointerMove, { passive: false });
+    window.addEventListener('pointerup', onGlobalPointerUp);
+    window.addEventListener('pointercancel', onGlobalPointerCancel);
+  };
+
+  const startDragging = (clientX: number, clientY: number) => {
+    const drag = dragRef.current;
+    if (drag.isDragging || !drag.element) return;
+    
+    drag.isDragging = true;
+    document.body.classList.add('drag-preview-active');
+    
+    const rect = drag.element.getBoundingClientRect();
+    const clone = drag.element.cloneNode(true) as HTMLElement;
+    clone.className = 'kb-card drag-preview';
+    clone.style.width = `${rect.width}px`;
+    clone.style.height = `${rect.height}px`;
+    clone.style.left = '0px';
+    clone.style.top = '0px';
+    clone.style.transform = `translate3d(${clientX - drag.offsetX}px, ${clientY - drag.offsetY}px, 0) scale(1.03)`;
+    document.body.appendChild(clone);
+    drag.clone = clone;
+    
+    const placeholder = document.createElement('div');
+    placeholder.className = 'kb-placeholder';
+    placeholder.style.width = `${rect.width}px`;
+    placeholder.style.height = `${rect.height}px`;
+    
+    drag.element.style.display = 'none';
+    drag.element.parentNode?.insertBefore(placeholder, drag.element);
+    drag.placeholder = placeholder;
+    
+    startAutoScrollLoop();
+  };
+
+  const onGlobalPointerMove = (e: PointerEvent) => {
+    const drag = dragRef.current;
+    if (!drag.element) return;
+    
+    drag.currentX = e.clientX;
+    drag.currentY = e.clientY;
+    
+    if (!drag.isDragging) {
+      const dist = Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY);
+      const isTouch = e.pointerType === 'touch';
+      if (!isTouch && dist > 5) {
+        startDragging(e.clientX, e.clientY);
+      } else if (isTouch && dist > 10) {
+        clearTimeout(drag.longPressTimer);
+        cleanupDragging();
+      }
+      return;
+    }
+    
+    e.preventDefault();
+    
+    requestAnimationFrame(() => {
+      if (drag.clone && drag.isDragging) {
+        drag.clone.style.transform = `translate3d(${drag.currentX - drag.offsetX}px, ${drag.currentY - drag.offsetY}px, 0) scale(1.03)`;
+      }
+    });
+    
+    updatePlaceholderPosition(e.clientX, e.clientY);
+  };
+
+  const updatePlaceholderPosition = (clientX: number, clientY: number) => {
+    const drag = dragRef.current;
+    if (!drag.placeholder) return;
+    
+    const elements = document.elementsFromPoint(clientX, clientY);
+    const columnEl = elements.find(el => el.classList.contains('kb-column')) as HTMLElement;
+    
+    document.querySelectorAll('.kb-column').forEach(col => col.classList.remove('column-drag-over-glow'));
+    
+    if (columnEl) {
+      columnEl.classList.add('column-drag-over-glow');
+      
+      const targetListId = columnEl.getAttribute('data-list-id');
+      if (!targetListId) return;
+      drag.targetListId = targetListId;
+      
+      const cardsContainer = columnEl.querySelector('.flex-1.overflow-y-auto.px-3.py-3.space-y-3') as HTMLElement;
+      if (!cardsContainer) return;
+      
+      const cards = Array.from(cardsContainer.querySelectorAll('.kb-card')) as HTMLElement[];
+      const activeCards = cards.filter(c => c !== drag.element && c !== drag.placeholder && c.style.display !== 'none');
+      
+      let inserted = false;
+      
+      for (const cardEl of activeCards) {
+        const cardRect = cardEl.getBoundingClientRect();
+        const cardMiddleY = cardRect.top + cardRect.height / 2;
+        
+        if (clientY < cardMiddleY) {
+          cardsContainer.insertBefore(drag.placeholder, cardEl);
+          inserted = true;
+          break;
+        }
+      }
+      
+      if (!inserted) {
+        cardsContainer.appendChild(drag.placeholder);
+      }
+    }
+  };
+
+  const startAutoScrollLoop = () => {
+    const drag = dragRef.current;
+    
+    const scrollLoop = () => {
+      if (!drag.isDragging) return;
+      
+      const boardContainer = boardScrollRef.current;
+      if (!boardContainer) return;
+      
+      const containerRect = boardContainer.getBoundingClientRect();
+      const clientX = drag.currentX;
+      const clientY = drag.currentY;
+      
+      const edgeThreshold = 80;
+      const maxScrollSpeed = 15;
+      
+      let horizontalSpeed = 0;
+      if (clientX > containerRect.right - edgeThreshold) {
+        const ratio = (clientX - (containerRect.right - edgeThreshold)) / edgeThreshold;
+        horizontalSpeed = Math.min(maxScrollSpeed, ratio * maxScrollSpeed);
+      } else if (clientX < containerRect.left + edgeThreshold) {
+        const ratio = ((containerRect.left + edgeThreshold) - clientX) / edgeThreshold;
+        horizontalSpeed = -Math.min(maxScrollSpeed, ratio * maxScrollSpeed);
+      }
+      
+      if (horizontalSpeed !== 0) {
+        boardContainer.scrollLeft += horizontalSpeed;
+      }
+      
+      const elements = document.elementsFromPoint(clientX, clientY);
+      const columnEl = elements.find(el => el.classList.contains('kb-column')) as HTMLElement;
+      if (columnEl) {
+        const cardsContainer = columnEl.querySelector('.flex-1.overflow-y-auto.px-3.py-3.space-y-3') as HTMLElement;
+        if (cardsContainer) {
+          const colRect = cardsContainer.getBoundingClientRect();
+          let verticalSpeed = 0;
+          
+          if (clientY > colRect.bottom - edgeThreshold) {
+            const ratio = (clientY - (colRect.bottom - edgeThreshold)) / edgeThreshold;
+            verticalSpeed = Math.min(maxScrollSpeed, ratio * maxScrollSpeed);
+          } else if (clientY < colRect.top + edgeThreshold) {
+            const ratio = ((colRect.top + edgeThreshold) - clientY) / edgeThreshold;
+            verticalSpeed = -Math.min(maxScrollSpeed, ratio * maxScrollSpeed);
+          }
+          
+          if (verticalSpeed !== 0) {
+            cardsContainer.scrollTop += verticalSpeed;
+          }
+        }
+      }
+      
+      drag.scrollTimer = requestAnimationFrame(scrollLoop);
+    };
+    
+    drag.scrollTimer = requestAnimationFrame(scrollLoop);
+  };
+
+  const onGlobalPointerUp = async (_e: PointerEvent) => {
+    const drag = dragRef.current;
+    clearTimeout(drag.longPressTimer);
+    cancelAnimationFrame(drag.scrollTimer);
+    
+    if (!drag.element || !drag.isDragging) {
+      cleanupDragging();
+      return;
+    }
+    
+    const targetListId = drag.targetListId;
+    const placeholder = drag.placeholder;
+    const parent = placeholder?.parentNode;
+    
+    if (targetListId && placeholder && parent) {
+      let targetIndex = 0;
+      for (let i = 0; i < parent.children.length; i++) {
+        const child = parent.children[i] as HTMLElement;
+        if (child === placeholder) {
+          break;
+        }
+        if (child.classList.contains('kb-card') && child !== drag.element && child.style.display !== 'none') {
+          targetIndex++;
+        }
+      }
+      
+      const targetList = stateRef.current.currentBoard?.lists.find(l => l.id === targetListId);
+      if (targetList) {
+        const targetCards = targetList.cards || [];
+        
+        let newPosition: number;
+        if (targetCards.length === 0) {
+          newPosition = 1000;
+        } else if (targetIndex === 0) {
+          newPosition = targetCards[0].position / 2;
+        } else if (targetIndex >= targetCards.length) {
+          newPosition = targetCards[targetCards.length - 1].position + 1000;
+        } else {
+          const prevPos = targetCards[targetIndex - 1].position;
+          const nextPos = targetCards[targetIndex].position;
+          newPosition = (prevPos + nextPos) / 2;
+        }
+        
+        try {
+          await updateCard(stateRef.current.boardId, drag.cardId, { listId: targetListId, position: newPosition });
+          addToast('Card Moved', 'Card position updated successfully.', 'success');
+        } catch (err: any) {
+          addToast('Error', err.message || 'Failed to move card.', 'error');
+        }
+      }
+    }
+    
+    cleanupDragging();
+  };
+
+  const cleanupDragging = () => {
+    const drag = dragRef.current;
+    document.body.classList.remove('drag-preview-active');
+    
+    document.querySelectorAll('.kb-column').forEach(col => col.classList.remove('column-drag-over-glow'));
+    
+    if (drag.clone) {
+      drag.clone.remove();
+    }
+    if (drag.placeholder) {
+      drag.placeholder.remove();
+    }
+    if (drag.element) {
+      drag.element.style.display = '';
+    }
+    
+    window.removeEventListener('pointermove', onGlobalPointerMove);
+    window.removeEventListener('pointerup', onGlobalPointerUp);
+    window.removeEventListener('pointercancel', onGlobalPointerCancel);
+    
+    dragRef.current = {
+      cardId: '',
+      listId: '',
+      element: null,
+      clone: null,
+      placeholder: null,
+      startX: 0,
+      startY: 0,
+      offsetX: 0,
+      offsetY: 0,
+      currentX: 0,
+      currentY: 0,
+      isDragging: false,
+      hasMoved: false,
+      longPressTimer: null,
+      targetListId: null,
+      targetPosition: 0,
+      scrollTimer: null,
+    };
+  };
+
+  const onGlobalPointerCancel = () => {
+    cleanupDragging();
+  };
+
   const saveListName = async (listId: string) => {
     if (!editingListName.trim()) {
       setEditingListId(null);
@@ -335,10 +1458,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
     }
   };
 
-  const handleDragStart = (e: React.DragEvent, cardId: string) => {
-    e.stopPropagation();
-    e.dataTransfer.setData('cardId', cardId);
-  };
+
 
   const handleListDragStart = (e: React.DragEvent, listId: string) => {
     if ((e.target as HTMLElement).closest('.kb-card')) {
@@ -388,7 +1508,22 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
       return;
     }
 
+    const inboxItemIdsStr = e.dataTransfer.getData('inboxItemIds');
+
+    if (inboxItemIdsStr && currentWorkspace) {
+      setDraggedEmail(null);
+      try {
+        const inboxItemIds = JSON.parse(inboxItemIdsStr) as string[];
+        await batchConvertInboxItems(currentWorkspace.id, inboxItemIds, { boardId, listId: targetListId });
+        addToast('Tasks Created', `Successfully converted ${inboxItemIds.length} emails into cards.`, 'success');
+      } catch (err: any) {
+        addToast('Batch Convert Error', err.message || 'Failed to batch convert items.', 'error');
+      }
+      return;
+    }
+
     if (inboxItemId && currentWorkspace) {
+      setDraggedEmail(null);
       try {
         await convertInboxItem(currentWorkspace.id, inboxItemId, { boardId, listId: targetListId });
       } catch (err) {
@@ -606,6 +1741,39 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                 </div>
               )}
             </button>
+            {/* Board Inbox Button */}
+            <button
+              onClick={() => setIsBoardInboxOpen(!isBoardInboxOpen)}
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all shadow-sm hover:scale-105 active:scale-95"
+              style={{ 
+                background: 'var(--bg-surface)', 
+                borderColor: 'var(--border)',
+                color: 'var(--text-primary)'
+              }}
+            >
+              <Inbox className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Board Inbox</span>
+              {boardInboxUnreadCount > 0 && (
+                <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 animate-pulse">
+                  {boardInboxUnreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Mobile Board Inbox Button (icon only) */}
+            <button
+              onClick={() => setIsBoardInboxOpen(!isBoardInboxOpen)}
+              className="md:hidden btn-icon rounded-lg relative mr-1"
+              title="Board Inbox"
+            >
+              <Inbox className="w-4 h-4 text-indigo-500" />
+              {boardInboxUnreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center animate-pulse">
+                  {boardInboxUnreadCount}
+                </span>
+              )}
+            </button>
+
             <button
               onClick={() => setCustomizerOpen(true)}
               className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all shadow-sm hover:scale-105 active:scale-95"
@@ -714,365 +1882,199 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
       )}
 
       {/* Main Tab View Port */}
-      <div className="flex-1 overflow-auto p-2 sm:p-4 md:p-6 z-10">
+      <div className="flex-1 overflow-auto p-2.5 sm:p-3 md:p-4 z-10">
         
         {/* Kanban View */}
         {activeTab === 'kanban' && (
-          <div className="flex gap-3 sm:gap-4 h-full items-start select-none pb-4">
-            {currentBoard.lists.map((list) => (
-              <div
-                key={list.id}
-                draggable={editingListId !== list.id}
-                onDragStart={(e) => handleListDragStart(e, list.id)}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, list.id)}
-                className={`kb-column ${hasCustomBg ? 'kb-column-glass' : ''}`}
-              >
-                {/* Column Header */}
-                <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-gray-200/50 dark:border-gray-800/40 cursor-grab active:cursor-grabbing">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {editingListId === list.id ? (
-                      <input
-                        type="text"
-                        value={editingListName}
-                        onChange={(e) => setEditingListName(e.target.value)}
-                        onBlur={() => saveListName(list.id)}
-                        onKeyDown={(e) => handleListNameKeyDown(e, list.id)}
-                        className="text-xs font-bold px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
-                        style={{ color: 'var(--text-primary)' }}
-                        autoFocus
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    ) : (
-                      <span 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingListId(list.id);
-                          setEditingListName(list.name);
-                        }}
-                        className="text-xs font-bold uppercase tracking-wider text-[#172b4d] dark:text-[#cbd5e1] truncate cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/50 px-1 py-0.5 rounded flex items-center gap-1.5 group/list min-w-0"
-                        title="Click to rename column"
-                      >
-                        <span className="truncate max-w-[8rem]">{list.name}</span>
-                        <Pencil className="w-2.5 h-2.5 opacity-0 group-hover/list:opacity-60 transition-opacity text-slate-500 shrink-0" />
-                      </span>
-                    )}
-                    <span 
-                      className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
-                      style={{ 
-                        background: 'var(--bg-body)', 
-                        color: 'var(--text-secondary)',
-                        border: '1px solid var(--border)' 
-                      }}
-                    >
-                      {list.cards.length}
-                    </span>
-                  </div>
-                  <button
-                    onClick={async () => {
-                      const confirmed = await showConfirm(
-                        'Archive List',
-                        `Archive "${list.name}"? All its cards will also be archived. You can restore them later from the board settings.`,
-                        'Archive',
-                        'Cancel'
-                      );
-                      if (!confirmed) return;
-                      try {
-                        await archiveList(boardId, list.id);
-                        addToast('List Archived', `"${list.name}" has been archived successfully.`, 'success');
-                      } catch (err: any) {
-                        addToast('Error', err.message || 'Failed to archive list. Please try again.', 'error');
-                      }
-                    }}
-                    className="btn-icon w-6 h-6 rounded-md hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
-                    title="Archive list"
-                  >
-                    <Archive className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Cards Container */}
-                <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
-                  {list.cards.length === 0 ? (
-                    /* Dotted Empty state inside List */
-                    <div 
-                      className="h-28 rounded-xl border-2 border-dashed flex flex-col items-center justify-center p-4 text-center transition-all hover:border-indigo-400 group"
-                      style={{ borderColor: 'var(--border)' }}
-                    >
-                      <Sparkles className="w-5 h-5 text-gray-400 dark:text-gray-600 mb-1 group-hover:animate-bounce" />
-                      <p className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>No cards here</p>
-                      <span className="text-[9px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Drag tasks or click plus below</span>
-                    </div>
-                  ) : (
-                    list.cards.map((card) => {
-                      let customData: any = {};
-                      try {
-                        if (card.customFields) {
-                          customData = JSON.parse(card.customFields);
-                        }
-                      } catch (e) {}
-                      const labels = customData.labels || [];
-                      const cardEmoji = customData.emoji || '';
-
-                      // Completed checks count
-                      const checklistCount = card.checklists?.length || 0;
-                      const completedChecklistCount = card.checklists?.filter(i => i.isCompleted).length || 0;
-                      const progressPercentage = checklistCount > 0 ? (completedChecklistCount / checklistCount) * 100 : 0;
-                      const commentsCount = card.comments?.length || 0;
-
-                      return (
-                        <div
-                          key={card.id}
-                          draggable={editingCardId !== card.id}
-                          onDragStart={(e) => handleDragStart(e, card.id)}
-                          onClick={() => {
-                            if (editingCardId !== card.id) {
-                              onOpenCardDetails(card);
-                            }
-                          }}
-                          className={`kb-card space-y-3 animate-fade-in group/card ${
-                            card.priority === 'URGENT' ? 'priority-left-urgent' :
-                            card.priority === 'HIGH' ? 'priority-left-high' :
-                            card.priority === 'MEDIUM' ? 'priority-left-medium' : 'priority-left-low'
-                          }`}
-                        >
-                          {card.coverImage && (
-                            <div className="w-full overflow-hidden rounded-lg mb-1">
-                              {card.coverImage.startsWith('linear-gradient') || card.coverImage.startsWith('radial-gradient') || card.coverImage.startsWith('#') ? (
-                                <div
-                                  className="w-full h-14"
-                                  style={{ background: card.coverImage }}
-                                />
-                              ) : (
-                                <img
-                                  src={card.coverImage}
-                                  alt="cover"
-                                  className="w-full h-24 object-cover"
-                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                />
-                              )}
-                            </div>
-                          )}
-
-                          {/* Labels list */}
-                          {labels.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {labels.map((lbl: any, idx: number) => (
-                                <span 
-                                  key={idx} 
-                                  className="text-[9px] px-2 py-0.5 rounded-full font-bold text-white uppercase tracking-wider"
-                                  style={{ backgroundColor: lbl.color || '#6366f1' }}
-                                >
-                                  {lbl.name}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Priority Indicator Pill */}
-                          <div className="flex items-center justify-between">
-                            <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full tracking-wider ${
-                              card.priority === 'URGENT' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
-                              card.priority === 'HIGH'   ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'   :
-                              card.priority === 'MEDIUM' ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 
-                                                           'bg-slate-500/10 text-slate-600 dark:text-slate-400'
-                            }`}>
-                              {card.priority}
-                            </span>
-                            {card.priority === 'URGENT' && (
-                              <Flame className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
-                            )}
-                          </div>
-
-                          {/* Title & Emoji */}
-                          {editingCardId === card.id ? (
-                            <div 
-                              className="space-y-1.5" 
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <textarea
-                                value={editingCardTitle}
-                                onChange={(e) => setEditingCardTitle(e.target.value)}
-                                onKeyDown={(e) => handleCardQuickRenameKeyDown(e, card.id)}
-                                className="w-full text-xs p-2 border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 resize-none font-semibold"
-                                style={{ borderColor: 'var(--border)' }}
-                                autoFocus
-                                rows={2}
-                              />
-                              <div className="flex gap-1.5 justify-end">
-                                <button
-                                  onClick={() => setEditingCardId(null)}
-                                  className="px-2.5 py-1 text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded hover:bg-slate-200"
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  onClick={() => saveCardQuickRename(card.id)}
-                                  className="px-2.5 py-1 text-[10px] bg-indigo-600 text-white rounded hover:bg-indigo-700 font-semibold"
-                                >
-                                  Save
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-start justify-between gap-1.5">
-                              <div className="flex items-start gap-1.5 min-w-0">
-                                {cardEmoji && <span className="text-sm shrink-0 leading-none mt-0.5">{cardEmoji}</span>}
-                                <h4 className="text-xs font-semibold leading-snug break-words" style={{ color: 'var(--text-primary)' }}>
-                                  {card.title}
-                                </h4>
-                              </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingCardId(card.id);
-                                  setEditingCardTitle(card.title);
-                                }}
-                                className="opacity-0 group-hover/card:opacity-100 p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-opacity shrink-0"
-                                title="Quick rename"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Checklist Meter Line */}
-                          {checklistCount > 0 && (
-                            <div>
-                              <div className="flex items-center justify-between text-[9px] font-bold text-gray-500">
-                                <span>Checklist Tasks</span>
-                                <span>{completedChecklistCount}/{checklistCount}</span>
-                              </div>
-                              <div className="card-progress-bar">
-                                <div 
-                                  className="card-progress-fill" 
-                                  style={{ 
-                                    width: `${progressPercentage}%`,
-                                    background: progressPercentage === 100 ? 'var(--success)' : 'var(--accent)'
-                                  }} 
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Card Footer badges */}
-                          <div className="flex items-center justify-between pt-1 border-t border-gray-100/50 dark:border-gray-800/40">
-                            <div className="flex items-center gap-2">
-                              {card.dueDate && (
-                                <span className={`flex items-center gap-1 text-[10px] font-bold rounded-md px-1.5 py-0.5 ${
-                                  new Date(card.dueDate) < new Date() && list.name.toLowerCase() !== 'done'
-                                    ? 'bg-red-500/10 text-red-600 dark:text-red-400'
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                                }`}>
-                                  <CalendarCheck className="w-3 h-3" />
-                                  {new Date(card.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                </span>
-                              )}
-
-                              {commentsCount > 0 && (
-                                <span className="flex items-center gap-1 text-[10px] text-gray-500" title="Comments">
-                                  <MessageSquare className="w-3 h-3" />
-                                  {commentsCount}
-                                </span>
-                              )}
-
-                              {card.loggedTime > 0 && (
-                                <span className="flex items-center gap-1 text-[10px] text-gray-500" title="Logged Time">
-                                  <Clock className="w-3 h-3" />
-                                  {card.loggedTime}m
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Assignee circles */}
-                            <div className="flex -space-x-1.5">
-                              {card.assignees.map(a => (
-                                <img
-                                  key={a.id}
-                                  src={getAvatarUrl(a.user.avatarUrl, a.user.name || a.user.username)}
-                                  alt={a.user.name || ''}
-                                  title={a.user.name || a.user.username}
-                                  className="w-5 h-5 rounded-full border border-white dark:border-[#1c2128]"
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-
-                {/* Add Card input block */}
-                <div className="px-3 pb-3 shrink-0 border-t border-gray-100/50 dark:border-gray-800/40 pt-2">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Add card title…"
-                      value={cardTitles[list.id] || ''}
-                      onChange={e => setCardTitles({ ...cardTitles, [list.id]: e.target.value })}
-                      onKeyDown={e => e.key === 'Enter' && handleCreateCardSubmit(list.id)}
-                      className="flex-1 text-xs px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-                      style={{ 
-                        borderColor: 'var(--border)',
-                        color: 'var(--text-primary)' 
-                      }}
-                    />
-                    <button
-                      onClick={() => handleCreateCardSubmit(list.id)}
-                      className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all hover:scale-105 active:scale-95"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {/* Add Column button */}
-            {newListOpen ? (
-              <form 
-                onSubmit={handleCreateListSubmit} 
-                className="w-[18rem] bg-white dark:bg-[#161a22] border rounded-2xl p-3 shrink-0 space-y-2.5 shadow-xl"
-                style={{ borderColor: 'var(--border)' }}
-              >
-                <input
-                  type="text" 
-                  value={newListName}
-                  onChange={e => setNewListName(e.target.value)}
-                  placeholder="Enter column title…"
-                  className="tf-input w-full text-xs py-2 px-3 rounded-xl" 
-                  required 
-                  autoFocus
+          <div className="flex gap-0 w-full h-full items-start overflow-hidden relative">
+            <div 
+              ref={boardScrollRef}
+              onPointerDown={handleBoardPointerDown}
+              onWheel={handleBoardWheel}
+              className="flex-1 flex gap-2.5 sm:gap-3 h-full items-start select-none pb-4 overflow-x-auto snap-x snap-mandatory md:snap-none scrollbar-thin"
+            >
+              {currentBoard.lists.map((list) => (
+                <KanbanColumn
+                  key={list.id}
+                  list={list}
+                  draggedEmail={draggedEmail}
+                  editingListId={editingListId}
+                  setEditingListId={setEditingListId}
+                  editingListName={editingListName}
+                  setEditingListName={setEditingListName}
+                  saveListName={saveListName}
+                  handleListNameKeyDown={handleListNameKeyDown}
+                  showConfirm={showConfirm}
+                  archiveList={archiveList}
+                  boardId={boardId}
+                  addToast={addToast}
+                  handleCreateCardSubmit={handleCreateCardSubmit}
+                  cardTitles={cardTitles}
+                  setCardTitles={setCardTitles}
+                  handleListDragStart={handleListDragStart}
+                  handleDragOver={handleDragOver}
+                  handleDrop={handleDrop}
+                  editingCardId={editingCardId}
+                  setEditingCardId={setEditingCardId}
+                  editingCardTitle={editingCardTitle}
+                  setEditingCardTitle={setEditingCardTitle}
+                  onOpenCardDetails={onOpenCardDetails}
+                  saveCardQuickRename={saveCardQuickRename}
+                  handleCardQuickRenameKeyDown={handleCardQuickRenameKeyDown}
+                  handleCardPointerDown={handleCardPointerDown}
+                  hasCustomBg={hasCustomBg}
                 />
-                <div className="flex gap-2">
-                  <button type="submit" className="btn-primary py-2 px-4 text-xs flex-1 justify-center rounded-xl">Add column</button>
-                  <button 
-                    type="button" 
-                    onClick={() => setNewListOpen(false)} 
-                    className="btn-icon rounded-xl"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+              ))}
+
+          {/* Add Column button */}
+          {newListOpen ? (
+            <form 
+              onSubmit={handleCreateListSubmit} 
+              className="w-[18rem] bg-white dark:bg-[#161a22] border rounded-2xl p-3 shrink-0 space-y-2.5 shadow-xl"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <input
+                type="text" 
+                value={newListName}
+                onChange={e => setNewListName(e.target.value)}
+                placeholder="Enter column title…"
+                className="tf-input w-full text-xs py-2 px-3 rounded-xl" 
+                required 
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button type="submit" className="btn-primary py-2 px-4 text-xs flex-1 justify-center rounded-xl">Add column</button>
+                <button 
+                  type="button" 
+                  onClick={() => setNewListOpen(false)} 
+                  className="btn-icon rounded-xl"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button
+              onClick={() => setNewListOpen(true)}
+              className="h-12 flex items-center gap-2 px-4 text-xs font-semibold rounded-2xl shrink-0 transition-all border border-dashed hover:border-solid hover:scale-102 hover:shadow-md cursor-pointer"
+              style={{
+                width: '18rem',
+                background: 'var(--bg-surface)',
+                borderColor: 'var(--border)',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              <PlusCircle className="w-4 h-4 text-indigo-500" />
+              <span>Create Column</span>
+            </button>
+          )}
+        </div>
+
+        {/* Board Staging Inbox Drawer */}
+        {isBoardInboxOpen && (
+          <div className="fixed md:relative inset-x-0 bottom-0 md:top-0 md:inset-x-auto md:right-0 w-full sm:w-80 md:w-80 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-[#101214] flex flex-col h-[75vh] md:h-full shrink-0 z-[100] md:z-30 shadow-2xl md:shadow-none rounded-t-2xl md:rounded-t-none animate-slide-in-up md:animate-slide-in-right overflow-hidden">
+            {/* Grab handle for mobile swipe down to close */}
+            <div className="md:hidden flex items-center justify-center py-2.5 shrink-0 cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors" onClick={() => setIsBoardInboxOpen(false)}>
+              <div className="w-12 h-1 bg-slate-350 dark:bg-slate-700 rounded-full" />
+            </div>
+            {/* Header */}
+            <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-55 dark:bg-[#161a1d] shrink-0">
+              <span className="font-bold text-xs flex items-center gap-1.5 text-slate-800 dark:text-[#f0f6fc]">
+                <Inbox className="w-4 h-4 text-indigo-500" /> Staging Area
+              </span>
+              
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={async () => {
+                    if (currentWorkspace) {
+                      await fetchInboxItems(currentWorkspace.id);
+                      await fetchBoardDetails(boardId);
+                    }
+                  }}
+                  className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-550 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+                  title="Sync Staging Area"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                </button>
+                
+                <button 
+                  onClick={() => setIsBoardInboxOpen(false)}
+                  className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-555 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+                  title="Close Staging Area"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+            
+            {/* List of Board specific emails */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
+              {inboxItems.filter(item => item.status !== 'ARCHIVED' && item.status !== 'CONVERTED').length === 0 ? (
+                <div className="border border-dashed border-slate-200 dark:border-slate-800 rounded-xl py-12 text-center text-slate-500 text-xs">
+                  <Mail className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                  No emails staged
                 </div>
-              </form>
-            ) : (
-              <button
-                onClick={() => setNewListOpen(true)}
-                className="h-12 flex items-center gap-2 px-4 text-xs font-semibold rounded-2xl shrink-0 transition-all border border-dashed hover:border-solid hover:scale-102 hover:shadow-md cursor-pointer"
-                style={{
-                  width: '18rem',
-                  background: 'var(--bg-surface)',
-                  borderColor: 'var(--border)',
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                <PlusCircle className="w-4 h-4 text-indigo-500" />
-                <span>Create Column</span>
-              </button>
-            )}
+              ) : (
+                inboxItems
+                  .filter(item => item.status !== 'ARCHIVED' && item.status !== 'CONVERTED')
+                  .map(item => {
+                    const sourceDetailsObj = JSON.parse(item.sourceDetails || '{}');
+                    return (
+                      <div
+                        key={item.id}
+                        draggable
+                        onDragStart={e => {
+                          e.dataTransfer.setData('inboxItemId', item.id);
+                          e.dataTransfer.setDragImage(transparentDragImg, 0, 0);
+                          setDraggedEmail(item);
+                        }}
+                        onDragEnd={() => {
+                          setDraggedEmail(null);
+                        }}
+                        className="bg-slate-50 dark:bg-[#181a1c] border border-slate-200 dark:border-slate-800 rounded-xl p-3 hover:border-indigo-400 dark:hover:border-indigo-700 hover:shadow-md transition cursor-grab active:cursor-grabbing text-xs space-y-2 relative"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] bg-red-500/10 text-red-500 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                            {item.source}
+                          </span>
+                          <button
+                            onClick={async () => {
+                              if (!currentWorkspace) return;
+                              try {
+                                await updateInboxItem(currentWorkspace.id, item.id, { status: 'ARCHIVED' });
+                                addToast('Item Archived', 'Staged item archived successfully.', 'success');
+                              } catch (e) {}
+                            }}
+                            className="text-[10px] text-slate-400 hover:text-red-500 cursor-pointer bg-transparent border-0"
+                          >
+                            Archive
+                          </button>
+                        </div>
+                        
+                        <h4 className="font-bold text-slate-855 dark:text-white leading-snug">
+                          {item.title}
+                        </h4>
+                        
+                        {item.description && (
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                            {item.description}
+                          </p>
+                        )}
+                        
+                        {sourceDetailsObj.sender && (
+                          <div className="text-[9px] text-slate-450 dark:text-slate-500 truncate font-semibold">
+                            From: {sourceDetailsObj.sender}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+              )}
+            </div>
           </div>
         )}
+      </div>
+    )}
 
         {/* Calendar View */}
         {activeTab === 'calendar' && (

@@ -376,7 +376,10 @@ router.get('/:id', authenticate, checkWorkspaceRole([]), async (req, res) => {
             lists: {
               include: {
                 cards: {
-                  where: { isArchived: false }
+                  where: { isArchived: false },
+                  include: {
+                    emailDetails: true
+                  }
                 }
               }
             }

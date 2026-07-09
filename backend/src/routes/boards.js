@@ -172,7 +172,8 @@ router.get('/:id', authenticate, checkBoardAccess, async (req, res) => {
                   include: {
                     user: { select: { id: true, username: true, name: true, avatarUrl: true } }
                   }
-                }
+                },
+                emailDetails: true
               }
             }
           }

@@ -7,6 +7,10 @@ export interface ToastItem {
   title: string;
   message: string;
   type: 'success' | 'error' | 'warning' | 'info';
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 export interface ConfirmModalState {
@@ -278,6 +282,15 @@ interface AppState {
   workspaceInvitations: any[];
   userInvitations: any[];
   workspaceEmailSettings: any | null;
+  
+  syncStatus: 'synced' | 'syncing' | 'offline';
+  lastSyncedTime: Date | null;
+  draggedEmail: InboxItem | null;
+  dragCoords: { x: number; y: number };
+  setSyncStatus: (status: 'synced' | 'syncing' | 'offline') => void;
+  setLastSyncedTime: (time: Date | null) => void;
+  setDraggedEmail: (email: InboxItem | null) => void;
+  setDragCoords: (coords: { x: number; y: number }) => void;
 
   // Actions
   setTheme: (theme: 'light' | 'dark') => void;
@@ -397,7 +410,13 @@ interface AppState {
   createInboxItem: (workspaceId: string, item: Partial<InboxItem>) => Promise<InboxItem>;
   updateInboxItem: (workspaceId: string, itemId: string, updates: Partial<InboxItem>) => Promise<InboxItem>;
   deleteInboxItem: (workspaceId: string, itemId: string) => Promise<void>;
-  convertInboxItem: (workspaceId: string, itemId: string, payload: { boardId: string; listId: string; assigneeIds?: string[]; labels?: any[]; priority?: string; dueDate?: string | null; checklist?: string[] }) => Promise<void>;
+  convertInboxItem: (workspaceId: string, itemId: string, payload: { boardId: string; listId: string; assigneeIds?: string[]; labels?: any[]; priority?: string; dueDate?: string | null; checklist?: string[]; title?: string; description?: string }) => Promise<void>;
+  undoConvertInboxItem: (workspaceId: string, itemId: string, cardId: string) => Promise<void>;
+  batchConvertInboxItems: (workspaceId: string, itemIds: string[], payload: { boardId: string; listId: string; priority?: string; dueDate?: string | null; assigneeIds?: string[]; labels?: any[] }) => Promise<void>;
+  batchArchiveInboxItems: (workspaceId: string, itemIds: string[]) => Promise<void>;
+  batchDeleteInboxItems: (workspaceId: string, itemIds: string[]) => Promise<void>;
+  batchUpdateInboxItemsStatus: (workspaceId: string, itemIds: string[], status: string) => Promise<void>;
+  batchAssignLabelsToInboxItems: (workspaceId: string, itemIds: string[], labels: string) => Promise<void>;
   mockIncomingInboxItems: (workspaceId: string) => Promise<void>;
   fetchEmailLogs: (workspaceId: string, boardId: string) => Promise<any[]>;
   sendTestEmail: (workspaceId: string, boardId: string) => Promise<void>;
@@ -422,7 +441,7 @@ interface AppState {
 
   // Centralized Toasts & Confirm Modal
   toasts: ToastItem[];
-  addToast: (title: string, message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
+  addToast: (title: string, message: string, type?: 'success' | 'error' | 'warning' | 'info', action?: { label: string; onClick: () => void }) => void;
   removeToast: (id: string) => void;
   confirmModal: ConfirmModalState;
   showConfirm: (title: string, message: string, confirmText?: string, cancelText?: string) => Promise<boolean>;
@@ -458,6 +477,14 @@ export const useStore = create<AppState>((set, get) => ({
   workspaceInvitations: [],
   userInvitations: [],
   workspaceEmailSettings: null,
+  syncStatus: 'synced',
+  lastSyncedTime: new Date(),
+  draggedEmail: null,
+  dragCoords: { x: 0, y: 0 },
+  setSyncStatus: (status) => set({ syncStatus: status }),
+  setLastSyncedTime: (time) => set({ lastSyncedTime: time }),
+  setDraggedEmail: (email) => set({ draggedEmail: email }),
+  setDragCoords: (coords) => set({ dragCoords: coords }),
 
   setTheme: (theme) => {
     localStorage.setItem('theme', theme);
@@ -1409,19 +1436,330 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   convertInboxItem: async (workspaceId, itemId, payload) => {
-    const res = await fetch(`${API_URL}/inbox/${workspaceId}/${itemId}/convert`, {
-      method: 'POST',
-      headers: getHeaders(get().token),
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) throw new Error('Failed to convert inbox item');
-    const { inboxItem } = await res.json();
+    const item = get().inboxItems.find(i => i.id === itemId);
+    if (!item) return;
+
+    // Optimistic Update states
+    const prevInboxItems = get().inboxItems;
+    const prevWorkspace = get().currentWorkspace;
+    const prevBoard = get().currentBoard;
+
+    const tempCardId = `temp-${Date.now()}`;
+    const tempCard: any = {
+      id: tempCardId,
+      title: payload.title || item.title,
+      description: payload.description || item.description || '',
+      position: 1000.0,
+      listId: payload.listId,
+      priority: payload.priority || item.priority || 'MEDIUM',
+      dueDate: payload.dueDate || item.dueDate || null,
+      isArchived: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      assignees: [],
+      checklists: [],
+      dependencies: [],
+      comments: [],
+      customFields: JSON.stringify({ labels: payload.labels || [], emoji: '', links: [] })
+    };
+
+    // 1. Update inbox item status to CONVERTED
+    const optInboxItems = get().inboxItems.map(i => i.id === itemId ? { ...i, status: 'CONVERTED' as any } : i);
+
+    // 2. Append card to currentBoard lists if matches boardId
+    let optBoard = get().currentBoard;
+    if (optBoard && optBoard.id === payload.boardId) {
+      optBoard = {
+        ...optBoard,
+        lists: optBoard.lists.map(list => {
+          if (list.id === payload.listId) {
+            return {
+              ...list,
+              cards: [...list.cards, tempCard]
+            };
+          }
+          return list;
+        })
+      };
+    }
+
+    // 3. Update currentWorkspace lists
+    let optWorkspace = get().currentWorkspace;
+    if (optWorkspace) {
+      optWorkspace = {
+        ...optWorkspace,
+        boards: optWorkspace.boards.map(b => {
+          if (b.id === payload.boardId) {
+            return {
+              ...b,
+              lists: (b.lists || []).map(list => {
+                if (list.id === payload.listId) {
+                  return { ...list, cards: [...(list.cards || []), tempCard] };
+                }
+                return list;
+              })
+            };
+          }
+          return b;
+        })
+      };
+    }
+
+    // Apply optimistic state
+    set({ inboxItems: optInboxItems, currentBoard: optBoard, currentWorkspace: optWorkspace });
+
+    try {
+      const res = await fetch(`${API_URL}/inbox/${workspaceId}/${itemId}/convert`, {
+        method: 'POST',
+        headers: getHeaders(get().token),
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('Failed to convert inbox item');
+      const { card: realCard, inboxItem: realInboxItem } = await res.json();
+
+      // Replace temp card in state
+      set((state) => {
+        let finalBoard = state.currentBoard;
+        if (finalBoard && finalBoard.id === payload.boardId) {
+          finalBoard = {
+            ...finalBoard,
+            lists: finalBoard.lists.map(list => {
+              if (list.id === payload.listId) {
+                return {
+                  ...list,
+                  cards: list.cards.map(c => c.id === tempCardId ? realCard : c)
+                };
+              }
+              return list;
+            })
+          };
+        }
+
+        let finalWorkspace = state.currentWorkspace;
+        if (finalWorkspace) {
+          finalWorkspace = {
+            ...finalWorkspace,
+            boards: finalWorkspace.boards.map(b => {
+              if (b.id === payload.boardId) {
+                return {
+                  ...b,
+                  lists: (b.lists || []).map(list => {
+                    if (list.id === payload.listId) {
+                      return { ...list, cards: (list.cards || []).map(c => c.id === tempCardId ? realCard : c) };
+                    }
+                    return list;
+                  })
+                };
+              }
+              return b;
+            })
+          };
+        }
+
+        return {
+          inboxItems: state.inboxItems.map(i => i.id === itemId ? realInboxItem : i),
+          currentBoard: finalBoard,
+          currentWorkspace: finalWorkspace
+        };
+      });
+
+      // Show toast with Undo!
+      get().addToast(
+        'Task Created',
+        `Task "${realCard.title}" created successfully.`,
+        'success',
+        {
+          label: 'Undo',
+          onClick: () => {
+            get().undoConvertInboxItem(workspaceId, itemId, realCard.id);
+          }
+        }
+      );
+    } catch (err) {
+      // Revert optimistic updates
+      set({ inboxItems: prevInboxItems, currentWorkspace: prevWorkspace, currentBoard: prevBoard });
+      get().addToast('Convert Failed', 'Failed to convert email to task.', 'error');
+      throw err;
+    }
+  },
+
+  undoConvertInboxItem: async (workspaceId, itemId, cardId) => {
+    // Optimistic Revert
+    const prevInboxItems = get().inboxItems;
+    const prevWorkspace = get().currentWorkspace;
+    const prevBoard = get().currentBoard;
+
+    // Set status back to NEW
+    const optInboxItems = get().inboxItems.map(i => i.id === itemId ? { ...i, status: 'NEW' as any } : i);
+
+    // Remove card from currentBoard lists
+    let optBoard = get().currentBoard;
+    if (optBoard) {
+      optBoard = {
+        ...optBoard,
+        lists: optBoard.lists.map(list => ({
+          ...list,
+          cards: list.cards.filter(c => c.id !== cardId)
+        }))
+      };
+    }
+
+    // Remove card from currentWorkspace lists
+    let optWorkspace = get().currentWorkspace;
+    if (optWorkspace) {
+      optWorkspace = {
+        ...optWorkspace,
+        boards: optWorkspace.boards.map(b => ({
+          ...b,
+          lists: (b.lists || []).map(list => ({
+            ...list,
+            cards: (list.cards || []).filter(c => c.id !== cardId)
+          }))
+        }))
+      };
+    }
+
+    set({ inboxItems: optInboxItems, currentBoard: optBoard, currentWorkspace: optWorkspace });
+
+    try {
+      const res = await fetch(`${API_URL}/inbox/${workspaceId}/${itemId}/undo-convert`, {
+        method: 'POST',
+        headers: getHeaders(get().token),
+        body: JSON.stringify({ cardId })
+      });
+      if (!res.ok) throw new Error('Failed to undo conversion');
+      const { inboxItem } = await res.json();
+      
+      set((state) => ({
+        inboxItems: state.inboxItems.map(i => i.id === itemId ? inboxItem : i)
+      }));
+      get().addToast('Undo Success', 'Task deleted, email restored to inbox.', 'success');
+    } catch (err) {
+      // Revert optimistic
+      set({ inboxItems: prevInboxItems, currentWorkspace: prevWorkspace, currentBoard: prevBoard });
+      get().addToast('Undo Failed', 'Could not revert task conversion.', 'error');
+      throw err;
+    }
+  },
+
+  batchConvertInboxItems: async (workspaceId, itemIds, payload) => {
+    set({ syncStatus: 'syncing' });
+    try {
+      const res = await fetch(`${API_URL}/inbox/${workspaceId}/batch/convert`, {
+        method: 'POST',
+        headers: getHeaders(get().token),
+        body: JSON.stringify({ itemIds, ...payload })
+      });
+      if (!res.ok) throw new Error('Failed batch conversion');
+      
+      // Re-fetch everything to ensure consistent state
+      await get().fetchInboxItems(workspaceId);
+      const currentWorkspace = get().currentWorkspace;
+      if (currentWorkspace) {
+        await get().fetchWorkspaceDetails(currentWorkspace.id);
+      }
+      const currentBoard = get().currentBoard;
+      if (currentBoard && currentBoard.id === payload.boardId) {
+        await get().fetchBoardDetails(currentBoard.id);
+      }
+      
+      set({ syncStatus: 'synced', lastSyncedTime: new Date() });
+      get().addToast('Batch Convert Success', `Converted ${itemIds.length} items to tasks.`, 'success');
+    } catch (err) {
+      set({ syncStatus: 'offline' });
+      get().addToast('Batch Convert Failed', 'Failed to convert selected items.', 'error');
+      throw err;
+    }
+  },
+
+  batchArchiveInboxItems: async (workspaceId, itemIds) => {
+    set({ syncStatus: 'syncing' });
+    // Optimistic Archive
+    const prevItems = get().inboxItems;
     set((state) => ({
-      inboxItems: state.inboxItems.map((i) => i.id === itemId ? inboxItem : i)
+      inboxItems: state.inboxItems.map(i => itemIds.includes(i.id) ? { ...i, status: 'ARCHIVED' as any } : i)
     }));
-    const currentWorkspace = get().currentWorkspace;
-    if (currentWorkspace) {
-      await get().fetchWorkspaceDetails(currentWorkspace.id);
+
+    try {
+      const res = await fetch(`${API_URL}/inbox/${workspaceId}/batch/archive`, {
+        method: 'POST',
+        headers: getHeaders(get().token),
+        body: JSON.stringify({ itemIds })
+      });
+      if (!res.ok) throw new Error('Failed batch archive');
+      set({ syncStatus: 'synced', lastSyncedTime: new Date() });
+      get().addToast('Batch Archive Success', `Archived ${itemIds.length} items.`, 'success');
+    } catch (err) {
+      set({ inboxItems: prevItems, syncStatus: 'offline' });
+      get().addToast('Batch Archive Failed', 'Failed to archive selected items.', 'error');
+      throw err;
+    }
+  },
+
+  batchDeleteInboxItems: async (workspaceId, itemIds) => {
+    set({ syncStatus: 'syncing' });
+    // Optimistic Delete
+    const prevItems = get().inboxItems;
+    set((state) => ({
+      inboxItems: state.inboxItems.filter(i => !itemIds.includes(i.id))
+    }));
+
+    try {
+      const res = await fetch(`${API_URL}/inbox/${workspaceId}/batch/delete`, {
+        method: 'POST',
+        headers: getHeaders(get().token),
+        body: JSON.stringify({ itemIds })
+      });
+      if (!res.ok) throw new Error('Failed batch delete');
+      set({ syncStatus: 'synced', lastSyncedTime: new Date() });
+      get().addToast('Batch Delete Success', `Deleted ${itemIds.length} items.`, 'success');
+    } catch (err) {
+      set({ inboxItems: prevItems, syncStatus: 'offline' });
+      get().addToast('Batch Delete Failed', 'Failed to delete selected items.', 'error');
+      throw err;
+    }
+  },
+
+  batchUpdateInboxItemsStatus: async (workspaceId, itemIds, status) => {
+    set({ syncStatus: 'syncing' });
+    // Optimistic status update
+    const prevItems = get().inboxItems;
+    set((state) => ({
+      inboxItems: state.inboxItems.map(i => itemIds.includes(i.id) ? { ...i, status: status as any } : i)
+    }));
+
+    try {
+      const res = await fetch(`${API_URL}/inbox/${workspaceId}/batch/status`, {
+        method: 'POST',
+        headers: getHeaders(get().token),
+        body: JSON.stringify({ itemIds, status })
+      });
+      if (!res.ok) throw new Error('Failed batch status update');
+      set({ syncStatus: 'synced', lastSyncedTime: new Date() });
+      get().addToast('Batch Status Success', `Updated status of ${itemIds.length} items.`, 'success');
+    } catch (err) {
+      set({ inboxItems: prevItems, syncStatus: 'offline' });
+      get().addToast('Batch Status Failed', 'Failed to update selected items.', 'error');
+      throw err;
+    }
+  },
+
+  batchAssignLabelsToInboxItems: async (workspaceId, itemIds, labels) => {
+    set({ syncStatus: 'syncing' });
+    try {
+      const res = await fetch(`${API_URL}/inbox/${workspaceId}/batch/labels`, {
+        method: 'POST',
+        headers: getHeaders(get().token),
+        body: JSON.stringify({ itemIds, labels })
+      });
+      if (!res.ok) throw new Error('Failed batch labels assignment');
+      await get().fetchInboxItems(workspaceId);
+      set({ syncStatus: 'synced', lastSyncedTime: new Date() });
+      get().addToast('Labels Assigned', 'Assigned labels to selected items.', 'success');
+    } catch (err) {
+      set({ syncStatus: 'offline' });
+      get().addToast('Labels Assignment Failed', 'Failed to assign labels.', 'error');
+      throw err;
     }
   },
 
@@ -1645,12 +1983,12 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   toasts: [],
-  addToast: (title, message, type = 'info') => {
+  addToast: (title, message, type = 'info', action) => {
     const id = Math.random().toString(36).substring(2, 9);
-    set((state) => ({ toasts: [...state.toasts, { id, title, message, type }] }));
+    set((state) => ({ toasts: [...state.toasts, { id, title, message, type, action }] }));
     setTimeout(() => {
       get().removeToast(id);
-    }, 4000);
+    }, 6000);
   },
   removeToast: (id) => {
     set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }));

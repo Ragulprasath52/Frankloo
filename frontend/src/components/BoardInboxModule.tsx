@@ -464,7 +464,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
   // Filter emails belonging to current selected board
   const boardInboxItems = inboxItems.filter(item => {
     if (item.source !== 'EMAIL') return false;
-    return item.boardId === selectedBoardId && item.status !== 'ARCHIVED';
+    return item.status !== 'ARCHIVED';
   });
 
   // Relative time formatter helper
@@ -647,18 +647,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
               >
                 <PlayCircle className="w-3.5 h-3.5" /> Simulate Test Email
               </button>
-              <span className="text-[11px] text-slate-450 dark:text-[#6e7681] hidden md:inline-block">
-                Board Selector:
-              </span>
-              <select 
-                value={selectedBoardId} 
-                onChange={(e) => setSelectedBoardId(e.target.value)}
-                className="bg-slate-50 dark:bg-white/5 border border-gray-250 dark:border-[#30363d] text-xs rounded-lg py-1 px-2 pr-7 font-bold text-gray-600 dark:text-[#8d96a0] max-w-[150px] md:max-w-none"
-              >
-                {currentWorkspace?.boards?.map(b => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
+
             </div>
           </div>
         </div>

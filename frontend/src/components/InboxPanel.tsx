@@ -2,16 +2,26 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { 
   Inbox, ChevronRight, Mail, Slack, Github, 
-  Calendar, Zap, Archive, CheckSquare, Search, Plus, Info, Clock, Send, ArrowLeft
+  Calendar, Zap, Archive, CheckSquare, Search, Plus, Info, Clock, Send, ArrowLeft, RotateCw, CheckCircle2
 } from 'lucide-react';
+
+const transparentDragImg = new Image();
+transparentDragImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
 export default function InboxPanel() {
   const { 
     currentWorkspace, inboxItems, fetchInboxItems, createInboxItem, 
     updateInboxItem, convertInboxItem, mockIncomingInboxItems, replyToGmail,
-    isInboxOpen, setInboxOpen, addToast
+    isInboxOpen, setInboxOpen, addToast, user,
+    syncStatus, lastSyncedTime, setDraggedEmail,
+    batchConvertInboxItems, batchArchiveInboxItems, batchDeleteInboxItems,
+    batchUpdateInboxItemsStatus, syncGmailInbox,
+    fetchWorkspaceDetails
   } = useStore();
   
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
   // Quick Capture Form States
   const [quickTitle, setQuickTitle] = useState('');
   const [quickDesc, setQuickDesc] = useState('');
@@ -23,6 +33,9 @@ export default function InboxPanel() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSource, setFilterSource] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('NEW_PROCESSING'); // NEW or PROCESSING by default
+  const [filterPriority, setFilterPriority] = useState<string>('ALL');
+  const [filterHasAttachments, setFilterHasAttachments] = useState<boolean>(false);
+  const [filterAssignedToMe, setFilterAssignedToMe] = useState<boolean>(false);
 
   // Advanced Convert States
   const [activeConvertId, setActiveConvertId] = useState<string | null>(null);
@@ -32,6 +45,11 @@ export default function InboxPanel() {
   const [selectedDueDate, setSelectedDueDate] = useState('');
   const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<string[]>([]);
   const [selectedLabelsText, setSelectedLabelsText] = useState('');
+
+  // Bulk Convert States
+  const [isBulkConvertOpen, setIsBulkConvertOpen] = useState(false);
+  const [bulkBoardId, setBulkBoardId] = useState('');
+  const [bulkListId, setBulkListId] = useState('');
 
   // Email Details States
   const [activeGmailDetailsItem, setActiveGmailDetailsItem] = useState<any | null>(null);
@@ -105,7 +123,6 @@ export default function InboxPanel() {
       setSelectedDueDate('');
       setSelectedAssigneeIds([]);
       setSelectedLabelsText('');
-      addToast('Task Created', 'Inbox item successfully converted into a board task.', 'success');
     } catch (err: any) {
       addToast('Convert Error', err.message || 'Failed to convert item.', 'error');
     }
@@ -141,6 +158,19 @@ export default function InboxPanel() {
     }
   };
 
+  // Manual refresh logic
+  const handleManualRefresh = async () => {
+    useStore.setState({ syncStatus: 'syncing' });
+    try {
+      await syncGmailInbox(currentWorkspace.id);
+      await fetchInboxItems(currentWorkspace.id);
+      await fetchWorkspaceDetails(currentWorkspace.id);
+      useStore.setState({ syncStatus: 'synced', lastSyncedTime: new Date() });
+    } catch (err) {
+      useStore.setState({ syncStatus: 'offline' });
+    }
+  };
+
   // Filter and Search processing
   const filteredItems = inboxItems.filter(item => {
     const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -151,23 +181,39 @@ export default function InboxPanel() {
     let matchesStatus = true;
     if (filterStatus === 'NEW_PROCESSING') {
       matchesStatus = item.status === 'NEW' || item.status === 'PROCESSING';
+    } else if (filterStatus === 'UNREAD') {
+      matchesStatus = item.status === 'NEW';
     } else if (filterStatus !== 'ALL') {
       matchesStatus = item.status === filterStatus;
     }
 
-    return matchesSearch && matchesSource && matchesStatus;
+    const matchesPriority = filterPriority === 'ALL' || item.priority === filterPriority;
+
+    const sourceDetailsObj = JSON.parse(item.sourceDetails || '{}');
+    const hasAtt = sourceDetailsObj.attachments && sourceDetailsObj.attachments.length > 0;
+    const matchesAttachments = !filterHasAttachments || hasAtt;
+
+    let matchesAssigned = true;
+    if (filterAssignedToMe && user) {
+      const name = (user.name || '').toLowerCase();
+      const username = (user.username || '').toLowerCase();
+      const bodyText = `${item.title} ${item.description}`.toLowerCase();
+      matchesAssigned = (name && bodyText.includes(name)) || bodyText.includes(username) || bodyText.includes(`@${username}`);
+    }
+
+    return matchesSearch && matchesSource && matchesStatus && matchesPriority && matchesAttachments && matchesAssigned;
   });
 
   const unreadCount = inboxItems.filter(item => item.status === 'NEW').length;
 
   const getSourceIcon = (source: string) => {
     switch (source) {
-      case 'GMAIL': return <Mail className="w-4 h-4 text-red-500" />;
-      case 'SLACK': return <Slack className="w-4 h-4 text-orange-500" />;
-      case 'DISCORD': return <Info className="w-4 h-4 text-indigo-500" />;
-      case 'GITHUB': return <Github className="w-4 h-4 text-slate-100" />;
-      case 'CALENDAR': return <Calendar className="w-4 h-4 text-blue-500" />;
-      default: return <Zap className="w-4 h-4 text-yellow-500" />;
+      case 'GMAIL': return <Mail className="w-4 h-4 text-red-500 shrink-0" />;
+      case 'SLACK': return <Slack className="w-4 h-4 text-orange-500 shrink-0" />;
+      case 'DISCORD': return <Info className="w-4 h-4 text-indigo-500 shrink-0" />;
+      case 'GITHUB': return <Github className="w-4 h-4 text-slate-150 dark:text-slate-100 shrink-0" />;
+      case 'CALENDAR': return <Calendar className="w-4 h-4 text-blue-500 shrink-0" />;
+      default: return <Zap className="w-4 h-4 text-yellow-500 shrink-0" />;
     }
   };
 
@@ -186,6 +232,36 @@ export default function InboxPanel() {
       case 'PROCESSING': return 'bg-purple-500/10 text-purple-400';
       case 'CONVERTED': return 'bg-emerald-500/10 text-emerald-400';
       default: return 'bg-slate-500/10 text-slate-400';
+    }
+  };
+
+  const getSyncStatusIndicator = () => {
+    if (syncStatus === 'syncing') {
+      return (
+        <span className="flex items-center gap-1.5 text-[10px] text-yellow-500 font-bold animate-pulse">
+          <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span> Syncing...
+        </span>
+      );
+    }
+    if (syncStatus === 'offline') {
+      return (
+        <span className="flex items-center gap-1.5 text-[10px] text-red-500 font-bold">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Connection lost
+        </span>
+      );
+    }
+    return (
+      <span className="flex items-center gap-1.5 text-[10px] text-emerald-500 font-bold" title={lastSyncedTime ? `Last synced: ${lastSyncedTime.toLocaleTimeString()}` : ''}>
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Synced {lastSyncedTime ? 'just now' : ''}
+      </span>
+    );
+  };
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedIds(filteredItems.map(i => i.id));
+    } else {
+      setSelectedIds([]);
     }
   };
 
@@ -233,16 +309,27 @@ export default function InboxPanel() {
             )}
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Sync status */}
+            {getSyncStatusIndicator()}
+            {/* Refresh button */}
+            <button
+              onClick={handleManualRefresh}
+              disabled={syncStatus === 'syncing'}
+              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-550 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+              title="Refresh Inbox"
+            >
+              <RotateCw className={`w-3.5 h-3.5 ${syncStatus === 'syncing' ? 'animate-spin text-indigo-500' : ''}`} />
+            </button>
             <button
               onClick={handleMockIncoming}
               className="text-[9px] sm:text-[10px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-650 dark:text-slate-300 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded font-semibold border border-slate-250 dark:border-slate-700 whitespace-nowrap"
             >
               Mock Alerts
             </button>
-            {/* Close button — always visible, especially important on mobile */}
+            {/* Close button */}
             <button
               onClick={() => setInboxOpen(false)}
-              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors"
+              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-550 dark:text-slate-450 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
               title="Close inbox"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -359,9 +446,10 @@ export default function InboxPanel() {
               <select
                 value={filterStatus}
                 onChange={e => setFilterStatus(e.target.value)}
-                className="bg-white dark:bg-[#22272b] border border-slate-200 dark:border-slate-700 rounded px-2 py-1.5 text-xs text-slate-850 dark:text-white focus:outline-none"
+                className="bg-white dark:bg-[#22272b] border border-slate-200 dark:border-slate-700 rounded px-2 py-1.5 text-xs text-slate-855 dark:text-white focus:outline-none"
               >
                 <option value="NEW_PROCESSING">Active</option>
+                <option value="UNREAD">Unread</option>
                 <option value="NEW">New</option>
                 <option value="PROCESSING">Processing</option>
                 <option value="CONVERTED">Converted</option>
@@ -386,10 +474,184 @@ export default function InboxPanel() {
                 </button>
               ))}
             </div>
+
+            {/* Extended Filters */}
+            <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-200 dark:border-slate-800/60">
+              <div>
+                <label className="block text-[8px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Priority</label>
+                <select
+                  value={filterPriority}
+                  onChange={e => setFilterPriority(e.target.value)}
+                  className="w-full bg-white dark:bg-[#22272b] border border-slate-200 dark:border-slate-700 rounded p-1 text-[11px] text-slate-800 dark:text-white focus:outline-none"
+                >
+                  <option value="ALL">All Priorities</option>
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="URGENT">Urgent</option>
+                </select>
+              </div>
+              
+              <div className="flex flex-col gap-1 justify-center pt-2">
+                <label className="flex items-center gap-1.5 cursor-pointer text-slate-655 dark:text-slate-400 text-[10px] select-none">
+                  <input
+                    type="checkbox"
+                    checked={filterHasAttachments}
+                    onChange={e => setFilterHasAttachments(e.target.checked)}
+                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3 h-3 cursor-pointer"
+                  />
+                  <span>Has Attachments</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer text-slate-655 dark:text-slate-400 text-[10px] select-none">
+                  <input
+                    type="checkbox"
+                    checked={filterAssignedToMe}
+                    onChange={e => setFilterAssignedToMe(e.target.checked)}
+                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3 h-3 cursor-pointer"
+                  />
+                  <span>Assigned to Me</span>
+                </label>
+              </div>
+            </div>
           </div>
+
+          {/* Bulk Selection Actions Bar */}
+          {selectedIds.length > 0 && (
+            <div className="bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 space-y-2.5 animate-fade-in text-xs text-indigo-900 dark:text-indigo-200">
+              <div className="flex items-center justify-between font-bold">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-indigo-500" />
+                  {selectedIds.length} items selected
+                </span>
+                <button onClick={() => setSelectedIds([])} className="text-indigo-500 hover:text-indigo-700 underline bg-transparent border-0 cursor-pointer text-[10px]">
+                  Clear selection
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 pt-1 border-t border-indigo-200 dark:border-indigo-850">
+                <button
+                  onClick={() => setIsBulkConvertOpen(!isBulkConvertOpen)}
+                  className="px-2.5 py-1 bg-indigo-650 hover:bg-indigo-700 text-white rounded font-bold shadow-sm cursor-pointer"
+                >
+                  Convert Selected
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      await batchArchiveInboxItems(currentWorkspace.id, selectedIds);
+                      setSelectedIds([]);
+                    } catch (e) {}
+                  }}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded font-semibold border border-slate-300 dark:border-slate-700 cursor-pointer"
+                >
+                  Archive
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      await batchDeleteInboxItems(currentWorkspace.id, selectedIds);
+                      setSelectedIds([]);
+                    } catch (e) {}
+                  }}
+                  className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded font-bold border border-rose-500/20 cursor-pointer"
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      await batchUpdateInboxItemsStatus(currentWorkspace.id, selectedIds, 'NEW');
+                      setSelectedIds([]);
+                    } catch (e) {}
+                  }}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded font-semibold border border-slate-300 dark:border-slate-700 cursor-pointer"
+                >
+                  Unread
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      await batchUpdateInboxItemsStatus(currentWorkspace.id, selectedIds, 'CONVERTED');
+                      setSelectedIds([]);
+                    } catch (e) {}
+                  }}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded font-semibold border border-slate-300 dark:border-slate-700 cursor-pointer"
+                >
+                  Read
+                </button>
+              </div>
+
+              {/* Bulk Convert Form */}
+              {isBulkConvertOpen && (
+                <div className="bg-white dark:bg-[#101214] border border-slate-200 dark:border-slate-800 rounded-lg p-2.5 space-y-2 mt-2">
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Target Board</label>
+                    <select
+                      value={bulkBoardId}
+                      onChange={e => {
+                        setBulkBoardId(e.target.value);
+                        const b = currentWorkspace.boards?.find(bd => bd.id === e.target.value);
+                        setBulkListId(b?.lists?.[0]?.id || '');
+                      }}
+                      className="w-full bg-slate-55 dark:bg-[#161a1d] border border-slate-200 dark:border-slate-700 rounded p-1 text-xs text-slate-800 dark:text-slate-200 focus:outline-none"
+                    >
+                      <option value="">-- Choose Board --</option>
+                      {currentWorkspace.boards?.map(b => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {bulkBoardId && (
+                    <div>
+                      <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Target Column</label>
+                      <select
+                        value={bulkListId}
+                        onChange={e => setBulkListId(e.target.value)}
+                        className="w-full bg-slate-55 dark:bg-[#161a1d] border border-slate-200 dark:border-slate-700 rounded p-1 text-xs text-slate-800 dark:text-slate-200 focus:outline-none"
+                      >
+                        <option value="">-- Choose Column --</option>
+                        {currentWorkspace.boards?.find(bd => bd.id === bulkBoardId)?.lists?.map(l => (
+                          <option key={l.id} value={l.id}>{l.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <button
+                    onClick={async () => {
+                      if (!bulkBoardId || !bulkListId) return;
+                      try {
+                        await batchConvertInboxItems(currentWorkspace.id, selectedIds, { boardId: bulkBoardId, listId: bulkListId });
+                        setSelectedIds([]);
+                        setIsBulkConvertOpen(false);
+                      } catch (e) {}
+                    }}
+                    disabled={!bulkBoardId || !bulkListId}
+                    className="w-full py-1.5 bg-indigo-650 hover:bg-indigo-700 text-white rounded font-bold disabled:opacity-50 cursor-pointer mt-1"
+                  >
+                    Confirm Batch Convert
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Inbox Feed List */}
           <div className="space-y-3 pb-8">
+            <div className="flex items-center justify-between px-1 text-[10px] text-slate-450 font-bold uppercase tracking-wider">
+              <span>Emails & Items ({filteredItems.length})</span>
+              {filteredItems.length > 0 && (
+                <label className="flex items-center gap-1 cursor-pointer select-none text-indigo-500 hover:text-indigo-650">
+                  <input
+                    type="checkbox"
+                    checked={filteredItems.length > 0 && selectedIds.length === filteredItems.length}
+                    onChange={handleSelectAll}
+                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3 h-3 cursor-pointer"
+                  />
+                  <span>Select All</span>
+                </label>
+              )}
+            </div>
+
             {filteredItems.length === 0 ? (
               <div className="border border-dashed border-slate-200 dark:border-slate-800 rounded-lg py-12 text-center text-slate-500 text-xs">
                 <Inbox className="w-8 h-8 text-slate-400 mx-auto mb-2" />
@@ -398,20 +660,44 @@ export default function InboxPanel() {
             ) : (
               filteredItems.map(item => {
                 const sourceDetailsObj = JSON.parse(item.sourceDetails || '{}');
+                const isSelected = selectedIds.includes(item.id);
                 return (
                   <div
                     key={item.id}
-                    draggable
+                    draggable={item.status !== 'CONVERTED'}
                     onDragStart={e => {
-                      e.dataTransfer.setData('inboxItemId', item.id);
+                      if (selectedIds.includes(item.id)) {
+                        e.dataTransfer.setData('inboxItemIds', JSON.stringify(selectedIds));
+                      } else {
+                        e.dataTransfer.setData('inboxItemId', item.id);
+                      }
+
+                      e.dataTransfer.setDragImage(transparentDragImg, 0, 0);
+                      setDraggedEmail(item);
                     }}
-                    className={`bg-slate-50 dark:bg-[#181a1c] border border-slate-200 dark:border-slate-800 rounded-lg p-3 hover:border-slate-350 dark:hover:border-slate-700 transition shadow-sm space-y-2 cursor-grab active:cursor-grabbing relative group ${
-                      item.status === 'CONVERTED' ? 'opacity-60' : ''
-                    }`}
+                    onDragEnd={() => {
+                      setDraggedEmail(null);
+                    }}
+                    className={`bg-slate-50 dark:bg-[#181a1c] border rounded-lg p-3 hover:border-slate-350 dark:hover:border-slate-700 transition shadow-sm space-y-2 cursor-grab active:cursor-grabbing relative group ${
+                      item.status === 'CONVERTED' ? 'opacity-60 bg-emerald-50/5 border-emerald-500/10' : ''
+                    } ${isSelected ? 'border-indigo-400 dark:border-indigo-650 bg-indigo-500/5 dark:bg-indigo-500/5' : 'border-slate-200 dark:border-slate-800'}`}
                   >
-                    {/* Top line: source badge and metadata */}
+                    {/* Top line: select box & source badge & metadata */}
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedIds([...selectedIds, item.id]);
+                            } else {
+                              setSelectedIds(selectedIds.filter(id => id !== item.id));
+                            }
+                          }}
+                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer pointer-events-auto shrink-0"
+                          onClick={e => e.stopPropagation()}
+                        />
                         {getSourceIcon(item.source)}
                         <span className="text-[0.625rem] font-bold text-slate-400 uppercase tracking-wider">
                           {item.source}
@@ -436,14 +722,14 @@ export default function InboxPanel() {
                           setActiveGmailDetailsItem(item);
                         }
                       }}
-                      className={item.source === 'GMAIL' ? 'cursor-pointer hover:opacity-80 transition-all' : ''}
+                      className={item.source === 'GMAIL' ? 'cursor-pointer hover:opacity-85 transition-all' : ''}
                     >
-                      <h4 className="font-semibold text-xs text-slate-800 dark:text-white leading-snug">
+                      <h4 className="font-semibold text-xs text-slate-850 dark:text-white leading-snug">
                         {item.source === 'GMAIL' && <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 mr-1 animate-pulse"></span>}
                         {item.title}
                       </h4>
                       {item.description && (
-                        <p className="text-[0.6875rem] text-slate-600 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                        <p className="text-[0.6875rem] text-slate-550 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
                           {item.description}
                         </p>
                       )}
@@ -451,7 +737,7 @@ export default function InboxPanel() {
 
                     {/* Source specific details */}
                     {item.source !== 'QUICK' && Object.keys(sourceDetailsObj).length > 0 && (
-                      <div className="bg-[#1f2326] border border-slate-800 p-2 rounded text-[0.625rem] text-slate-400 space-y-0.5">
+                      <div className="bg-slate-100/50 dark:bg-[#1f2326] border border-slate-200 dark:border-slate-800 p-2 rounded text-[0.625rem] text-slate-500 dark:text-slate-400 space-y-0.5">
                         {sourceDetailsObj.sender && <div><b>Sender:</b> {sourceDetailsObj.sender}</div>}
                         {sourceDetailsObj.channel && <div><b>Channel:</b> {sourceDetailsObj.channel}</div>}
                         {sourceDetailsObj.repo && <div><b>Repo:</b> {sourceDetailsObj.repo}</div>}
@@ -461,18 +747,18 @@ export default function InboxPanel() {
                             href={sourceDetailsObj.link} 
                             target="_blank" 
                             rel="noopener noreferrer" 
-                            className="text-indigo-400 hover:underline inline-block mt-0.5"
+                            className="text-indigo-550 dark:text-indigo-400 hover:underline inline-block mt-0.5 font-bold"
                           >
                             View Original Link
                           </a>
                         )}
                         {sourceDetailsObj.attachments && sourceDetailsObj.attachments.length > 0 && (
-                          <div className="mt-1.5 pt-1.5 border-t border-slate-800/80">
-                            <span className="font-bold block mb-0.5">Attachments ({sourceDetailsObj.attachments.length}):</span>
+                          <div className="mt-1.5 pt-1.5 border-t border-slate-200 dark:border-slate-800/80">
+                            <span className="font-bold block mb-0.5 text-slate-650 dark:text-slate-350">Attachments ({sourceDetailsObj.attachments.length}):</span>
                             <ul className="list-disc pl-3.5 space-y-0.5 text-slate-500 font-medium">
                               {sourceDetailsObj.attachments.map((att: any, idx: number) => (
                                 <li key={idx} className="truncate" title={att.filename}>
-                                  {att.filename} <span className="text-[9px] text-slate-600 font-normal">({Math.round((att.size || 0) / 1024)} KB)</span>
+                                  {att.filename} <span className="text-[9px] text-slate-450 font-normal">({Math.round((att.size || 0) / 1024)} KB)</span>
                                 </li>
                               ))}
                             </ul>
@@ -497,7 +783,7 @@ export default function InboxPanel() {
                         {item.status !== 'ARCHIVED' && (
                           <button
                             onClick={() => handleStatusChange(item.id, 'ARCHIVED')}
-                            className="hover:text-red-400 flex items-center gap-0.5 font-medium bg-transparent border-0 cursor-pointer"
+                            className="hover:text-red-505 dark:hover:text-red-400 flex items-center gap-0.5 font-medium bg-transparent border-0 cursor-pointer"
                             title="Archive Item"
                           >
                             <Archive className="w-3 h-3" /> Archive
@@ -511,7 +797,7 @@ export default function InboxPanel() {
                                 setSelectedBoardId(currentWorkspace.boards[0].id);
                               }
                             }}
-                            className="hover:text-indigo-400 flex items-center gap-0.5 font-medium bg-transparent border-0 cursor-pointer"
+                            className="hover:text-indigo-505 dark:hover:text-indigo-400 flex items-center gap-0.5 font-medium bg-transparent border-0 cursor-pointer"
                             title="Convert to Task"
                           >
                             <CheckSquare className="w-3 h-3" /> Convert
@@ -528,7 +814,7 @@ export default function InboxPanel() {
                           <select
                             value={selectedBoardId}
                             onChange={e => setSelectedBoardId(e.target.value)}
-                            className="w-full bg-white dark:bg-[#101214] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-1.5 rounded focus:outline-none"
+                            className="w-full bg-white dark:bg-[#101214] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-1.5 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
                           >
                             <option value="">-- Choose Board --</option>
                             {currentWorkspace.boards?.map(b => (
@@ -543,7 +829,7 @@ export default function InboxPanel() {
                               <select
                                 value={selectedListId}
                                 onChange={e => setSelectedListId(e.target.value)}
-                                className="w-full bg-white dark:bg-[#101214] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-1.5 rounded focus:outline-none"
+                                className="w-full bg-white dark:bg-[#101214] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-1.5 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
                               >
                                 <option value="">-- Choose Column --</option>
                                 {currentWorkspace.boards?.find(b => b.id === selectedBoardId)?.lists?.map(l => (
@@ -592,7 +878,7 @@ export default function InboxPanel() {
                               <label className="block text-[0.5625rem] font-bold text-slate-500 uppercase tracking-wider mb-1">Assign Members</label>
                               <div className="max-h-20 overflow-y-auto border border-slate-200 dark:border-slate-850 p-1.5 rounded bg-white dark:bg-[#101214] space-y-1">
                                 {currentWorkspace.members?.map(m => (
-                                  <label key={m.user.id} className="flex items-center gap-1.5 text-[10px] cursor-pointer text-slate-650 dark:text-slate-400">
+                                  <label key={m.user.id} className="flex items-center gap-1.5 text-[10px] cursor-pointer text-slate-655 dark:text-slate-400">
                                     <input
                                       type="checkbox"
                                       checked={selectedAssigneeIds.includes(m.user.id)}
@@ -603,7 +889,7 @@ export default function InboxPanel() {
                                           setSelectedAssigneeIds(selectedAssigneeIds.filter(id => id !== m.user.id));
                                         }
                                       }}
-                                      className="rounded text-indigo-600 focus:ring-indigo-500 border-slate-355 w-3 h-3"
+                                      className="rounded text-indigo-650 focus:ring-indigo-500 border-slate-350 w-3 h-3"
                                     />
                                     <span>{m.user.name || m.user.username}</span>
                                   </label>
@@ -624,7 +910,7 @@ export default function InboxPanel() {
                               setSelectedAssigneeIds([]);
                               setSelectedLabelsText('');
                             }}
-                            className="px-2 py-1 text-slate-550 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+                            className="px-2 py-1 text-slate-550 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white cursor-pointer"
                           >
                             Cancel
                           </button>
@@ -632,7 +918,7 @@ export default function InboxPanel() {
                             type="button"
                             onClick={() => handleConvertItem(item.id)}
                             disabled={!selectedBoardId || !selectedListId}
-                            className="px-3 py-1 bg-indigo-650 hover:bg-indigo-700 text-white font-bold rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-3 py-1 bg-indigo-650 hover:bg-indigo-700 text-white font-bold rounded disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                           >
                             Convert
                           </button>
@@ -655,7 +941,7 @@ export default function InboxPanel() {
                   setActiveGmailDetailsItem(null);
                   setReplyText('');
                 }}
-                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-white font-semibold transition"
+                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-850 dark:hover:text-white font-semibold transition cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4 text-indigo-500" /> Back to Inbox
               </button>
@@ -667,7 +953,7 @@ export default function InboxPanel() {
                       handleStatusChange(activeGmailDetailsItem.id, 'ARCHIVED');
                       setActiveGmailDetailsItem(null);
                     }}
-                    className="text-[10px] sm:text-xs font-semibold py-1.5 px-3 bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg flex items-center gap-1.5"
+                    className="text-[10px] sm:text-xs font-semibold py-1.5 px-3 bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-350 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg flex items-center gap-1.5 cursor-pointer"
                   >
                     <Archive className="w-3.5 h-3.5" /> Archive
                   </button>
@@ -680,7 +966,7 @@ export default function InboxPanel() {
                     }
                     setActiveGmailDetailsItem(null);
                   }}
-                  className="text-[10px] sm:text-xs font-semibold py-1.5 px-3 bg-indigo-650 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-1.5"
+                  className="text-[10px] sm:text-xs font-semibold py-1.5 px-3 bg-indigo-650 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-1.5 cursor-pointer"
                 >
                   <CheckSquare className="w-3.5 h-3.5" /> Convert
                 </button>
@@ -723,7 +1009,7 @@ export default function InboxPanel() {
                           <span className="block text-[10px] font-semibold text-slate-750 dark:text-slate-300 truncate" title={att.filename}>
                             {att.filename}
                           </span>
-                          <span className="text-[9px] text-slate-400">
+                          <span className="text-[9px] text-slate-405">
                             {(att.size / 1024).toFixed(0)} KB
                           </span>
                         </div>
@@ -750,7 +1036,7 @@ export default function InboxPanel() {
                   type="button"
                   onClick={handleSendReply}
                   disabled={!replyText.trim() || sendingReply}
-                  className="btn-primary py-2 w-full justify-center text-xs font-semibold rounded-xl flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn-primary py-2 w-full justify-center text-xs font-semibold rounded-xl flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   <Send className="w-3.5 h-3.5" />
                   {sendingReply ? 'Sending Reply...' : 'Send Reply'}

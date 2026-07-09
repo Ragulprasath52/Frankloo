@@ -323,7 +323,194 @@ router.delete('/:workspaceId/:itemId', authenticate, async (req, res) => {
   }
 });
 
-// POST convert inbox item to card
+// Helper function to convert a single inbox item to a card
+export async function convertSingleItemInternal({
+  workspaceId,
+  itemId,
+  boardId,
+  listId,
+  assigneeIds,
+  labels,
+  priority,
+  dueDate,
+  checklist,
+  title,
+  description,
+  userId
+}) {
+  const item = await prisma.inboxItem.findUnique({
+    where: { id: itemId, workspaceId }
+  });
+
+  if (!item) throw new Error('Inbox item not found');
+
+  const detailsObj = JSON.parse(item.sourceDetails || '{}');
+  const sourceDesc = item.source !== 'QUICK' 
+    ? `\n\n*Source: ${item.source}*\n${detailsObj.subject || detailsObj.channel || detailsObj.repo || detailsObj.calendar || ''}\n${detailsObj.link ? `[View original link](${detailsObj.link})` : ''}`
+    : '';
+
+  // 1. Smart Auto Extraction - People Mentioned -> Suggested Members
+  let finalAssigneeIds = assigneeIds || [];
+  if (finalAssigneeIds.length === 0) {
+    const workspaceMembers = await prisma.workspaceMember.findMany({
+      where: { workspaceId },
+      include: { user: true }
+    });
+    const searchableText = `${title || ''} ${description || ''} ${item.title || ''} ${item.description || ''}`.toLowerCase();
+    for (const member of workspaceMembers) {
+      const name = (member.user.name || '').toLowerCase();
+      const username = (member.user.username || '').toLowerCase();
+      const emailPart = member.user.email.split('@')[0].toLowerCase();
+      if (
+        (name && searchableText.includes(name)) ||
+        (username && searchableText.includes(username)) ||
+        searchableText.includes(`@${username}`) ||
+        searchableText.includes(emailPart)
+      ) {
+        finalAssigneeIds.push(member.userId);
+      }
+    }
+    finalAssigneeIds = [...new Set(finalAssigneeIds)];
+  }
+
+  // 2. Smart Auto Extraction - Links
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const textToScan = `${description || ''} ${item.description || ''} ${detailsObj.text || ''}`;
+  const extractedUrls = [...new Set(textToScan.match(urlRegex) || [])];
+  const extractedLinks = extractedUrls.map(url => {
+    try {
+      return { url, title: new URL(url).hostname };
+    } catch (e) {
+      return { url, title: 'Link' };
+    }
+  });
+
+  const customFieldsData = {
+    labels: labels || [],
+    emoji: '',
+    links: extractedLinks
+  };
+
+  // Create the Card
+  const card = await prisma.card.create({
+    data: {
+      title: title || item.title,
+      description: (description !== undefined ? description : (item.description || '')) + sourceDesc,
+      position: 1000.0,
+      priority: priority || item.priority || 'MEDIUM',
+      dueDate: dueDate ? new Date(dueDate) : (item.dueDate ? new Date(item.dueDate) : null),
+      listId,
+      customFields: JSON.stringify(customFieldsData)
+    },
+    include: {
+      assignees: true,
+      checklists: true,
+      dependencies: true
+    }
+  });
+
+  // Create CardEmailDetails if GMAIL or EMAIL source
+  if (item.source === 'GMAIL' || item.source === 'EMAIL') {
+    await prisma.cardEmailDetails.create({
+      data: {
+        cardId: card.id,
+        sender: detailsObj.sender || 'Unknown Sender',
+        subject: detailsObj.subject || item.title,
+        messageId: detailsObj.messageId || null,
+        threadId: detailsObj.threadId || null,
+        bodyHtml: detailsObj.html || item.description,
+        bodyText: detailsObj.text || item.description,
+        replyLink: detailsObj.link || null,
+        hasAttachments: detailsObj.attachments && detailsObj.attachments.length > 0
+      }
+    });
+  }
+
+  // Handle assignees
+  if (finalAssigneeIds.length > 0) {
+    for (const memberId of finalAssigneeIds) {
+      await prisma.cardAssignee.create({
+        data: {
+          cardId: card.id,
+          userId: memberId
+        }
+      });
+    }
+  }
+
+  // Handle attachments if present
+  if (detailsObj.attachments && detailsObj.attachments.length > 0) {
+    for (const att of detailsObj.attachments) {
+      await prisma.cardAttachment.create({
+        data: {
+          cardId: card.id,
+          uploadedBy: userId,
+          filename: att.filename,
+          storagePath: att.storagePath || 'uploads/gmail-dummy',
+          mimeType: att.mimeType || 'application/octet-stream',
+          size: att.size || 0
+        }
+      });
+    }
+  }
+
+  // Handle checklists (passed from request, or parsed from email body)
+  const checklistsToCreate = [];
+  if (checklist && Array.isArray(checklist)) {
+    checklistsToCreate.push(...checklist.filter(Boolean));
+  } else if (detailsObj.checklists && Array.isArray(detailsObj.checklists)) {
+    checklistsToCreate.push(...detailsObj.checklists.filter(Boolean));
+  }
+
+  if (checklistsToCreate.length > 0) {
+    for (let idx = 0; idx < checklistsToCreate.length; idx++) {
+      await prisma.checklistItem.create({
+        data: {
+          cardId: card.id,
+          content: checklistsToCreate[idx],
+          position: idx * 100.0
+        }
+      });
+    }
+  }
+
+  // Update status of InboxItem to CONVERTED
+  const updatedItem = await prisma.inboxItem.update({
+    where: { id: itemId },
+    data: { status: 'CONVERTED' }
+  });
+
+  // Create activity log
+  await prisma.activityLog.create({
+    data: {
+      userId,
+      boardId,
+      cardId: card.id,
+      action: 'CREATE_CARD',
+      details: `Converted inbox item to card: "${card.title}"`
+    }
+  });
+
+  // Notify updates via Socket
+  notifyBoardUpdate(boardId, 'CARD_CREATE', card);
+
+  // Fetch full card with assignees and checklists for client response
+  const fullCard = await prisma.card.findUnique({
+    where: { id: card.id },
+    include: {
+      assignees: { include: { user: { select: { id: true, username: true, name: true, avatarUrl: true } } } },
+      checklists: true,
+      dependencies: { include: { dependsOnCard: { select: { id: true, title: true } } } },
+      comments: {
+        orderBy: { createdAt: 'desc' },
+        include: { user: { select: { id: true, username: true, name: true, avatarUrl: true } } }
+      }
+    }
+  });
+
+  return { card: fullCard, inboxItem: updatedItem };
+}
+
 // POST convert inbox item to card
 router.post('/:workspaceId/:itemId/convert', authenticate, async (req, res) => {
   try {
@@ -337,128 +524,260 @@ router.post('/:workspaceId/:itemId/convert', authenticate, async (req, res) => {
     });
     if (!membership) return res.status(403).json({ error: 'Access denied' });
 
-    const item = await prisma.inboxItem.findUnique({
-      where: { id: itemId, workspaceId }
+    const result = await convertSingleItemInternal({
+      workspaceId,
+      itemId,
+      boardId,
+      listId,
+      assigneeIds,
+      labels,
+      priority,
+      dueDate,
+      checklist,
+      title,
+      description,
+      userId: req.user.id
     });
 
-    if (!item) return res.status(404).json({ error: 'Inbox item not found' });
+    res.json(result);
+  } catch (error) {
+    console.error('Convert inbox item error:', error);
+    res.status(500).json({ error: error.message || 'Server error' });
+  }
+});
 
-    // 1. Create the Card
-    const detailsObj = JSON.parse(item.sourceDetails || '{}');
-    const sourceDesc = item.source !== 'QUICK' 
-      ? `\n\n*Source: ${item.source}*\n${detailsObj.subject || detailsObj.channel || detailsObj.repo || detailsObj.calendar || ''}\n${detailsObj.link ? `[View original link](${detailsObj.link})` : ''}`
-      : '';
+// POST undo conversion of inbox item to card
+router.post('/:workspaceId/:itemId/undo-convert', authenticate, async (req, res) => {
+  try {
+    const { workspaceId, itemId } = req.params;
+    const { cardId } = req.body;
 
-    const customFieldsData = {
-      labels: labels || [],
-      emoji: ''
-    };
+    if (!cardId) return res.status(400).json({ error: 'Card ID is required to undo conversion' });
 
-    const card = await prisma.card.create({
-      data: {
-        title: title || item.title,
-        description: (description !== undefined ? description : (item.description || '')) + sourceDesc,
-        position: 1000.0,
-        priority: priority || item.priority || 'MEDIUM',
-        dueDate: dueDate ? new Date(dueDate) : (item.dueDate ? new Date(item.dueDate) : null),
-        listId,
-        customFields: JSON.stringify(customFieldsData)
-      },
-      include: {
-        assignees: true,
-        checklists: true,
-        dependencies: true
-      }
+    const membership = await prisma.workspaceMember.findFirst({
+      where: { workspaceId, userId: req.user.id }
+    });
+    if (!membership) return res.status(403).json({ error: 'Access denied' });
+
+    // Find the card to get its board ID
+    const card = await prisma.card.findUnique({
+      where: { id: cardId },
+      include: { list: true }
     });
 
-    // Create CardEmailDetails if GMAIL or EMAIL source
-    if (item.source === 'GMAIL' || item.source === 'EMAIL') {
-      await prisma.cardEmailDetails.create({
+    if (card) {
+      // Delete the Card
+      await prisma.card.delete({
+        where: { id: cardId }
+      });
+      // Notify board updates
+      notifyBoardUpdate(card.list.boardId, 'CARD_DELETE', { id: cardId });
+    }
+
+    // Set InboxItem status back to NEW
+    const updatedItem = await prisma.inboxItem.update({
+      where: { id: itemId, workspaceId },
+      data: { status: 'NEW' }
+    });
+
+    // Create activity log
+    if (card) {
+      await prisma.activityLog.create({
         data: {
-          cardId: card.id,
-          sender: detailsObj.sender || 'Unknown Sender',
-          subject: detailsObj.subject || item.title,
-          messageId: detailsObj.messageId || null,
-          threadId: detailsObj.threadId || null,
-          bodyHtml: detailsObj.html || item.description,
-          bodyText: detailsObj.text || item.description,
-          replyLink: detailsObj.link || null,
-          hasAttachments: detailsObj.attachments && detailsObj.attachments.length > 0
+          userId: req.user.id,
+          boardId: card.list.boardId,
+          action: 'DELETE_CARD',
+          details: `Reverted conversion of email to card: "${card.title}" (Undo)`
         }
       });
     }
 
-    // 1b. Handle assignees
-    if (assigneeIds && assigneeIds.length > 0) {
-      for (const userId of assigneeIds) {
-        await prisma.cardAssignee.create({
-          data: {
-            cardId: card.id,
-            userId
-          }
-        });
-      }
-    }
-
-    // 1c. Handle attachments if present
-    if (detailsObj.attachments && detailsObj.attachments.length > 0) {
-      for (const att of detailsObj.attachments) {
-        await prisma.cardAttachment.create({
-          data: {
-            cardId: card.id,
-            uploadedBy: req.user.id,
-            filename: att.filename,
-            storagePath: att.storagePath || 'uploads/gmail-dummy',
-            mimeType: att.mimeType || 'application/octet-stream',
-            size: att.size || 0
-          }
-        });
-      }
-    }
-
-    // 1d. Handle checklists (passed from request, or parsed from email body)
-    const checklistsToCreate = [];
-    if (checklist && Array.isArray(checklist)) {
-      checklistsToCreate.push(...checklist.filter(Boolean));
-    } else if (detailsObj.checklists && Array.isArray(detailsObj.checklists)) {
-      checklistsToCreate.push(...detailsObj.checklists.filter(Boolean));
-    }
-
-    if (checklistsToCreate.length > 0) {
-      for (let idx = 0; idx < checklistsToCreate.length; idx++) {
-        await prisma.checklistItem.create({
-          data: {
-            cardId: card.id,
-            content: checklistsToCreate[idx],
-            position: idx * 100.0
-          }
-        });
-      }
-    }
-
-    // 2. Update status of InboxItem to CONVERTED
-    const updatedItem = await prisma.inboxItem.update({
-      where: { id: itemId },
-      data: { status: 'CONVERTED' }
-    });
-
-    // Create activity log
-    await prisma.activityLog.create({
-      data: {
-        userId: req.user.id,
-        boardId,
-        cardId: card.id,
-        action: 'CREATE_CARD',
-        details: `Converted inbox item to card: "${card.title}"`
-      }
-    });
-
-    // Notify updates
-    notifyBoardUpdate(boardId, 'CARD_CREATE', card);
-
-    res.json({ card, inboxItem: updatedItem });
+    res.json({ success: true, inboxItem: updatedItem });
   } catch (error) {
-    console.error('Convert inbox item error:', error);
+    console.error('Undo convert error:', error);
+    res.status(500).json({ error: error.message || 'Server error' });
+  }
+});
+
+// POST batch convert inbox items
+router.post('/:workspaceId/batch/convert', authenticate, async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+    const { itemIds, boardId, listId, priority, dueDate, assigneeIds, labels } = req.body;
+
+    if (!boardId || !listId || !itemIds || !Array.isArray(itemIds)) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+
+    const membership = await prisma.workspaceMember.findFirst({
+      where: { workspaceId, userId: req.user.id }
+    });
+    if (!membership) return res.status(403).json({ error: 'Access denied' });
+
+    const cards = [];
+    const inboxItems = [];
+
+    for (const itemId of itemIds) {
+      try {
+        const result = await convertSingleItemInternal({
+          workspaceId,
+          itemId,
+          boardId,
+          listId,
+          assigneeIds,
+          labels,
+          priority,
+          dueDate,
+          checklist: undefined, // default checklist from email
+          title: undefined,
+          description: undefined,
+          userId: req.user.id
+        });
+        cards.push(result.card);
+        inboxItems.push(result.inboxItem);
+      } catch (err) {
+        console.error(`Failed to convert batch item ${itemId}:`, err);
+      }
+    }
+
+    res.json({ cards, inboxItems });
+  } catch (error) {
+    console.error('Batch convert error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST batch archive inbox items
+router.post('/:workspaceId/batch/archive', authenticate, async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+    const { itemIds } = req.body;
+
+    if (!itemIds || !Array.isArray(itemIds)) {
+      return res.status(400).json({ error: 'Missing itemIds' });
+    }
+
+    const membership = await prisma.workspaceMember.findFirst({
+      where: { workspaceId, userId: req.user.id }
+    });
+    if (!membership) return res.status(403).json({ error: 'Access denied' });
+
+    await prisma.inboxItem.updateMany({
+      where: { id: { in: itemIds }, workspaceId },
+      data: { status: 'ARCHIVED' }
+    });
+
+    const updatedItems = await prisma.inboxItem.findMany({
+      where: { id: { in: itemIds }, workspaceId }
+    });
+
+    res.json(updatedItems);
+  } catch (error) {
+    console.error('Batch archive error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST batch delete inbox items
+router.post('/:workspaceId/batch/delete', authenticate, async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+    const { itemIds } = req.body;
+
+    if (!itemIds || !Array.isArray(itemIds)) {
+      return res.status(400).json({ error: 'Missing itemIds' });
+    }
+
+    const membership = await prisma.workspaceMember.findFirst({
+      where: { workspaceId, userId: req.user.id }
+    });
+    if (!membership) return res.status(403).json({ error: 'Access denied' });
+
+    await prisma.inboxItem.deleteMany({
+      where: { id: { in: itemIds }, workspaceId }
+    });
+
+    res.json({ success: true, deletedIds: itemIds });
+  } catch (error) {
+    console.error('Batch delete error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST batch update status (e.g. read/unread)
+router.post('/:workspaceId/batch/status', authenticate, async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+    const { itemIds, status } = req.body;
+
+    if (!itemIds || !Array.isArray(itemIds) || !status) {
+      return res.status(400).json({ error: 'Missing itemIds or status' });
+    }
+
+    const membership = await prisma.workspaceMember.findFirst({
+      where: { workspaceId, userId: req.user.id }
+    });
+    if (!membership) return res.status(403).json({ error: 'Access denied' });
+
+    await prisma.inboxItem.updateMany({
+      where: { id: { in: itemIds }, workspaceId },
+      data: { status }
+    });
+
+    const updatedItems = await prisma.inboxItem.findMany({
+      where: { id: { in: itemIds }, workspaceId }
+    });
+
+    res.json(updatedItems);
+  } catch (error) {
+    console.error('Batch status update error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST batch assign labels
+router.post('/:workspaceId/batch/labels', authenticate, async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+    const { itemIds, labels } = req.body; // labels is comma-separated string or array of label names
+
+    if (!itemIds || !Array.isArray(itemIds) || !labels) {
+      return res.status(400).json({ error: 'Missing itemIds or labels' });
+    }
+
+    const membership = await prisma.workspaceMember.findFirst({
+      where: { workspaceId, userId: req.user.id }
+    });
+    if (!membership) return res.status(403).json({ error: 'Access denied' });
+
+    const parsedLabels = Array.isArray(labels)
+      ? labels
+      : labels.split(',').map(l => l.trim()).filter(Boolean);
+
+    // Get current inbox items to update their sourceDetails / priority / tags if applicable
+    // But since labels inside InboxItem are not a direct DB column (they are created when converted),
+    // we can update their sourceDetails to store these labels so that they carry over on conversion!
+    const items = await prisma.inboxItem.findMany({
+      where: { id: { in: itemIds }, workspaceId }
+    });
+
+    const updatedItems = [];
+    for (const item of items) {
+      const details = JSON.parse(item.sourceDetails || '{}');
+      details.labels = parsedLabels.map(name => ({ name, color: '#36b37e' }));
+
+      const updated = await prisma.inboxItem.update({
+        where: { id: item.id },
+        data: {
+          sourceDetails: JSON.stringify(details)
+        }
+      });
+      updatedItems.push(updated);
+    }
+
+    res.json(updatedItems);
+  } catch (error) {
+    console.error('Batch labels assignment error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -538,8 +857,14 @@ router.post('/:workspaceId/mock-incoming', authenticate, async (req, res) => {
 export async function processIncomingEmail({ to, from, subject, text, html, attachments, threadId, messageId }) {
   const cleanTo = to.match(/<([^>]+)>/)?.[1] || to.trim();
   console.log(`[PROCESS INCOMING EMAIL] cleanTo = ${cleanTo}`);
-  const board = await prisma.board.findUnique({
-    where: { incomingEmailAddress: cleanTo },
+  const prefix = cleanTo.split('@')[0] || '';
+  const board = await prisma.board.findFirst({
+    where: {
+      OR: [
+        { incomingEmailAddress: cleanTo },
+        ...(prefix.length >= 8 ? [{ id: { startsWith: prefix } }] : [])
+      ]
+    },
     include: { workspace: true }
   });
 

@@ -1035,14 +1035,24 @@ a:focus:not(:focus-visible) {
 .kb-column {
   display: flex;
   flex-direction: column;
-  width: 19rem;
+  width: calc(100vw - 2.5rem);
+  max-width: 280px;
   max-height: 100%;
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.04);
   transition: border-color 0.2s, box-shadow 0.2s;
   flex-shrink: 0;
+  scroll-snap-align: center;
+}
+
+@media (min-width: 768px) {
+  .kb-column {
+    width: 270px;
+    max-width: 285px;
+    scroll-snap-align: none;
+  }
 }
 
 .dark .kb-column {
@@ -1068,8 +1078,8 @@ a:focus:not(:focus-visible) {
 .kb-card {
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px;
+  border-radius: 8px;
+  padding: 10px;
   box-shadow: var(--shadow-sm);
   cursor: grab;
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
@@ -1327,4 +1337,66 @@ body,
 }
 .dark .email-content-wrapper * {
   color: #000000;
+}
+
+/* Overrides for Pointer Events Drag Overlays */
+.drag-preview-active {
+  user-select: none !important;
+  cursor: grabbing !important;
+}
+
+.drag-preview-active * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+.drag-preview {
+  position: fixed !important;
+  pointer-events: none !important;
+  z-index: 99999 !important;
+  opacity: 0.92 !important;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.15), 0 8px 10px -6px rgb(0 0 0 / 0.15) !important;
+  transform: scale(1.03) !important;
+  transform-origin: center center !important;
+  will-change: transform !important;
+  transition: transform 0.05s linear !important;
+  border-radius: 12px !important;
+}
+
+.kb-placeholder {
+  border: 2px dashed rgba(99, 102, 241, 0.45) !important;
+  background: rgba(99, 102, 241, 0.03) !important;
+  border-radius: 12px !important;
+  box-sizing: border-box !important;
+  margin-bottom: 0.75rem !important;
+  transition: height 0.15s ease-out !important;
+}
+
+.dark .kb-placeholder {
+  border-color: rgba(99, 102, 241, 0.35) !important;
+  background: rgba(99, 102, 241, 0.05) !important;
+}
+
+/* Columns glow effect when columns are targeted */
+.column-drag-over-glow {
+  ring-width: 2px !important;
+  --tw-ring-color: rgba(99, 102, 241, 0.6) !important;
+  box-shadow: 0 10px 15px -3px rgb(99 102 241 / 0.15), 0 4px 6px -4px rgb(99 102 241 / 0.15) !important;
+}
+
+.column-animate-shift {
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
