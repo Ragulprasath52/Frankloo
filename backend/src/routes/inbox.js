@@ -4,8 +4,139 @@ import { prisma } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { notifyBoardUpdate } from '../socket.js';
 import { parseEmailBody } from '../utils/emailParser.js';
+import { parseEmailIntelligently, getDiceSimilarity } from '../utils/emailParserService.js';
 
 const router = Router();
+
+// POST parse email body intelligently
+router.post('/parse-email', async (req, res) => {
+  try {
+    const { title, text, html } = req.body;
+    const parsed = parseEmailIntelligently(title || '', text || '', html || '');
+    res.json(parsed);
+  } catch (error) {
+    console.error('Parse email endpoint error:', error);
+    res.status(500).json({ error: 'Failed to parse email' });
+  }
+});
+
+// POST check for duplicate tasks
+router.post('/check-duplicates', authenticate, async (req, res) => {
+  try {
+    const { boardId, title } = req.body;
+    if (!boardId || !title) {
+      return res.status(400).json({ error: 'Missing boardId or title' });
+    }
+
+    const cards = await prisma.card.findMany({
+      where: {
+        list: { boardId },
+        isArchived: false
+      },
+      include: {
+        list: { select: { name: true } }
+      }
+    });
+
+    const duplicates = [];
+    for (const card of cards) {
+      const similarity = getDiceSimilarity(title, card.title);
+      if (similarity >= 60) {
+        duplicates.push({
+          id: card.id,
+          title: card.title,
+          listName: card.list.name,
+          similarity
+        });
+      }
+    }
+
+    duplicates.sort((a, b) => b.similarity - a.similarity);
+
+    res.json({
+      hasDuplicates: duplicates.length > 0,
+      duplicates
+    });
+  } catch (error) {
+    console.error('Check duplicates error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST merge email data into an existing card
+router.post('/merge-card', authenticate, async (req, res) => {
+  try {
+    const { cardId, inboxItemId, description, checklist, labels } = req.body;
+    if (!cardId || !inboxItemId) {
+      return res.status(400).json({ error: 'Missing cardId or inboxItemId' });
+    }
+
+    const card = await prisma.card.findUnique({
+      where: { id: cardId },
+      include: { list: true }
+    });
+    if (!card) return res.status(404).json({ error: 'Target card not found' });
+
+    let updatedDesc = card.description || '';
+    if (description) {
+      updatedDesc += (updatedDesc ? '\n\n' : '') + `--- Merged from Email ---\n${description}`;
+    }
+
+    let currentCustomFields = { labels: [], emoji: '' };
+    if (card.customFields) {
+      try {
+        currentCustomFields = JSON.parse(card.customFields);
+      } catch (e) {}
+    }
+    if (!currentCustomFields.labels) currentCustomFields.labels = [];
+
+    if (labels && Array.isArray(labels)) {
+      labels.forEach(lbl => {
+        if (!currentCustomFields.labels.some(l => l.name.toLowerCase() === lbl.toLowerCase())) {
+          currentCustomFields.labels.push({ name: lbl, color: '#0969da' });
+        }
+      });
+    }
+
+    await prisma.card.update({
+      where: { id: cardId },
+      data: {
+        description: updatedDesc,
+        customFields: JSON.stringify(currentCustomFields)
+      }
+    });
+
+    if (checklist && Array.isArray(checklist)) {
+      const lastChecklist = await prisma.checklistItem.findFirst({
+        where: { cardId },
+        orderBy: { position: 'desc' }
+      });
+      let basePos = lastChecklist ? lastChecklist.position + 100.0 : 0;
+
+      for (const item of checklist) {
+        await prisma.checklistItem.create({
+          data: {
+            cardId,
+            content: item,
+            position: basePos
+          }
+        });
+        basePos += 100.0;
+      }
+    }
+
+    await prisma.inboxItem.update({
+      where: { id: inboxItemId },
+      data: { status: 'CONVERTED' }
+    });
+
+    notifyBoardUpdate(card.list.boardId, 'CARD_UPDATE', card);
+    res.json({ success: true, message: 'Card merged successfully' });
+  } catch (error) {
+    console.error('Merge card error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 // POST inbound parsed email from SMTP/forward service
 router.post('/incoming-email', async (req, res) => {
@@ -26,14 +157,21 @@ router.post('/incoming-email', async (req, res) => {
 // POST inbound parsed email from Cloudflare Email Workers
 router.post('/cloudflare-email', express.text({ type: 'text/plain', limit: '25mb' }), async (req, res) => {
   try {
+    console.log('[CLOUDFLARE EMAIL ARRIVED]');
+    console.log('Headers x-cloudflare-secret:', req.headers['x-cloudflare-secret']);
+    console.log('Headers x-envelope-to:', req.headers['x-envelope-to']);
+    console.log('Headers x-envelope-from:', req.headers['x-envelope-from']);
+
     const secret = process.env.CLOUDFLARE_SECRET;
     if (secret && req.headers['x-cloudflare-secret'] !== secret) {
+      console.warn('[CLOUDFLARE SECRET MISMATCH]');
       return res.status(401).json({ error: 'Invalid Cloudflare secret' });
     }
 
     let to, from, subject, text, html, attachments, threadId, messageId;
 
     if (typeof req.body === 'string') {
+      console.log('Parsing raw MIME body from string...');
       const parser = new PostalMime();
       const parsedEmail = await parser.parse(req.body);
 
@@ -51,10 +189,14 @@ router.post('/cloudflare-email', express.text({ type: 'text/plain', limit: '25mb
         storagePath: 'uploads/gmail-dummy'
       }));
     } else {
+      console.log('Body is JSON object...');
       ({ to, from, subject, text, html, attachments, threadId, messageId } = req.body || {});
     }
 
+    console.log(`Email details parsed: from=${from}, to=${to}, subject=${subject}`);
+
     if (!to || !from) {
+      console.warn('[MISSING FIELDS] to or from was empty');
       return res.status(400).json({ error: 'Missing required email fields (to, from)' });
     }
 
@@ -68,6 +210,7 @@ router.post('/cloudflare-email', express.text({ type: 'text/plain', limit: '25mb
       threadId,
       messageId
     });
+    console.log('[CLOUDFLARE EMAIL PROCESSED SUCCESSFULLY]', result);
     res.json(result);
   } catch (error) {
     console.error('Cloudflare Email Route Error:', error);
@@ -185,7 +328,7 @@ router.delete('/:workspaceId/:itemId', authenticate, async (req, res) => {
 router.post('/:workspaceId/:itemId/convert', authenticate, async (req, res) => {
   try {
     const { workspaceId, itemId } = req.params;
-    const { boardId, listId, assigneeIds, labels, priority, dueDate, checklist } = req.body;
+    const { boardId, listId, assigneeIds, labels, priority, dueDate, checklist, title, description } = req.body;
 
     if (!boardId || !listId) return res.status(400).json({ error: 'Board ID and List ID are required' });
 
@@ -213,8 +356,8 @@ router.post('/:workspaceId/:itemId/convert', authenticate, async (req, res) => {
 
     const card = await prisma.card.create({
       data: {
-        title: item.title,
-        description: (item.description || '') + sourceDesc,
+        title: title || item.title,
+        description: (description !== undefined ? description : (item.description || '')) + sourceDesc,
         position: 1000.0,
         priority: priority || item.priority || 'MEDIUM',
         dueDate: dueDate ? new Date(dueDate) : (item.dueDate ? new Date(item.dueDate) : null),
@@ -394,16 +537,21 @@ router.post('/:workspaceId/mock-incoming', authenticate, async (req, res) => {
 // Helper function to process all incoming emails (from SMTP webhook or test simulator)
 export async function processIncomingEmail({ to, from, subject, text, html, attachments, threadId, messageId }) {
   const cleanTo = to.match(/<([^>]+)>/)?.[1] || to.trim();
+  console.log(`[PROCESS INCOMING EMAIL] cleanTo = ${cleanTo}`);
   const board = await prisma.board.findUnique({
     where: { incomingEmailAddress: cleanTo },
     include: { workspace: true }
   });
 
   if (!board) {
+    console.warn(`[PROCESS INCOMING EMAIL] Board not found for address: "${cleanTo}"`);
     throw new Error('Board not found for this email address');
   }
 
+  console.log(`[PROCESS INCOMING EMAIL] Found board: "${board.name}" (id: ${board.id})`);
+
   if (!board.incomingEmailEnabled) {
+    console.warn(`[PROCESS INCOMING EMAIL] Incoming email is disabled for board: "${board.name}"`);
     throw new Error('Incoming email is disabled for this board');
   }
 

@@ -93,22 +93,22 @@
      DARK MODE — Linear + GitHub Dark + Discord
      ============================================================ */
   .dark {
-    --bg-body: #0d1117;
-    --bg-surface: #161b22;
-    --bg-sidebar: #161b22;
-    --bg-card: #21262d;
-    --bg-column: #1c2128;
-    --bg-input: #0d1117;
-    --bg-hover: rgba(177, 186, 196, 0.08);
-    --bg-active: rgba(177, 186, 196, 0.14);
+    --bg-body: #000000;
+    --bg-surface: #0a0a0c;
+    --bg-sidebar: #050507;
+    --bg-card: #0d0d0f;
+    --bg-column: #08080a;
+    --bg-input: #020203;
+    --bg-hover: rgba(255, 255, 255, 0.05);
+    --bg-active: rgba(255, 255, 255, 0.09);
 
-    --text-primary: #e6edf3;
+    --text-primary: #f0f6fc;
     --text-secondary: #8d96a0;
-    --text-muted: #6e7681;
-    --text-on-dark: #e6edf3;
+    --text-muted: #5e646d;
+    --text-on-dark: #f0f6fc;
 
-    --border: #30363d;
-    --border-strong: #484f58;
+    --border: #2d3139;
+    --border-strong: #3d4450;
     --border-focus: #388bfd;
 
     --accent: #388bfd;
@@ -123,12 +123,41 @@
     --warning: #d29922;
     --warning-subtle: rgba(210, 153, 34, 0.12);
 
-    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.2);
-    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25);
-    --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.3);
-    --shadow-card-hover: 0 8px 28px rgba(0, 0, 0, 0.5);
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.6), 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.7), 0 1px 3px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.8), 0 2px 6px rgba(0, 0, 0, 0.6);
+    --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.9), 0 4px 12px rgba(0, 0, 0, 0.7);
+    --shadow-card-hover: 0 8px 28px rgba(0, 0, 0, 0.9);
+  }
+
+  /* Utility class overrides in dark mode to enforce the premium true black theme */
+  .dark .dark\:bg-\[\#161a22\],
+  .dark .dark\:bg-\[\#161b22\],
+  .dark .dark\:bg-\[\#1d2125\],
+  .dark .dark\:bg-\[\#21262d\],
+  .dark .dark\:bg-\[\#1c2128\],
+  .dark .dark\:bg-\[\#1c1e22\],
+  .dark .dark\:bg-\[\#181a1d\],
+  .dark .dark\:bg-\[\#161a1d\],
+  .dark .dark\:bg-\[\#22272b\],
+  .dark .dark\:bg-\[\#2c333a\],
+  .dark .dark\:bg-slate-900,
+  .dark [class*="dark:bg-slate-"],
+  .dark [class*="dark:bg-gray-"] {
+    background-color: var(--bg-surface) !important;
+  }
+
+  .dark .dark\:bg-\[\#101214\],
+  .dark .dark\:bg-\[\#0d1117\] {
+    background-color: var(--bg-body) !important;
+  }
+
+  .dark .dark\:border-\[\#30363d\],
+  .dark .dark\:border-slate-800,
+  .dark [class*="dark:border-slate-"],
+  .dark [class*="dark:border-gray-"] {
+    border-color: var(--border) !important;
   }
 
   /* Base resets */
@@ -1269,4 +1298,33 @@ body,
   .overflow-auto {
     -webkit-overflow-scrolling: touch;
   }
+}
+
+/* ── Email Content Wrapper ────────────────────────────── */
+.email-content-wrapper {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: #e2e8f0 !important;
+}
+.email-content-wrapper img, 
+.email-content-wrapper table, 
+.email-content-wrapper div, 
+.email-content-wrapper p {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+.email-content-wrapper img {
+  height: auto !important;
+}
+.email-content-wrapper table {
+  width: 100% !important;
+  table-layout: fixed !important;
+}
+.dark .email-content-wrapper {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: #30363d !important;
+}
+.dark .email-content-wrapper * {
+  color: #000000;
 }

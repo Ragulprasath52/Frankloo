@@ -6,7 +6,8 @@ import {
   Plus, PlusCircle,
   Trash2, Copy, X, MoreVertical,
   Slack, Github, Calendar, Cpu, Lock, Info, Zap,
-  Mail, RefreshCw, Activity, CheckSquare, ExternalLink, AlertCircle
+  Mail, RefreshCw, Activity, CheckSquare, ExternalLink, AlertCircle,
+  Search, Star
 } from 'lucide-react';
 import AppearanceSettings from './AppearanceSettings';
 import WikiDocsModule from './WikiDocsModule';
@@ -73,13 +74,44 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
   const [boardBg, setBoardBg] = useState('indigo');
   const [activeDropdownBoardId, setActiveDropdownBoardId] = useState<string | null>(null);
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('trel_favorite_boards') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const handleOutsideClick = () => {
       setActiveDropdownBoardId(null);
     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
     window.addEventListener('click', handleOutsideClick);
-    return () => window.removeEventListener('click', handleOutsideClick);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('click', handleOutsideClick);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
+
+  const toggleFavoriteBoard = (boardId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const updated = favorites.includes(boardId)
+      ? favorites.filter(id => id !== boardId)
+      : [...favorites, boardId];
+    setFavorites(updated);
+    localStorage.setItem('trel_favorite_boards', JSON.stringify(updated));
+  };
 
   // Integrations state
   const [slackWebhookUrl, setSlackWebhookUrl] = useState('');
@@ -366,119 +398,249 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
   }
 
   return (
-    <div className="flex-1 overflow-y-auto overflow-x-hidden">
+    <div className="flex-grow overflow-y-auto overflow-x-hidden">
       {/* ── Boards Tab ─────────────────────── */}
       {activeTab === 'boards' && (
-        <div className="p-4 md:p-8 animate-fade-in">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-8">
-            <div>
-              <h2 className="text-xl md:text-2xl font-bold mb-1 truncate" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
-                {currentWorkspace?.name || 'Workspace'}
-              </h2>
-              <p className="text-xs md:text-sm" style={{ color: 'var(--text-muted)' }}>
-                {currentWorkspace?.boards?.length || 0} board{(currentWorkspace?.boards?.length ?? 0) !== 1 ? 's' : ''}
-              </p>
-            </div>
-            <button onClick={() => setBoardModalOpen(true)} className="btn-primary w-full md:w-auto justify-center" style={{ padding: '9px 18px', fontSize: '0.875rem' }}>
-              <Plus className="w-4 h-4" /> Create board
-            </button>
-          </div>
+        (() => {
+          const filteredBoards = currentWorkspace?.boards?.filter(b => 
+            b.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            (b.description || '').toLowerCase().includes(searchQuery.toLowerCase())
+          ) || [];
 
-          {/* Board grid — modern dynamic thumbnails */}
-          {(!currentWorkspace?.boards || currentWorkspace.boards.length === 0) ? (
-            <div className="empty-state" style={{ borderRadius: 'var(--radius-xl)', padding: '5rem 2rem' }}>
-              <div className="empty-state-icon" style={{ width: '56px', height: '56px', borderRadius: 'var(--radius-lg)', background: 'var(--accent-muted)' }}>
-                <PlusCircle className="w-7 h-7" style={{ color: 'var(--accent)' }} />
-              </div>
-              <p className="text-lg font-semibold mt-2" style={{ color: 'var(--text-primary)' }}>No boards yet</p>
-              <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Create your first board to start organizing work</p>
-              <button onClick={() => setBoardModalOpen(true)} className="btn-primary mt-4">
-                <Plus className="w-4 h-4" /> Create your first board
-              </button>
-            </div>
-          ) : (
-            <div className="responsive-board-grid">
-              {currentWorkspace.boards.map((b) => (
-                <div
-                  key={b.id}
-                  onClick={() => onSelectBoard(b.id)}
-                  className="board-thumbnail group"
-                  style={{ background: BOARD_GRADIENTS[b.background] || BOARD_GRADIENTS.indigo }}
-                >
-                  {/* Board name */}
-                  <div className="absolute inset-0 p-3 flex flex-col justify-between">
-                    <p className="font-bold text-sm text-white leading-snug line-clamp-2 drop-shadow">{b.name}</p>
-                    
-                    {/* Actions Menu */}
-                    <div className="absolute top-2 right-2 z-10">
-                      <button
-                        onClick={e => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setActiveDropdownBoardId(activeDropdownBoardId === b.id ? null : b.id);
-                        }}
-                        className="p-1 rounded-md bg-black/40 hover:bg-black/60 text-white transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                        title="Board options"
-                      >
-                        <MoreVertical className="w-3.5 h-3.5" />
-                      </button>
+          const ownerMember = currentWorkspace?.members?.find(m => m.role.toLowerCase() === 'owner');
+          const ownerName = ownerMember?.user?.name || ownerMember?.user?.username || 'Team Owner';
 
-                      {activeDropdownBoardId === b.id && (
-                        <div
-                          className="absolute right-0 mt-1 w-32 bg-white dark:bg-[#21262d] border border-gray-200 dark:border-gray-800 rounded-lg shadow-xl py-1 z-[100] animate-fade-in text-left"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          <button
-                            onClick={e => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setActiveDropdownBoardId(null);
-                              handleDuplicateBoard(b.id, e);
-                            }}
-                            className="w-full px-3 py-1.5 text-xs text-[#172b4d] dark:text-[#c9d1d9] hover:bg-gray-100 dark:hover:bg-white/5 flex items-center gap-2 font-medium"
-                          >
-                            <Copy className="w-3.5 h-3.5" /> Duplicate
-                          </button>
-                          {isEditor && (
-                            <button
-                              onClick={e => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setActiveDropdownBoardId(null);
-                                handleDeleteBoard(b.id, b.name, e);
-                              }}
-                              className="w-full px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/10 flex items-center gap-2 font-medium"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" /> Delete
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
+          return (
+            <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto w-full animate-fade-in text-slate-800 dark:text-[#c9d1d9]">
+              {/* ── Top Header Section ── */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800/80 pb-6 shrink-0">
+                <div className="space-y-1">
+                  <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50 font-sans">
+                    {currentWorkspace?.name || 'Workspace Boards'}
+                  </h1>
+                  {currentWorkspace?.description && (
+                    <p className="text-xs text-slate-500 dark:text-[#8d96a0] leading-relaxed max-w-xl truncate">
+                      {currentWorkspace.description}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2 text-[10px] font-semibold text-slate-400 dark:text-slate-550">
+                    <span className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/40 px-2 py-0.5 rounded-md text-slate-600 dark:text-slate-400">
+                      {currentWorkspace?.boards?.length || 0} Board{(currentWorkspace?.boards?.length ?? 0) !== 1 ? 's' : ''}
+                    </span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/40 px-2 py-0.5 rounded-md text-slate-600 dark:text-slate-400">
+                      {currentWorkspace?.members?.length || 0} Member{(currentWorkspace?.members?.length ?? 0) !== 1 ? 's' : ''}
+                    </span>
                   </div>
                 </div>
-              ))}
 
-              {/* Create new board placeholder */}
-              <div
-                onClick={() => setBoardModalOpen(true)}
-                className="aspect-[5/3] flex flex-col items-center justify-center cursor-pointer rounded-xl transition-all"
-                style={{
-                  background: 'var(--bg-hover)',
-                  border: '2px dashed var(--border)',
-                  color: 'var(--text-muted)',
-                  borderRadius: 'var(--radius-md)',
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-active)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)'; (e.currentTarget as HTMLDivElement).style.color = 'var(--accent)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-hover)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLDivElement).style.color = 'var(--text-muted)'; }}
-              >
-                <PlusCircle className="w-6 h-6 mb-2" />
-                <span className="text-xs font-semibold">Create board</span>
+                {/* Search and CTA Action block */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+                  <div className="relative flex-grow sm:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-550" />
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      placeholder="Search boards..."
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-14 py-2 text-xs bg-slate-50 dark:bg-white/5 border border-slate-250 dark:border-slate-800 focus:border-indigo-500 dark:focus:border-indigo-650 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-slate-200 transition-all font-medium"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex items-center bg-slate-200/60 dark:bg-white/10 px-1.5 py-0.5 rounded text-[8px] font-bold text-slate-500 dark:text-slate-400 border border-slate-300/20">
+                      Ctrl+K
+                    </div>
+                  </div>
+                  
+                  <button 
+                    onClick={() => setBoardModalOpen(true)} 
+                    className="btn-primary justify-center font-bold text-xs py-2 px-4.5 rounded-xl shadow-sm hover:translate-y-[-1px] transition-transform w-full sm:w-auto shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Create Board
+                  </button>
+                </div>
               </div>
+
+              {/* ── Boards Grid / Layout ── */}
+              {(!currentWorkspace?.boards || currentWorkspace.boards.length === 0) ? (
+                /* Workspace Empty State */
+                <div className="flex flex-col items-center justify-center text-center py-16 px-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-slate-850 max-w-md mx-auto">
+                  <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800/40 text-slate-400 dark:text-slate-500 flex items-center justify-center mb-4">
+                    <PlusCircle className="w-6 h-6" />
+                  </div>
+                  <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100 mb-1.5 animate-pulse">No boards yet</h3>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 max-w-xs mb-5 leading-relaxed">
+                    Create your first board to start planning, organizing projects, and tracking milestones with your team.
+                  </p>
+                  <button
+                    onClick={() => setBoardModalOpen(true)}
+                    className="btn-primary py-2 px-4 rounded-xl text-xs font-bold justify-center"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Create your first board
+                  </button>
+                </div>
+              ) : filteredBoards.length === 0 ? (
+                /* Search Empty State */
+                <div className="flex flex-col items-center justify-center text-center py-12 px-4 max-w-xs mx-auto">
+                  <span className="text-sm font-bold text-slate-400 dark:text-slate-550 block mb-1">No matching boards</span>
+                  <span className="text-xs text-gray-400 block">Try checking your search filters or try another spelling.</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {filteredBoards.map(b => {
+                    // Calculate task counts
+                    const totalTasks = b.lists?.flatMap(l => l.cards).length || 0;
+                    const completedTasks = b.lists
+                      ?.filter(l => l.name.toLowerCase() === 'done' || l.name.toLowerCase() === 'completed')
+                      ?.flatMap(l => l.cards).length || 0;
+                    const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+                    const isFavorite = favorites.includes(b.id);
+
+                    return (
+                      <div
+                        key={b.id}
+                        onClick={() => onSelectBoard(b.id)}
+                        className="group relative flex flex-col bg-white dark:bg-[#161b22] border border-slate-200/80 dark:border-slate-800/80 rounded-xl overflow-hidden shadow-sm hover:shadow-md hover:border-slate-350 dark:hover:border-slate-700 transition-all duration-200 cursor-pointer"
+                      >
+                        {/* Top: Cover banner with absolute controls */}
+                        <div 
+                          className="h-16 w-full relative transition-all duration-200"
+                          style={{ background: BOARD_GRADIENTS[b.background] || BOARD_GRADIENTS.indigo }}
+                        >
+                          {/* Overlay protection */}
+                          <div className="absolute inset-0 bg-black/10 group-hover:bg-black/15 transition-colors" />
+
+                          {/* Top Left: Favorite Toggle Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => toggleFavoriteBoard(b.id, e)}
+                            className="absolute top-2 left-2 p-1.5 rounded-lg bg-black/25 hover:bg-black/45 text-white transition-all z-10 animate-fade-in"
+                            title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+                          >
+                            <Star className={`w-3 h-3 transition-colors ${isFavorite ? "fill-amber-400 text-amber-400" : "text-white/80"}`} />
+                          </button>
+
+                          {/* Top Right: Options Trigger Button */}
+                          <div className="absolute top-2 right-2 z-10">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setActiveDropdownBoardId(activeDropdownBoardId === b.id ? null : b.id);
+                              }}
+                              className="p-1.5 rounded-lg bg-black/25 hover:bg-black/45 text-white transition-all"
+                              title="Board options"
+                            >
+                              <MoreVertical className="w-3 h-3" />
+                            </button>
+
+                            {/* Dropdown Options menu */}
+                            {activeDropdownBoardId === b.id && (
+                              <div
+                                className="absolute right-0 mt-1 w-32 bg-white dark:bg-[#21262d] border border-slate-200 dark:border-slate-850 rounded-lg shadow-xl py-1 z-20 animate-fade-in text-left text-xs"
+                                onClick={e => e.stopPropagation()}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={e => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setActiveDropdownBoardId(null);
+                                    handleDuplicateBoard(b.id, e);
+                                  }}
+                                  className="w-full px-3 py-1.5 text-slate-700 dark:text-[#c9d1d9] hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-2 font-medium"
+                                >
+                                  <Copy className="w-3.5 h-3.5 text-slate-400" /> Duplicate
+                                </button>
+                                {isEditor && (
+                                  <button
+                                    type="button"
+                                    onClick={e => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setActiveDropdownBoardId(null);
+                                      handleDeleteBoard(b.id, b.name, e);
+                                    }}
+                                    className="w-full px-3 py-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-955/10 flex items-center gap-2 font-medium border-t border-slate-100 dark:border-slate-800/60"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Middle: Details content */}
+                        <div className="p-4 flex-grow flex flex-col justify-between space-y-3 min-h-[100px]">
+                          <div className="space-y-1">
+                            <h3 className="font-bold text-xs.5 text-slate-800 dark:text-slate-200 line-clamp-1 group-hover:text-indigo-650 dark:group-hover:text-indigo-400 transition-colors">
+                              {b.name}
+                            </h3>
+                            <p className="text-[11px] text-slate-450 dark:text-slate-400 line-clamp-2 leading-relaxed min-h-[32px]">
+                              {b.description || "No project description provided."}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[9px] text-slate-400 dark:text-slate-550 font-sans pt-1">
+                            <span>Active Project</span>
+                            <span className="font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 max-w-[90px] truncate">
+                              {ownerName}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Bottom: Progress + Members */}
+                        <div className="px-4 pb-4 pt-3 border-t border-slate-100 dark:border-slate-800/60 flex flex-col gap-2 bg-slate-50/30 dark:bg-slate-900/10">
+                          <div className="flex items-center justify-between">
+                            {/* Workspace member initials stack */}
+                            <div className="flex -space-x-1.5 overflow-hidden">
+                              {(currentWorkspace?.members || []).slice(0, 3).map((m, idx) => {
+                                const nameVal = m.user?.name || m.user?.username || "?";
+                                const init = nameVal.substring(0, 2).toUpperCase();
+                                const colors = ['bg-indigo-500', 'bg-rose-500', 'bg-emerald-500', 'bg-amber-500'];
+                                const c = colors[idx % colors.length];
+
+                                return (
+                                  <div 
+                                    key={m.user?.id || idx}
+                                    className={`w-5 h-5 rounded-full border border-white dark:border-[#161b22] text-[8px] font-bold text-white flex items-center justify-center ${c}`}
+                                    title={nameVal}
+                                  >
+                                    {init}
+                                  </div>
+                                );
+                              })}
+                              {(currentWorkspace?.members?.length ?? 0) > 3 && (
+                                <div 
+                                  className="w-5 h-5 rounded-full border border-white dark:border-[#161b22] text-[8px] font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center"
+                                >
+                                  +{(currentWorkspace?.members?.length ?? 0) - 3}
+                                </div>
+                              )}
+                            </div>
+
+                            <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold tracking-tight">
+                              {completedTasks}/{totalTasks} Tasks
+                            </span>
+                          </div>
+
+                          {/* Progress bar */}
+                          <div className="w-full h-1 bg-slate-100 dark:bg-slate-800/60 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-indigo-500 dark:bg-indigo-650 transition-all duration-300 rounded-full" 
+                              style={{ width: `${progress}%` }} 
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          );
+        })()
       )}
 
       {/* ── Board Inbox Tab ─────────────────────────── */}

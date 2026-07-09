@@ -7,7 +7,8 @@ import {
   Columns, Calendar as CalendarIcon, 
   BarChart3, UserCheck, Play, ArrowLeft, Plus, X, Trash2, Archive,
   CalendarCheck, Clock, CheckCircle, PlusCircle, Copy, Check, Info, Lock, Paintbrush,
-  MessageSquare, AlertCircle, Sparkles, ChevronRight, Flame, Upload, HelpCircle, Users
+  MessageSquare, AlertCircle, Sparkles, ChevronRight, Flame, Upload, HelpCircle, Users,
+  Pencil
 } from 'lucide-react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -37,7 +38,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
     user, currentBoard, fetchBoardDetails, deleteBoard,
     createList, archiveList, createCard, updateCard, updateBoard,
     createAutomationRule, deleteAutomationRule, currentWorkspace, convertInboxItem, token,
-    addToast, showConfirm
+    addToast, showConfirm, fetchArchivedItems, updateList
   } = useStore();
 
   const themeStore = useThemeStore();
@@ -53,6 +54,14 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
   const [calendarSyncOpen, setCalendarSyncOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showAllMembersModal, setShowAllMembersModal] = useState(false);
+  
+  // Board & Card Renaming states
+  const [isEditingBoardName, setIsEditingBoardName] = useState(false);
+  const [editedBoardName, setEditedBoardName] = useState(currentBoard?.name || '');
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [editingCardTitle, setEditingCardTitle] = useState('');
+  const [editingListId, setEditingListId] = useState<string | null>(null);
+  const [editingListName, setEditingListName] = useState('');
   // Customizer form states
   const [customizerOpen, setCustomizerOpen] = useState(false);
   const [overrideIcon, setOverrideIcon] = useState('');
@@ -62,7 +71,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
   const [overrideBackgroundValue, setOverrideBackgroundValue] = useState('');
 
   // Email-to-Board States
-  const [activeCustomizerTab, setActiveCustomizerTab] = useState<'style' | 'email' | 'danger'>('style');
+  const [activeCustomizerTab, setActiveCustomizerTab] = useState<'style' | 'email' | 'archive' | 'danger'>('style');
   const [emailEnabled, setEmailEnabled] = useState(true);
   const [emailAddress, setEmailAddress] = useState('');
   const [emailListId, setEmailListId] = useState('');
@@ -71,6 +80,33 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
   const [emailDefaultLabels, setEmailDefaultLabels] = useState('');
   const [emailAutoAssignees, setEmailAutoAssignees] = useState<string[]>([]);
   const [emailThreadAction, setEmailThreadAction] = useState('COMMENT');
+
+  // Archive Restore States
+  const [archivedLists, setArchivedLists] = useState<any[]>([]);
+  const [archivedCards, setArchivedCards] = useState<any[]>([]);
+  const [loadingArchived, setLoadingArchived] = useState(false);
+
+  const loadArchivedItems = async () => {
+    if (!boardId) return;
+    setLoadingArchived(true);
+    try {
+      const data = await fetchArchivedItems(boardId);
+      console.log('[ARCHIVED ITEMS FETCHED]', data);
+      setArchivedLists(data.lists || []);
+      setArchivedCards(data.cards || []);
+    } catch (err: any) {
+      console.error(err);
+      addToast('Error Loading Archive', err.message || 'Failed to fetch archived items.', 'error');
+    } finally {
+      setLoadingArchived(false);
+    }
+  };
+
+  useEffect(() => {
+    if (customizerOpen && activeCustomizerTab === 'archive') {
+      loadArchivedItems();
+    }
+  }, [customizerOpen, activeCustomizerTab]);
 
   // Sync state values when Customizer opens
   useEffect(() => {
@@ -211,8 +247,104 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
     fetchBoardDetails(boardId);
   }, [boardId]);
 
+  useEffect(() => {
+    if (currentBoard) {
+      setEditedBoardName(currentBoard.name);
+    }
+  }, [currentBoard]);
+
+  const saveBoardName = async () => {
+    if (!currentBoard || !editedBoardName.trim()) {
+      setEditedBoardName(currentBoard?.name || '');
+      setIsEditingBoardName(false);
+      return;
+    }
+    if (editedBoardName.trim() === currentBoard.name) {
+      setIsEditingBoardName(false);
+      return;
+    }
+    try {
+      await updateBoard(currentBoard.id, { name: editedBoardName.trim() });
+      addToast('Board Renamed', `Board name updated to "${editedBoardName.trim()}"`, 'success');
+    } catch (err: any) {
+      addToast('Error', err.message || 'Failed to rename board', 'error');
+      setEditedBoardName(currentBoard.name);
+    } finally {
+      setIsEditingBoardName(false);
+    }
+  };
+
+  const handleBoardNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      saveBoardName();
+    } else if (e.key === 'Escape') {
+      setEditedBoardName(currentBoard?.name || '');
+      setIsEditingBoardName(false);
+    }
+  };
+
+  const saveCardQuickRename = async (cardId: string) => {
+    if (!editingCardTitle.trim()) {
+      setEditingCardId(null);
+      return;
+    }
+    const allCards = currentBoard?.lists.flatMap(l => l.cards) || [];
+    const card = allCards.find(c => c.id === cardId);
+    if (card && editingCardTitle.trim() !== card.title) {
+      try {
+        await updateCard(boardId, cardId, { title: editingCardTitle.trim() });
+        addToast('Card Renamed', 'Task title updated successfully', 'success');
+      } catch (err: any) {
+        addToast('Error', err.message || 'Failed to rename card', 'error');
+      }
+    }
+    setEditingCardId(null);
+  };
+
+  const handleCardQuickRenameKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, cardId: string) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      saveCardQuickRename(cardId);
+    } else if (e.key === 'Escape') {
+      setEditingCardId(null);
+    }
+  };
+
+  const saveListName = async (listId: string) => {
+    if (!editingListName.trim()) {
+      setEditingListId(null);
+      return;
+    }
+    const list = currentBoard?.lists.find(l => l.id === listId);
+    if (list && editingListName.trim() !== list.name) {
+      try {
+        await updateList(boardId, listId, editingListName.trim());
+        addToast('Column Renamed', `Column name updated to "${editingListName.trim()}"`, 'success');
+      } catch (err: any) {
+        addToast('Error', err.message || 'Failed to rename column', 'error');
+      }
+    }
+    setEditingListId(null);
+  };
+
+  const handleListNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, listId: string) => {
+    if (e.key === 'Enter') {
+      saveListName(listId);
+    } else if (e.key === 'Escape') {
+      setEditingListId(null);
+    }
+  };
+
   const handleDragStart = (e: React.DragEvent, cardId: string) => {
+    e.stopPropagation();
     e.dataTransfer.setData('cardId', cardId);
+  };
+
+  const handleListDragStart = (e: React.DragEvent, listId: string) => {
+    if ((e.target as HTMLElement).closest('.kb-card')) {
+      return;
+    }
+    e.dataTransfer.setData('listId', listId);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -221,8 +353,40 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
 
   const handleDrop = async (e: React.DragEvent, targetListId: string) => {
     e.preventDefault();
+    const draggedListId = e.dataTransfer.getData('listId');
     const cardId = e.dataTransfer.getData('cardId');
     const inboxItemId = e.dataTransfer.getData('inboxItemId');
+
+    if (draggedListId) {
+      if (draggedListId === targetListId) return;
+
+      const lists = currentBoard?.lists || [];
+      const draggedIndex = lists.findIndex(l => l.id === draggedListId);
+      const targetIndex = lists.findIndex(l => l.id === targetListId);
+
+      if (draggedIndex === -1 || targetIndex === -1) return;
+
+      let newPosition: number;
+      if (draggedIndex < targetIndex) {
+        // Dragged right: place after target
+        const targetPos = lists[targetIndex].position;
+        const nextPos = targetIndex + 1 < lists.length ? lists[targetIndex + 1].position : targetPos + 1000;
+        newPosition = (targetPos + nextPos) / 2;
+      } else {
+        // Dragged left: place before target
+        const targetPos = lists[targetIndex].position;
+        const prevPos = targetIndex > 0 ? lists[targetIndex - 1].position : 0;
+        newPosition = (targetPos + prevPos) / 2;
+      }
+
+      try {
+        await updateList(boardId, draggedListId, undefined, newPosition);
+        addToast('Column Moved', 'Column order updated successfully', 'success');
+      } catch (err: any) {
+        addToast('Error', err.message || 'Failed to move column', 'error');
+      }
+      return;
+    }
 
     if (inboxItemId && currentWorkspace) {
       try {
@@ -384,14 +548,33 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                 <ChevronRight className="w-3 h-3" />
                 <span style={{ color: 'var(--text-muted)' }}>Board</span>
               </div>
-              <h2 className="text-sm sm:text-base font-bold leading-tight flex items-center gap-2 truncate" style={{ color: 'var(--text-primary)' }}>
-                <span className="truncate">{currentBoard.name}</span>
-                {totalTasks > 0 && (
-                  <span className="hidden md:inline text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0" style={{ background: 'var(--accent-muted)', color: 'var(--accent)' }}>
-                    {totalTasks} Tasks
-                  </span>
-                )}
-              </h2>
+              {isEditingBoardName ? (
+                <input
+                  type="text"
+                  value={editedBoardName}
+                  onChange={(e) => setEditedBoardName(e.target.value)}
+                  onBlur={saveBoardName}
+                  onKeyDown={handleBoardNameKeyDown}
+                  className="text-sm sm:text-base font-bold leading-tight px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[15rem] sm:max-w-[25rem]"
+                  style={{ color: 'var(--text-primary)' }}
+                  autoFocus
+                />
+              ) : (
+                <h2 
+                  onClick={() => setIsEditingBoardName(true)}
+                  className="text-sm sm:text-base font-bold leading-tight flex items-center gap-2 truncate cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/50 px-1 py-0.5 rounded group" 
+                  style={{ color: 'var(--text-primary)' }}
+                  title="Click to rename board"
+                >
+                  <span className="truncate">{currentBoard.name}</span>
+                  <Pencil className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity text-slate-500 shrink-0" />
+                  {totalTasks > 0 && (
+                    <span className="hidden md:inline text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0" style={{ background: 'var(--accent-muted)', color: 'var(--accent)' }}>
+                      {totalTasks} Tasks
+                    </span>
+                  )}
+                </h2>
+              )}
               {currentBoard.description && (
                 <p className="hidden md:block text-xs mt-0.5 line-clamp-1 max-w-[24rem]" style={{ color: 'var(--text-muted)' }}>
                   {currentBoard.description}
@@ -504,9 +687,28 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-black/30 backdrop-blur-[0.5px]" />
-          <div className="absolute bottom-4 left-6 flex items-center gap-2">
+          <div className="absolute bottom-4 left-6 flex items-center gap-2 z-20">
             <span className="text-3xl filter drop-shadow">{boardOverride?.icon || '📋'}</span>
-            <h1 className="text-xl font-extrabold text-white filter drop-shadow-md">{currentBoard.name}</h1>
+            {isEditingBoardName ? (
+              <input
+                type="text"
+                value={editedBoardName}
+                onChange={(e) => setEditedBoardName(e.target.value)}
+                onBlur={saveBoardName}
+                onKeyDown={handleBoardNameKeyDown}
+                className="text-xl font-extrabold text-slate-800 dark:text-slate-100 bg-white/90 dark:bg-slate-900/90 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[20rem]"
+                autoFocus
+              />
+            ) : (
+              <h1 
+                onClick={() => setIsEditingBoardName(true)}
+                className="text-xl font-extrabold text-white filter drop-shadow-md cursor-pointer hover:bg-black/20 px-2 py-0.5 rounded flex items-center gap-2 group"
+                title="Click to rename board"
+              >
+                <span>{currentBoard.name}</span>
+                <Pencil className="w-4 h-4 opacity-0 group-hover:opacity-80 transition-opacity text-white shrink-0" />
+              </h1>
+            )}
           </div>
         </div>
       )}
@@ -520,18 +722,43 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
             {currentBoard.lists.map((list) => (
               <div
                 key={list.id}
+                draggable={editingListId !== list.id}
+                onDragStart={(e) => handleListDragStart(e, list.id)}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, list.id)}
                 className={`kb-column ${hasCustomBg ? 'kb-column-glass' : ''}`}
               >
                 {/* Column Header */}
-                <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-gray-200/50 dark:border-gray-800/40">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-[#172b4d] dark:text-[#cbd5e1] truncate max-w-[10rem]">
-                      {list.name}
-                    </span>
+                <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-gray-200/50 dark:border-gray-800/40 cursor-grab active:cursor-grabbing">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {editingListId === list.id ? (
+                      <input
+                        type="text"
+                        value={editingListName}
+                        onChange={(e) => setEditingListName(e.target.value)}
+                        onBlur={() => saveListName(list.id)}
+                        onKeyDown={(e) => handleListNameKeyDown(e, list.id)}
+                        className="text-xs font-bold px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
+                        style={{ color: 'var(--text-primary)' }}
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <span 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingListId(list.id);
+                          setEditingListName(list.name);
+                        }}
+                        className="text-xs font-bold uppercase tracking-wider text-[#172b4d] dark:text-[#cbd5e1] truncate cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/50 px-1 py-0.5 rounded flex items-center gap-1.5 group/list min-w-0"
+                        title="Click to rename column"
+                      >
+                        <span className="truncate max-w-[8rem]">{list.name}</span>
+                        <Pencil className="w-2.5 h-2.5 opacity-0 group-hover/list:opacity-60 transition-opacity text-slate-500 shrink-0" />
+                      </span>
+                    )}
                     <span 
-                      className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
                       style={{ 
                         background: 'var(--bg-body)', 
                         color: 'var(--text-secondary)',
@@ -596,10 +823,14 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                       return (
                         <div
                           key={card.id}
-                          draggable
+                          draggable={editingCardId !== card.id}
                           onDragStart={(e) => handleDragStart(e, card.id)}
-                          onClick={() => onOpenCardDetails(card)}
-                          className={`kb-card space-y-3 animate-fade-in ${
+                          onClick={() => {
+                            if (editingCardId !== card.id) {
+                              onOpenCardDetails(card);
+                            }
+                          }}
+                          className={`kb-card space-y-3 animate-fade-in group/card ${
                             card.priority === 'URGENT' ? 'priority-left-urgent' :
                             card.priority === 'HIGH' ? 'priority-left-high' :
                             card.priority === 'MEDIUM' ? 'priority-left-medium' : 'priority-left-low'
@@ -654,12 +885,56 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                           </div>
 
                           {/* Title & Emoji */}
-                          <div className="flex items-start gap-1.5">
-                            {cardEmoji && <span className="text-sm shrink-0 leading-none mt-0.5">{cardEmoji}</span>}
-                            <h4 className="text-xs font-semibold leading-snug" style={{ color: 'var(--text-primary)' }}>
-                              {card.title}
-                            </h4>
-                          </div>
+                          {editingCardId === card.id ? (
+                            <div 
+                              className="space-y-1.5" 
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <textarea
+                                value={editingCardTitle}
+                                onChange={(e) => setEditingCardTitle(e.target.value)}
+                                onKeyDown={(e) => handleCardQuickRenameKeyDown(e, card.id)}
+                                className="w-full text-xs p-2 border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 resize-none font-semibold"
+                                style={{ borderColor: 'var(--border)' }}
+                                autoFocus
+                                rows={2}
+                              />
+                              <div className="flex gap-1.5 justify-end">
+                                <button
+                                  onClick={() => setEditingCardId(null)}
+                                  className="px-2.5 py-1 text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded hover:bg-slate-200"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  onClick={() => saveCardQuickRename(card.id)}
+                                  className="px-2.5 py-1 text-[10px] bg-indigo-600 text-white rounded hover:bg-indigo-700 font-semibold"
+                                >
+                                  Save
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-start justify-between gap-1.5">
+                              <div className="flex items-start gap-1.5 min-w-0">
+                                {cardEmoji && <span className="text-sm shrink-0 leading-none mt-0.5">{cardEmoji}</span>}
+                                <h4 className="text-xs font-semibold leading-snug break-words" style={{ color: 'var(--text-primary)' }}>
+                                  {card.title}
+                                </h4>
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingCardId(card.id);
+                                  setEditingCardTitle(card.title);
+                                }}
+                                className="opacity-0 group-hover/card:opacity-100 p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-opacity shrink-0"
+                                title="Quick rename"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
 
                           {/* Checklist Meter Line */}
                           {checklistCount > 0 && (
@@ -1143,43 +1418,56 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
             </div>
 
             {/* Modal Tabs */}
-            {isOwnerOrAdmin && (
-              <div className="flex border-b border-gray-100 dark:border-gray-800 px-4 md:px-6">
-                <button 
-                  type="button"
-                  onClick={() => setActiveCustomizerTab('style')}
-                  className={`py-2.5 px-4 font-semibold text-xs border-b-2 transition-colors ${
-                    activeCustomizerTab === 'style' 
-                      ? 'border-indigo-500 text-indigo-650 dark:text-indigo-400' 
-                      : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
-                  }`}
-                >
-                  Styling
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => setActiveCustomizerTab('email')}
-                  className={`py-2.5 px-4 font-semibold text-xs border-b-2 transition-colors ${
-                    activeCustomizerTab === 'email' 
-                      ? 'border-indigo-500 text-indigo-650 dark:text-indigo-400' 
-                      : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
-                  }`}
-                >
-                  Email-to-Board
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => setActiveCustomizerTab('danger')}
-                  className={`py-2.5 px-4 font-semibold text-xs border-b-2 transition-colors ${
-                    activeCustomizerTab === 'danger' 
-                      ? 'border-red-500 text-red-650 dark:text-red-400' 
-                      : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
-                  }`}
-                >
-                  Danger Zone
-                </button>
-              </div>
-            )}
+            <div className="flex border-b border-gray-100 dark:border-gray-800 px-4 md:px-6 overflow-x-auto shrink-0 scrollbar-none">
+              <button 
+                type="button"
+                onClick={() => setActiveCustomizerTab('style')}
+                className={`py-2.5 px-4 font-semibold text-xs border-b-2 transition-colors shrink-0 ${
+                  activeCustomizerTab === 'style' 
+                    ? 'border-indigo-500 text-indigo-650 dark:text-indigo-400' 
+                    : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
+                }`}
+              >
+                Styling
+              </button>
+              <button 
+                type="button"
+                onClick={() => setActiveCustomizerTab('archive')}
+                className={`py-2.5 px-4 font-semibold text-xs border-b-2 transition-colors shrink-0 ${
+                  activeCustomizerTab === 'archive' 
+                    ? 'border-indigo-500 text-indigo-650 dark:text-indigo-400' 
+                    : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
+                }`}
+              >
+                Archived Items
+              </button>
+              {isOwnerOrAdmin && (
+                <>
+                  <button 
+                    type="button"
+                    onClick={() => setActiveCustomizerTab('email')}
+                    className={`py-2.5 px-4 font-semibold text-xs border-b-2 transition-colors shrink-0 ${
+                      activeCustomizerTab === 'email' 
+                        ? 'border-indigo-500 text-indigo-650 dark:text-indigo-400' 
+                        : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
+                    }`}
+                  >
+                    Email-to-Board
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setActiveCustomizerTab('danger')}
+                    className={`py-2.5 px-4 font-semibold text-xs border-b-2 transition-colors shrink-0 ${
+                      activeCustomizerTab === 'danger' 
+                        ? 'border-red-500 text-red-650 dark:text-red-400' 
+                        : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
+                    }`}
+                  >
+                    Danger Zone
+                  </button>
+                </>
+              )}
+            </div>
 
             {activeCustomizerTab === 'style' ? (
               <form onSubmit={handleSaveCustomization} className="p-4 md:p-6 space-y-4 md:space-y-5 max-h-[70vh] overflow-y-auto">
@@ -1548,6 +1836,102 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                   </button>
                 </div>
               </form>
+            ) : activeCustomizerTab === 'archive' ? (
+              <div className="p-4 md:p-6 space-y-4 max-h-[70vh] overflow-y-auto text-[#172b4d] dark:text-[#b6c2cf]">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Restore previously archived lists or task cards to the board.
+                </p>
+
+                {loadingArchived ? (
+                  <div className="py-8 flex flex-col items-center justify-center gap-2">
+                    <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin border-indigo-500" />
+                    <span className="text-xs text-gray-400">Loading archives...</span>
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    
+                    {/* Archived Lists Section */}
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-xs uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                        <Columns className="w-3.5 h-3.5" /> Archived Columns ({archivedLists.length})
+                      </h4>
+                      {archivedLists.length === 0 ? (
+                        <p className="text-[11px] text-gray-400 italic py-1">No archived columns on this board.</p>
+                      ) : (
+                        <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                          {archivedLists.map(l => (
+                            <div key={l.id} className="flex items-center justify-between p-2.5 rounded-xl border border-gray-150 dark:border-gray-800 bg-slate-50/50 dark:bg-slate-900/40">
+                              <span className="text-xs font-semibold truncate max-w-[16rem]">{l.name}</span>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    await updateList(boardId, l.id, undefined, undefined, false);
+                                    addToast('Column Restored', `"${l.name}" column and its cards restored.`, 'success');
+                                    loadArchivedItems();
+                                  } catch (err: any) {
+                                    addToast('Error', err.message || 'Failed to restore column', 'error');
+                                  }
+                                }}
+                                className="text-[10px] font-bold text-indigo-500 hover:text-indigo-650 bg-indigo-500/10 hover:bg-indigo-500/20 px-2.5 py-1 rounded-lg transition-colors shrink-0"
+                              >
+                                Restore
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Archived Cards Section */}
+                    <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                      <h4 className="font-bold text-xs uppercase tracking-wider text-[#8590a2] flex items-center gap-1.5">
+                        <CalendarCheck className="w-3.5 h-3.5" /> Archived Cards ({archivedCards.length})
+                      </h4>
+                      {archivedCards.length === 0 ? (
+                        <p className="text-[11px] text-gray-400 italic py-1">No archived cards on this board.</p>
+                      ) : (
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          {archivedCards.map(c => (
+                            <div key={c.id} className="flex items-center justify-between p-2.5 rounded-xl border border-gray-150 dark:border-gray-800 bg-slate-50/50 dark:bg-slate-900/40">
+                              <div className="min-w-0 pr-2">
+                                <span className="text-xs font-semibold block truncate" style={{ color: 'var(--text-primary)' }}>{c.title}</span>
+                                <span className="text-[9px] text-gray-400">Originally in column: <span className="font-medium text-gray-500 dark:text-gray-405">{c.list?.name || 'Unknown'}</span></span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    await updateCard(boardId, c.id, { isArchived: false });
+                                    addToast('Card Restored', `"${c.title}" has been restored.`, 'success');
+                                    loadArchivedItems();
+                                  } catch (err: any) {
+                                    addToast('Error', err.message || 'Failed to restore card', 'error');
+                                  }
+                                }}
+                                className="text-[10px] font-bold text-indigo-500 hover:text-indigo-650 bg-indigo-500/10 hover:bg-indigo-500/20 px-2.5 py-1 rounded-lg transition-colors shrink-0"
+                              >
+                                Restore
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+                )}
+
+                <div className="flex gap-2.5 pt-3 border-t border-gray-100 dark:border-gray-800">
+                  <button 
+                    type="button" 
+                    onClick={() => setCustomizerOpen(false)} 
+                    className="btn-secondary flex-1 justify-center text-xs py-2.5 rounded-xl"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
             ) : (
               <div className="p-4 md:p-6 space-y-4 md:space-y-5 max-h-[70vh] overflow-y-auto">
                 <div className="p-4 border border-red-200/60 dark:border-red-900/40 rounded-xl bg-red-50/10 dark:bg-red-950/5 space-y-3">

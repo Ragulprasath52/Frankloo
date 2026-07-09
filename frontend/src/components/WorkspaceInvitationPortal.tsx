@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Mail, Send, History, Activity, X, RefreshCw, AlertCircle,
-  Eye, Moon, Sun, Laptop, Smartphone, CheckCircle2, Clock,
-  ShieldAlert, Sparkles, Server
+  Mail, Send, Activity, X, RefreshCw, AlertCircle,
+  Eye, Moon, Sun, Laptop, Smartphone, Sparkles,
+  Server, Plus, Lock, Search
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 
@@ -28,6 +28,11 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'send' | 'history' | 'branding' | 'smtp'>('dashboard');
+
+  const [sendInviteModalOpen, setSendInviteModalOpen] = useState(false);
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyRoleFilter, setHistoryRoleFilter] = useState<'ALL' | 'MEMBER' | 'ADMIN' | 'VIEWER'>('ALL');
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<'ALL' | 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'REVOKED'>('ALL');
 
   // Dashboard Stats States
   const [dashboardStats, setDashboardStats] = useState<any>(null);
@@ -331,7 +336,7 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
   };
 
   return (
-    <div className="p-4 sm:p-8 max-w-7xl mx-auto h-[calc(100vh-48px)] overflow-y-auto overflow-x-hidden space-y-6 flex flex-col justify-start select-none animate-fade-in text-[#172b4d] dark:text-[#b6c2cf]">
+    <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto w-full animate-fade-in text-slate-800 dark:text-[#c9d1d9]">
       <style>{`
         /* Dynamic simulator override for email previews in dark mode */
         .dark-email .email-container {
@@ -368,379 +373,308 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
         }
       `}</style>
       
-      {/* Dynamic Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#dfe1e6] dark:border-[#a6c5e229] pb-5 shrink-0">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2 text-[#091e42] dark:text-[#f0f6fc] font-display">
-            <Mail className="w-6 h-6 text-blue-500" />
-            Invitations &amp; Custom Branding
+      {/* ── Page Header Section ── */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 dark:border-slate-800/80 pb-6 shrink-0">
+        <div className="space-y-1.5">
+          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50 font-sans flex items-center gap-2">
+            <Mail className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500 shrink-0" /> Workspace Invitations
           </h1>
-          <p className="text-xs sm:text-sm text-[#5e6c84] dark:text-[#9fadbc] mt-1 leading-snug">
-            Configure custom SMTP settings, design branded templates, track acceptance analytics, and send batch email invites.
+          <p className="text-xs text-slate-500 dark:text-[#8d96a0] leading-relaxed">
+            Manage workspace invitations, email templates and SMTP configuration.
           </p>
         </div>
-        <div className="flex bg-slate-100 dark:bg-[#1d2125] p-0.5 rounded-lg border border-slate-200 dark:border-slate-800 overflow-x-auto whitespace-nowrap scrollbar-none shrink-0 max-w-full">
-          {(['dashboard', 'send', 'history', 'branding', 'smtp'] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md capitalize transition-all ${activeTab === tab ? 'bg-white dark:bg-[#2c333a] shadow-sm text-blue-600 dark:text-[#579dff] font-bold' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}`}
-            >
-              {tab === 'smtp' ? 'SMTP config' : tab}
-            </button>
-          ))}
-        </div>
+
+        <button 
+          onClick={() => setSendInviteModalOpen(true)} 
+          className="btn-primary justify-center font-bold text-xs py-2.5 px-4.5 rounded-xl shadow-sm hover:translate-y-[-1px] transition-transform w-full sm:w-auto shrink-0"
+        >
+          <Plus className="w-3.5 h-3.5" /> Send Invitation
+        </button>
       </div>
 
-      {/* Main Tabbed Views */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      {/* ── Segmented Navigation Tabs ── */}
+      <div className="flex bg-slate-50 dark:bg-[#0d0d0f] p-1 rounded-xl border border-slate-100 dark:border-[#2d3139] overflow-x-auto whitespace-nowrap scrollbar-none shrink-0 max-w-full">
+        <button
+          onClick={() => setActiveTab('dashboard')}
+          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'dashboard' ? 'bg-white dark:bg-[#161b22] border border-slate-200/50 dark:border-[#2d3139] shadow-sm text-blue-600 dark:text-[#579dff]' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}`}
+        >
+          Dashboard &amp; Feed
+        </button>
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'history' ? 'bg-white dark:bg-[#161b22] border border-slate-200/50 dark:border-[#2d3139] shadow-sm text-blue-600 dark:text-[#579dff]' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}`}
+        >
+          Invitations List
+        </button>
+        <button
+          onClick={() => setActiveTab('branding')}
+          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'branding' ? 'bg-white dark:bg-[#161b22] border border-slate-200/50 dark:border-[#2d3139] shadow-sm text-blue-600 dark:text-[#579dff]' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}`}
+        >
+          Email Branding &amp; Template
+        </button>
+        <button
+          onClick={() => setActiveTab('smtp')}
+          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'smtp' ? 'bg-white dark:bg-[#161b22] border border-slate-200/50 dark:border-[#2d3139] shadow-sm text-blue-600 dark:text-[#579dff]' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}`}
+        >
+          SMTP Server Configuration
+        </button>
+      </div>
+
+      {/* ── Summary statistics pill row ── */}
+      <div className="flex flex-wrap items-center gap-3 bg-slate-50/50 dark:bg-[#0d0d0f] border border-slate-150 dark:border-[#2d3139] p-3.5 rounded-xl text-xs font-semibold text-slate-550 dark:text-[#8d96a0]">
+        <span className="font-bold text-[10px] uppercase text-slate-400 mr-2">Summary Metrics:</span>
+        <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2.5 py-0.5 rounded-lg">Pending • {statsLoading ? '...' : dashboardStats?.pending || 0}</span>
+        <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2.5 py-0.5 rounded-lg">Accepted • {statsLoading ? '...' : dashboardStats?.accepted || 0}</span>
+        <span className="bg-rose-500/10 text-rose-500 border border-rose-500/20 px-2.5 py-0.5 rounded-lg">Expired • {statsLoading ? '...' : (dashboardStats?.expired || 0) + (dashboardStats?.revoked || 0)}</span>
+      </div>
+
+      {/* ── Main Tabbed Views ── */}
+      <div className="flex-1 min-h-0">
         
-        {/* =========================================================
-           TAB 1: INTEGRATED DASHBOARD WIDGETS
-           ========================================================= */}
+        {/* TAB 1: INTEGRATED DASHBOARD & ACTIVITY FEED */}
         {activeTab === 'dashboard' && (
-          <div className="space-y-8 animate-fade-in">
-            {/* Typographic Stats Ribbon (Frameless, integrated, modern stats layout) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-0 md:divide-x divide-slate-200 dark:divide-slate-800 pb-8 border-b border-slate-200 dark:border-slate-800">
-              <div className="pb-4 md:pb-0 border-b border-slate-150 dark:border-slate-850 md:border-b-0 md:pr-8 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
-                  <Clock className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Pending Invitations</span>
-                  <div className="flex items-baseline gap-2 mt-0.5">
-                    <span className="text-3xl font-extrabold text-[#091e42] dark:text-[#f0f6fc]">{statsLoading ? '...' : dashboardStats?.pending || 0}</span>
-                    <span className="text-[10px] text-amber-500 font-semibold bg-amber-500/10 px-2 py-0.5 rounded-md">Active links</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pb-4 md:pb-0 border-b border-slate-150 dark:border-slate-850 md:border-b-0 md:px-8 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-                  <CheckCircle2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Accepted Invitations</span>
-                  <div className="flex items-baseline gap-2 mt-0.5">
-                    <span className="text-3xl font-extrabold text-[#091e42] dark:text-[#f0f6fc]">{statsLoading ? '...' : dashboardStats?.accepted || 0}</span>
-                    <span className="text-[10px] text-emerald-500 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-md">Joined team</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="md:pl-8 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0">
-                  <ShieldAlert className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Expired &amp; Revoked</span>
-                  <div className="flex items-baseline gap-2 mt-0.5">
-                    <span className="text-3xl font-extrabold text-[#091e42] dark:text-[#f0f6fc]">{statsLoading ? '...' : (dashboardStats?.expired || 0) + (dashboardStats?.revoked || 0)}</span>
-                    <span className="text-[10px] text-rose-500 font-semibold bg-rose-500/10 px-2 py-0.5 rounded-md">Inactive links</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Recent Invitation Activity Logs Feed */}
-            <div className="pt-4">
-              {/* Timeline Activity Feed */}
-              <div className="flex flex-col justify-start pb-8">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2 mb-6 pb-2 border-b border-slate-100 dark:border-slate-800">
-                  <Activity className="w-4 h-4 text-emerald-500" /> Recent Invitation Activity Logs
-                </h3>
-                <div className="flex-1 overflow-y-auto pr-2 min-h-[300px] max-h-[380px] space-y-4 relative border-l border-slate-200 dark:border-slate-800 ml-2 pl-6 pt-1">
-                  {statsLoading ? (
-                    <div className="text-center py-12 text-xs text-slate-400">Loading activity feed...</div>
-                  ) : recentLogs.length === 0 ? (
-                    <div className="text-center py-12 text-xs text-slate-400 italic">No invitation activity logs recorded yet.</div>
-                  ) : (
-                    recentLogs.map((log) => {
-                      let dotColor = 'bg-blue-500 ring-blue-500/20';
-                      if (log.action === 'INVITE_ACCEPTED') dotColor = 'bg-emerald-500 ring-emerald-500/20';
-                      if (log.action === 'INVITE_REVOKED') dotColor = 'bg-rose-500 ring-rose-500/20';
-                      if (log.action === 'DELIVERY_FAILURE') dotColor = 'bg-amber-400 ring-amber-400/20';
-
-                      return (
-                        <div key={log.id} className="relative text-xs space-y-0.5">
-                          <span className={`absolute -left-[29px] top-1 w-2 h-2 rounded-full ring-4 ring-[#f6f8fa] dark:ring-[#0d1117] ${dotColor}`} />
-                          <div className="flex justify-between gap-4">
-                            <p className="font-medium text-slate-800 dark:text-[#f0f6fc]">
-                              <span className="font-bold">{log.email}</span>: {log.details}
-                            </p>
-                            <span className="text-[10px] text-slate-400 whitespace-nowrap">{new Date(log.createdAt).toLocaleDateString()}</span>
-                          </div>
-                          <span className="text-[10px] text-slate-400 font-mono tracking-wider block">Action: {log.action}</span>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* =========================================================
-           TAB 2: SEND EMAIL INVITATIONS
-           ========================================================= */}
-        {activeTab === 'send' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start animate-fade-in divide-y lg:divide-y-0 lg:divide-x divide-slate-200 dark:divide-slate-800">
-            {/* Form Column */}
-            <form onSubmit={handleSendInvitations} className="space-y-6 pb-8 lg:pb-0 lg:pr-8">
-              <div className="flex items-center gap-2 pb-3 mb-2 border-b border-slate-150 dark:border-slate-800">
-                <Send className="w-4 h-4 text-blue-500" />
-                <h3 className="font-bold text-sm text-[#091e42] dark:text-[#f0f6fc]">Invite Workspace Members</h3>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="tf-label">Emails / Usernames (separated by comma, semicolon or newline)</label>
-                <textarea
-                  value={emailsInput}
-                  onChange={e => setEmailsInput(e.target.value)}
-                  placeholder="colleague@example.com, developer@company.com, support@team.org"
-                  className="tf-input text-xs w-full h-24"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="tf-label">Collaborator Role</label>
-                <select
-                  value={inviteRole}
-                  onChange={e => setInviteRole(e.target.value as any)}
-                  className="tf-input text-xs w-full"
-                >
-                  <option value="MEMBER">Member (standard collaborate, create cards/lists)</option>
-                  <option value="ADMIN">Admin (managing boards, members, integrations)</option>
-                  <option value="VIEWER">Guest (read-only, view boards/wiki docs)</option>
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="tf-label">Custom Message (Included in email template)</label>
-                <textarea
-                  value={customMessage}
-                  onChange={e => setCustomMessage(e.target.value)}
-                  placeholder="Hi! Join our team workspace to start collaborating on tasks, documentation, and milestones."
-                  className="tf-input text-xs w-full h-20 resize-none"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={sendingInvites}
-                className="btn-primary w-full py-2.5 flex items-center justify-center gap-1.5 shadow-sm text-xs"
-              >
-                {sendingInvites ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" /> Dispatching Workspace Invites...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" /> Send Workspace Invites
-                  </>
-                )}
-              </button>
-            </form>
-
-            {/* Branded Email Live Preview Column (Updating in real-time) */}
-            <div className="pt-8 lg:pt-0 lg:pl-8 flex flex-col justify-start">
-              <div className="flex justify-between items-center mb-3">
-                <span className="text-xs uppercase font-extrabold tracking-wider text-slate-400 flex items-center gap-1">
-                  <Eye className="w-4 h-4" /> Live Branded Email Preview
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPreviewTheme(previewTheme === 'light' ? 'dark' : 'light')}
-                    className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500"
-                    title="Toggle Dark Mode Preview"
-                  >
-                    {previewTheme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                  </button>
-                  <button
-                    onClick={() => setPreviewDevice(previewDevice === 'desktop' ? 'mobile' : 'desktop')}
-                    className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500"
-                    title="Toggle Mobile View Preview"
-                  >
-                    {previewDevice === 'desktop' ? <Smartphone className="w-4 h-4" /> : <Laptop className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Responsive Container */}
-              <div className={`mx-auto w-full transition-all duration-300 border border-slate-255 dark:border-slate-800 rounded-xl overflow-hidden shadow-md bg-white ${previewDevice === 'mobile' ? 'max-w-[340px]' : 'max-w-full'}`}>
-                {/* Simulated Email Client Frame */}
-                <div className="bg-[#f0f2f5] dark:bg-[#1d2125] p-3 text-xs border-b border-slate-255 dark:border-slate-800">
-                  <p className="truncate"><span className="font-bold text-slate-500">From:</span> {senderName} &lt;no-reply@frankloo.local&gt;</p>
-                  <p className="truncate"><span className="font-bold text-slate-500">Subject:</span> {emailSubject.replace(/\{\{workspace_name\}\}/g, currentWorkspace?.name || 'Workspace')}</p>
-                </div>
-                <div
-                  className={`p-4 overflow-y-auto max-h-[350px] transition-colors duration-200 ${previewTheme === 'dark' ? 'bg-[#0d1117] text-[#c9d1d9] dark-email' : 'bg-[#f6f8fa] text-[#24292f]'}`}
-                  dangerouslySetInnerHTML={{ __html: getCompiledPreview() }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* =========================================================
-           TAB 3: INVITATION HISTORY TABLE
-           ========================================================= */}
-        {activeTab === 'history' && (
-          <div className="space-y-4 animate-fade-in">
-            <div className="pb-3 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-              <h3 className="font-bold text-sm text-[#091e42] dark:text-[#f0f6fc] flex items-center gap-2">
-                <History className="w-4 h-4 text-blue-500" />
-                Invitation History
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-white dark:bg-[#0d0d0f] border border-slate-200/80 dark:border-[#2d3139] rounded-xl p-5 shadow-sm space-y-4">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2 mb-2 pb-2 border-b border-slate-100 dark:border-slate-800">
+                <Activity className="w-4 h-4 text-emerald-500" /> Recent Invitation Activity Logs
               </h3>
-              <button
-                onClick={() => fetchWorkspaceInvitations(workspaceId)}
-                className="btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5"
-              >
-                <RefreshCw className="w-3.5 h-3.5" /> Refresh List
-              </button>
+              
+              <div className="relative border-l border-slate-100 dark:border-[#2d3139] ml-2 pl-4 space-y-4 max-h-[350px] overflow-y-auto pr-1 pt-1.5">
+                {statsLoading ? (
+                  <div className="text-center py-12 text-xs text-slate-400">Loading activity feed...</div>
+                ) : recentLogs.length === 0 ? (
+                  <div className="text-center py-12 text-xs text-slate-400 italic">No invitation activity logs recorded yet.</div>
+                ) : (
+                  recentLogs.map((log) => {
+                    let dotColor = 'bg-blue-500 ring-blue-500/20';
+                    if (log.action === 'INVITE_ACCEPTED') dotColor = 'bg-emerald-500 ring-emerald-500/20';
+                    if (log.action === 'INVITE_REVOKED') dotColor = 'bg-rose-500 ring-rose-500/20';
+                    if (log.action === 'DELIVERY_FAILURE') dotColor = 'bg-amber-400 ring-amber-400/20';
+
+                    return (
+                      <div key={log.id} className="relative text-xs space-y-1">
+                        <span className={`absolute -left-[20.5px] top-1.5 w-1.5 h-1.5 rounded-full bg-blue-500 ring-4 ring-white dark:ring-[#0d0d0f] ${dotColor}`} />
+                        <div className="flex justify-between gap-4">
+                          <p className="font-medium text-slate-700 dark:text-slate-350 leading-relaxed text-[11px]">
+                            <span className="font-bold text-slate-800 dark:text-slate-200">{log.email}</span>: {log.details}
+                          </p>
+                          <span className="text-[9px] text-slate-400 whitespace-nowrap">{new Date(log.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <span className="text-[9px] text-slate-400 font-mono tracking-wider block">Action: {log.action}</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
-
-            {(!workspaceInvitations || workspaceInvitations.length === 0) ? (
-              <div className="text-center py-16 text-slate-400 space-y-2">
-                <Mail className="w-12 h-12 text-slate-300 mx-auto" />
-                <p className="font-semibold text-sm">No invitations found</p>
-                <p className="text-xs">Any pending or accepted invites will appear in this log trail.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl">
-                <table className="w-full text-left border-collapse bg-white dark:bg-[#161b22]">
-                  <thead>
-                    <tr className="border-b border-[#dfe1e6] dark:border-[#a6c5e229] bg-slate-50/50 dark:bg-[#1d2125]/20 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-                      <th className="px-5 py-3.5">Recipient Email</th>
-                      <th className="px-5 py-3.5">Role</th>
-                      <th className="px-5 py-3.5">Invite Status</th>
-                      <th className="px-5 py-3.5">Delivery Status</th>
-                      <th className="px-5 py-3.5">Date Sent</th>
-                      <th className="px-5 py-3.5">Telemetry</th>
-                      <th className="px-5 py-3.5 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                    {workspaceInvitations.map((inv: any) => {
-                      // Status color resolution
-                      let statusBadge = 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400';
-                      if (inv.status === 'ACCEPTED') statusBadge = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400';
-                      if (inv.status === 'EXPIRED') statusBadge = 'bg-gray-100 text-gray-700 dark:bg-gray-800/40 dark:text-gray-400';
-                      if (inv.status === 'REVOKED') statusBadge = 'bg-rose-100 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400';
-
-                      // Delivery color resolution
-                      let deliveryBadge = 'bg-slate-100 text-slate-700 dark:bg-slate-800/40 dark:text-slate-400';
-                      if (inv.deliveryStatus === 'DELIVERED') deliveryBadge = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400';
-                      if (inv.deliveryStatus === 'FAILED') deliveryBadge = 'bg-rose-100 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400';
-
-                      return (
-                        <tr key={inv.id} className="hover:bg-slate-50/50 dark:hover:bg-white/5 transition-all">
-                          <td className="px-5 py-4 font-semibold text-slate-800 dark:text-[#f0f6fc]">{inv.email}</td>
-                          <td className="px-5 py-4 uppercase font-bold text-[10px] tracking-wide text-slate-500">{inv.role === 'VIEWER' ? 'Guest' : inv.role.toLowerCase()}</td>
-                          <td className="px-5 py-4">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${statusBadge}`}>
-                              {inv.status}
-                            </span>
-                          </td>
-                          <td className="px-5 py-4">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit ${deliveryBadge}`} title={inv.deliveryError || undefined}>
-                              {inv.deliveryStatus}
-                              {inv.deliveryError && <AlertCircle className="w-3.5 h-3.5 text-rose-500" />}
-                            </span>
-                          </td>
-                          <td className="px-5 py-4 text-slate-400">{new Date(inv.createdAt).toLocaleString()}</td>
-                          <td className="px-5 py-4 text-slate-400 space-y-0.5 text-[10px]">
-                            <p>Resends: {inv.resentCount}</p>
-                            {inv.lastResentAt && <p>Last: {new Date(inv.lastResentAt).toLocaleDateString()}</p>}
-                          </td>
-                          <td className="px-5 py-4 text-right">
-                            {inv.status === 'PENDING' && (
-                              <div className="flex justify-end gap-1.5">
-                                <button
-                                  onClick={() => handleResendInvite(inv.id)}
-                                  className="btn-secondary py-1 px-2 flex items-center gap-1 text-[11px]"
-                                  title="Resend workspace invite link"
-                                >
-                                  <RefreshCw className="w-3.5 h-3.5" /> Resend
-                                </button>
-                                <button
-                                  onClick={() => handleRevokeInvite(inv.id)}
-                                  className="btn-danger hover:bg-rose-500/10 text-rose-500 py-1 px-2 flex items-center gap-1 text-[11px]"
-                                  title="Revoke and cancel invite link"
-                                >
-                                  <X className="w-3.5 h-3.5" /> Revoke
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </div>
         )}
 
-        {/* =========================================================
-           TAB 4: EMAIL TEMPLATE & BRANDING SETTINGS
-           ========================================================= */}
+        {/* TAB 2: INVITATIONS HISTORY LIST */}
+        {activeTab === 'history' && (() => {
+          const filteredInvitations = (workspaceInvitations || []).filter((inv: any) => {
+            const matchSearch = (inv.email || '').toLowerCase().includes(historySearch.toLowerCase());
+            const matchRole = historyRoleFilter === 'ALL' ? true : inv.role === historyRoleFilter;
+            const matchStatus = historyStatusFilter === 'ALL' ? true : inv.status === historyStatusFilter;
+            return matchSearch && matchRole && matchStatus;
+          });
+
+          return (
+            <div className="space-y-6 animate-fade-in">
+              {/* Search & Filters Toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50/50 dark:bg-[#0d0d0f] border border-slate-100 dark:border-[#2d3139] p-4 rounded-xl">
+                <div className="relative flex-grow max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-550" />
+                  <input
+                    type="text"
+                    placeholder="Search invited email address..."
+                    value={historySearch}
+                    onChange={e => setHistorySearch(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-[#161b22] border border-slate-250 dark:border-[#2d3139] focus:border-indigo-500 dark:focus:border-indigo-650 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-slate-200 transition-all font-medium"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-1.5 bg-white dark:bg-[#161b22] border border-slate-200/60 dark:border-[#2d3139] px-3 py-1.5 rounded-xl">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase mr-1">Role</span>
+                    <select
+                      value={historyRoleFilter}
+                      onChange={e => setHistoryRoleFilter(e.target.value as any)}
+                      className="bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer"
+                    >
+                      <option value="ALL" className="dark:bg-[#161b22]">All Roles</option>
+                      <option value="MEMBER" className="dark:bg-[#161b22]">Member</option>
+                      <option value="ADMIN" className="dark:bg-[#161b22]">Admin</option>
+                      <option value="VIEWER" className="dark:bg-[#161b22]">Guest</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 bg-white dark:bg-[#161b22] border border-slate-200/60 dark:border-[#2d3139] px-3 py-1.5 rounded-xl">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase mr-1">Status</span>
+                    <select
+                      value={historyStatusFilter}
+                      onChange={e => setHistoryStatusFilter(e.target.value as any)}
+                      className="bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer"
+                    >
+                      <option value="ALL" className="dark:bg-[#161b22]">All Statuses</option>
+                      <option value="PENDING" className="dark:bg-[#161b22]">Pending</option>
+                      <option value="ACCEPTED" className="dark:bg-[#161b22]">Accepted</option>
+                      <option value="EXPIRED" className="dark:bg-[#161b22]">Expired</option>
+                      <option value="REVOKED" className="dark:bg-[#161b22]">Revoked</option>
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={() => fetchWorkspaceInvitations(workspaceId)}
+                    className="btn-secondary text-xs py-2 px-4 rounded-xl flex items-center gap-1.5 shadow-sm font-bold hover:translate-y-[-1px] transition-transform border border-slate-200 dark:border-[#2d3139]"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Refresh List
+                  </button>
+                </div>
+              </div>
+
+              {filteredInvitations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center text-center py-16 px-4 bg-slate-50 dark:bg-[#0d0d0f] rounded-2xl border border-slate-100 dark:border-[#2d3139] max-w-md mx-auto">
+                  <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800/40 text-slate-400 dark:text-slate-550 flex items-center justify-center mb-4">
+                    <Mail className="w-6 h-6" />
+                  </div>
+                  <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100 mb-1.5">No invitations found</h3>
+                  <p className="text-xs text-slate-400 dark:text-slate-550 max-w-xs mb-5 leading-relaxed">
+                    Try modifying your search queries or active filter tags.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-white dark:bg-[#0d0d0f] border border-slate-200/80 dark:border-[#2d3139] rounded-xl overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[750px]">
+                      <thead>
+                        <tr className="border-b border-slate-100 dark:border-[#2d3139] bg-slate-50/50 dark:bg-[#161b22] text-[10px] font-bold uppercase text-slate-400 dark:text-slate-550 tracking-wider">
+                          <th className="px-5 py-3">Recipient Email</th>
+                          <th className="px-5 py-3">Workspace Role</th>
+                          <th className="px-5 py-3">Invite Status</th>
+                          <th className="px-5 py-3">Delivery Status</th>
+                          <th className="px-5 py-3">Date Sent</th>
+                          <th className="px-5 py-3">Resends</th>
+                          <th className="px-5 py-3 w-32"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-[#2d3139] text-xs">
+                        {filteredInvitations.map((inv: any) => {
+                          let statusBadge = 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400';
+                          if (inv.status === 'ACCEPTED') statusBadge = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400';
+                          if (inv.status === 'EXPIRED') statusBadge = 'bg-gray-100 text-gray-700 dark:bg-gray-800/40 dark:text-gray-400';
+                          if (inv.status === 'REVOKED') statusBadge = 'bg-rose-100 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400';
+
+                          let deliveryBadge = 'bg-slate-100 text-slate-700 dark:bg-slate-800/40 dark:text-slate-400';
+                          if (inv.deliveryStatus === 'DELIVERED') deliveryBadge = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400';
+                          if (inv.deliveryStatus === 'FAILED') deliveryBadge = 'bg-rose-100 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400';
+
+                          return (
+                            <tr key={inv.id} className="hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors">
+                              <td className="px-5 py-4 font-semibold text-slate-800 dark:text-slate-200">{inv.email}</td>
+                              <td className="px-5 py-4 uppercase font-bold text-[10px] tracking-wide text-slate-500">{inv.role === 'VIEWER' ? 'Guest' : inv.role.toLowerCase()}</td>
+                              <td className="px-5 py-4">
+                                <span className={`px-2 py-0.5 border rounded-full text-[9px] font-bold uppercase shrink-0 ${statusBadge}`}>
+                                  {inv.status}
+                                </span>
+                              </td>
+                              <td className="px-5 py-4">
+                                <span className={`px-2 py-0.5 border rounded-full text-[9px] font-bold flex items-center gap-1 w-fit ${deliveryBadge}`} title={inv.deliveryError || undefined}>
+                                  {inv.deliveryStatus}
+                                  {inv.deliveryError && <AlertCircle className="w-3 h-3 text-rose-500" />}
+                                </span>
+                              </td>
+                              <td className="px-5 py-4 text-slate-450 dark:text-slate-500">
+                                {new Date(inv.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </td>
+                              <td className="px-5 py-4 text-slate-450 dark:text-slate-500 font-medium">
+                                {inv.resentCount || 0}
+                              </td>
+                              <td className="px-5 py-4 text-right">
+                                {inv.status === 'PENDING' && (
+                                  <div className="flex justify-end gap-1.5">
+                                    <button
+                                      onClick={() => handleResendInvite(inv.id)}
+                                      className="p-1 rounded text-blue-500 hover:bg-blue-500/10 transition-colors"
+                                      title="Resend invitation link"
+                                    >
+                                      <RefreshCw className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleRevokeInvite(inv.id)}
+                                      className="p-1 rounded text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors"
+                                      title="Cancel and revoke invite link"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* TAB 3: BRANDING & EMAIL TEMPLATES */}
         {activeTab === 'branding' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start animate-fade-in divide-y lg:divide-y-0 lg:divide-x divide-slate-200 dark:divide-slate-800">
             {/* Branding Inputs Form */}
             <form onSubmit={handleSaveBranding} className="space-y-6 pb-8 lg:pb-0 lg:pr-8">
               <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-150 dark:border-slate-800">
-                <h3 className="font-bold text-sm text-[#091e42] dark:text-[#f0f6fc] flex items-center gap-2">
+                <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-blue-500" /> Workspace Custom Branding
                 </h3>
                 <button
                   type="submit"
                   disabled={updatingBranding}
-                  className="btn-primary py-1.5 px-4 text-xs flex items-center gap-1.5 shadow-sm"
+                  className="btn-primary py-1.5 px-4 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm"
                 >
                   {updatingBranding ? 'Saving changes...' : 'Save Settings'}
                 </button>
               </div>
 
-
               {/* Accent & Button color pickers */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="tf-label">Branding Accent Color</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500">Accent Color</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
                       value={brandingAccentColor}
                       onChange={e => setBrandingAccentColor(e.target.value)}
-                      className="w-10 h-8 rounded border border-slate-255 cursor-pointer p-0 shrink-0"
+                      className="w-10 h-8 rounded-lg border border-slate-250 cursor-pointer p-0 shrink-0 bg-transparent"
                     />
                     <input
                       type="text"
                       value={brandingAccentColor}
                       onChange={e => setBrandingAccentColor(e.target.value)}
                       placeholder="#0052cc"
-                      className="tf-input text-xs w-full py-1.5 font-mono"
+                      className="w-full pl-3 pr-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-850 dark:text-slate-200 text-xs font-mono"
                     />
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="tf-label">Button Color</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500">Button Color</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
                       value={brandingButtonColor}
                       onChange={e => setBrandingButtonColor(e.target.value)}
-                      className="w-10 h-8 rounded border border-slate-255 cursor-pointer p-0 shrink-0"
+                      className="w-10 h-8 rounded-lg border border-slate-250 cursor-pointer p-0 shrink-0 bg-transparent"
                     />
                     <input
                       type="text"
                       value={brandingButtonColor}
                       onChange={e => setBrandingButtonColor(e.target.value)}
                       placeholder="#0052cc"
-                      className="tf-input text-xs w-full py-1.5 font-mono"
+                      className="w-full pl-3 pr-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-850 dark:text-slate-200 text-xs font-mono"
                     />
                   </div>
                 </div>
@@ -749,54 +683,54 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
               {/* Email details */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="tf-label">Sender Name</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500">Sender Name</label>
                   <input
                     type="text"
                     value={senderName}
                     onChange={e => setSenderName(e.target.value)}
                     placeholder="Frankloo"
-                    className="tf-input text-xs w-full"
+                    className="w-full pl-3 pr-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-850 dark:text-slate-200 text-xs font-semibold"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="tf-label">Reply-to Email Address</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500">Reply-To Address</label>
                   <input
                     type="email"
                     value={replyTo}
                     onChange={e => setReplyTo(e.target.value)}
                     placeholder="support@frankloo.local"
-                    className="tf-input text-xs w-full"
+                    className="w-full pl-3 pr-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-850 dark:text-slate-200 text-xs font-semibold"
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="tf-label">Email Subject Header</label>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500">Email Subject Header</label>
                 <input
                   type="text"
                   value={emailSubject}
                   onChange={e => setEmailSubject(e.target.value)}
                   placeholder="You're invited to join {{workspace_name}} on Frankloo"
-                  className="tf-input text-xs w-full"
+                  className="w-full pl-3 pr-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-850 dark:text-slate-200 text-xs font-semibold"
                   required
                 />
-                <p className="text-[10px] text-slate-400 mt-1">Variables supported: {"{{workspace_name}}"}</p>
+                <p className="text-[9px] text-slate-450 dark:text-slate-500 mt-1">Variables supported: {"{{workspace_name}}"}</p>
               </div>
 
               <div className="space-y-1.5">
-                <label className="tf-label">Email Footer Text</label>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500">Email Footer Text</label>
                 <input
                   type="text"
                   value={brandingFooter}
                   onChange={e => setBrandingFooter(e.target.value)}
                   placeholder="Frankloo Workspace Integration Services"
-                  className="tf-input text-xs w-full"
+                  className="w-full pl-3 pr-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-850 dark:text-slate-200 text-xs font-semibold"
                 />
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center mb-1">
-                  <label className="tf-label mb-0">HTML Editor Override (Leave empty for default template)</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500">HTML Editor Override</label>
                   <button
                     type="button"
                     onClick={async () => {
@@ -808,7 +742,7 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
                       );
                       if (confirmed) setCustomBodyHtml('');
                     }}
-                    className="text-[10px] text-red-500 hover:underline"
+                    className="text-[10px] text-rose-500 hover:underline font-bold"
                   >
                     Reset default
                   </button>
@@ -817,9 +751,9 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
                   value={customBodyHtml}
                   onChange={e => setCustomBodyHtml(e.target.value)}
                   placeholder="<div>Custom HTML Layout... Use standard variables: {{workspace_name}}, {{invite_link}}, etc.</div>"
-                  className="tf-input text-xs w-full h-32 font-mono"
+                  className="w-full pl-3 pr-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-850 dark:text-slate-200 text-xs font-mono h-32"
                 />
-                <p className="text-[10px] text-slate-400 mt-1">Variables supported: {"{{workspace_name}}, {{workspace_logo}}, {{workspace_owner}}, {{role}}, {{invite_link}}, {{expiry_date}}, {{custom_message}}, {{accent_color}}, {{button_color}}, {{footer}}"}</p>
+                <p className="text-[9px] text-slate-450 dark:text-slate-500 mt-1 leading-normal">Supported: {"{{workspace_name}}, {{workspace_logo}}, {{workspace_owner}}, {{role}}, {{invite_link}}, {{expiry_date}}, {{custom_message}}, {{accent_color}}, {{button_color}}, {{footer}}"}</p>
               </div>
             </form>
 
@@ -827,7 +761,7 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
             <div className="pt-8 lg:pt-0 lg:pl-8 flex flex-col justify-start">
               <div className="flex justify-between items-center mb-3">
                 <span className="text-xs uppercase font-extrabold tracking-wider text-slate-400 flex items-center gap-1">
-                  <Eye className="w-4 h-4" /> Customized Live Template Preview
+                  <Eye className="w-4 h-4" /> Branded Template Preview
                 </span>
                 <div className="flex gap-2">
                   <button
@@ -847,12 +781,12 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
                 </div>
               </div>
 
-              {/* Responsive Container */}
-              <div className={`mx-auto w-full transition-all duration-300 border border-slate-255 dark:border-slate-800 rounded-xl overflow-hidden shadow-md bg-white ${previewDevice === 'mobile' ? 'max-w-[340px]' : 'max-w-full'}`}>
+              {/* Responsive Simulated Container */}
+              <div className={`mx-auto w-full transition-all duration-300 border border-slate-200 dark:border-[#2d3139] rounded-xl overflow-hidden shadow-md bg-white ${previewDevice === 'mobile' ? 'max-w-[340px]' : 'max-w-full'}`}>
                 {/* Simulated Email Client Frame */}
-                <div className="bg-[#f0f2f5] dark:bg-[#1d2125] p-3 text-xs border-b border-slate-255 dark:border-slate-800">
-                  <p className="truncate"><span className="font-bold text-slate-500">From:</span> {senderName} &lt;no-reply@frankloo.local&gt;</p>
-                  <p className="truncate"><span className="font-bold text-slate-500">Subject:</span> {emailSubject.replace(/\{\{workspace_name\}\}/g, currentWorkspace?.name || 'Workspace')}</p>
+                <div className="bg-[#f0f2f5] dark:bg-[#161b22] p-3 text-xs border-b border-slate-255 dark:border-[#2d3139]">
+                  <p className="truncate text-slate-650 dark:text-slate-400"><span className="font-bold text-slate-500">From:</span> {senderName} &lt;no-reply@frankloo.local&gt;</p>
+                  <p className="truncate text-slate-650 dark:text-slate-400"><span className="font-bold text-slate-500">Subject:</span> {emailSubject.replace(/\{\{workspace_name\}\}/g, currentWorkspace?.name || 'Workspace')}</p>
                 </div>
                 <div
                   className={`p-4 overflow-y-auto max-h-[380px] transition-colors duration-200 ${previewTheme === 'dark' ? 'bg-[#0d1117] text-[#c9d1d9] dark-email' : 'bg-[#f6f8fa] text-[#24292f]'}`}
@@ -863,30 +797,28 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
           </div>
         )}
 
-        {/* =========================================================
-           TAB 5: SMTP SERVER CONFIGURATION
-           ========================================================= */}
+        {/* TAB 4: SMTP CONFIGURATION */}
         {activeTab === 'smtp' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start animate-fade-in divide-y lg:divide-y-0 lg:divide-x divide-slate-200 dark:divide-slate-800">
             {/* SMTP Inputs form */}
             <form onSubmit={handleSaveSmtp} className="lg:col-span-2 space-y-6 pb-8 lg:pb-0 lg:pr-8">
               <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-150 dark:border-slate-800">
-                <h3 className="font-bold text-sm text-[#091e42] dark:text-[#f0f6fc] flex items-center gap-2">
-                  <Server className="w-4 h-4 text-blue-500" /> Workspace SMTP Server Settings
+                <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Server className="w-4 h-4 text-blue-500" /> Server SMTP Connection
                 </h3>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={handleTestSmtp}
                     disabled={testingSmtp}
-                    className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 disabled:opacity-50"
+                    className="btn-secondary py-1.5 px-3 rounded-xl text-xs flex items-center gap-1.5 disabled:opacity-50 border border-slate-200 dark:border-[#2d3139]"
                   >
-                    {testingSmtp ? 'Running diagnostics...' : 'Test SMTP Connection'}
+                    {testingSmtp ? 'Running diagnostics...' : 'Test Connection'}
                   </button>
                   <button
                     type="submit"
                     disabled={updatingSmtp}
-                    className="btn-primary py-1.5 px-4 text-xs flex items-center gap-1.5 shadow-sm"
+                    className="btn-primary py-1.5 px-4 rounded-xl text-xs flex items-center gap-1.5 shadow-sm font-bold"
                   >
                     {updatingSmtp ? 'Saving configurations...' : 'Save Settings'}
                   </button>
@@ -895,24 +827,24 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="tf-label">SMTP Host Server</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500">SMTP Host Server</label>
                   <input
                     type="text"
                     value={smtpHost}
                     onChange={e => setSmtpHost(e.target.value)}
-                    placeholder="smtp.gmail.com, smtp.sendgrid.net"
-                    className="tf-input text-xs w-full"
+                    placeholder="smtp.gmail.com"
+                    className="w-full pl-3 pr-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-850 dark:text-slate-200 text-xs font-semibold"
                     required
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="tf-label">SMTP Port Number</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500">SMTP Port</label>
                   <input
                     type="text"
                     value={smtpPort}
                     onChange={e => setSmtpPort(e.target.value)}
-                    placeholder="587, 465, 25"
-                    className="tf-input text-xs w-full"
+                    placeholder="587"
+                    className="w-full pl-3 pr-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-850 dark:text-slate-200 text-xs font-semibold"
                     required
                   />
                 </div>
@@ -920,24 +852,24 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="tf-label">SMTP Username Address</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500">SMTP Username</label>
                   <input
                     type="text"
                     value={smtpUser}
                     onChange={e => setSmtpUser(e.target.value)}
                     placeholder="user@example.com"
-                    className="tf-input text-xs w-full"
+                    className="w-full pl-3 pr-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-850 dark:text-slate-200 text-xs font-semibold"
                     required
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="tf-label">SMTP Password</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500">SMTP Password</label>
                   <input
                     type="password"
                     value={smtpPass}
                     onChange={e => setSmtpPass(e.target.value)}
-                    placeholder="••••••••••••••••"
-                    className="tf-input text-xs w-full"
+                    placeholder="••••••••••••"
+                    className="w-full pl-3 pr-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-850 dark:text-slate-200 text-xs font-semibold"
                     required
                   />
                 </div>
@@ -945,13 +877,13 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="tf-label">Sender Email Address (From)</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500">Sender Email Address (From)</label>
                   <input
                     type="text"
                     value={smtpFrom}
                     onChange={e => setSmtpFrom(e.target.value)}
                     placeholder="TaskFlow Pro <no-reply@frankloo.local>"
-                    className="tf-input text-xs w-full"
+                    className="w-full pl-3 pr-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-850 dark:text-slate-200 text-xs font-semibold"
                   />
                 </div>
                 <div className="flex items-center justify-start h-full pt-4">
@@ -960,9 +892,9 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
                       type="checkbox"
                       checked={smtpSecure}
                       onChange={e => setSmtpSecure(e.target.checked)}
-                      className="rounded border-[#dfe1e6] text-blue-600 focus:ring-blue-500"
+                      className="rounded border-[#dfe1e6] dark:border-[#2d3139] bg-transparent text-blue-600 focus:ring-blue-500"
                     />
-                    <span>Force Secure Connection (SSL/TLS for port 465)</span>
+                    <span className="text-slate-650 dark:text-slate-400 font-semibold select-none">Force Secure Connection (SSL/TLS)</span>
                   </label>
                 </div>
               </div>
@@ -970,16 +902,18 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
 
             {/* Diagnostics details & info */}
             <div className="pt-8 lg:pt-0 lg:pl-8 space-y-4">
-              <h4 className="font-bold text-xs uppercase text-slate-400 tracking-wider">SMTP Support Center</h4>
-              <p className="text-xs text-[#5e6c84] dark:text-[#9fadbc] leading-relaxed">
-                Frankloo supports standard SMTP servers for delivering workspace collaborator invitations. 
+              <h4 className="font-bold text-xs uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-blue-500" /> SMTP Support Info
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-[#8d96a0] leading-relaxed">
+                TaskFlow delivers invitation messages securely through your SMTP configuration. Verify connection credentials to start sending.
               </p>
-              <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 p-4 rounded-xl text-xs space-y-2 leading-relaxed text-slate-500">
-                <p className="font-bold text-[#172b4d] dark:text-[#f0f6fc]">Recommended configs:</p>
+              <div className="bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] p-4 rounded-xl text-xs space-y-2 leading-relaxed text-slate-500">
+                <p className="font-bold text-slate-800 dark:text-slate-350">Recommended parameters:</p>
                 <ul className="list-disc pl-4 space-y-1.5 text-[11px]">
-                  <li><strong className="text-slate-700 dark:text-slate-350">Gmail:</strong> smtp.gmail.com, Port 587, Secure connection disabled, Auth via App Passwords.</li>
-                  <li><strong className="text-slate-700 dark:text-slate-350">SendGrid:</strong> smtp.sendgrid.net, Port 587, User: apikey.</li>
-                  <li><strong className="text-slate-700 dark:text-slate-350">Zoho:</strong> smtp.zoho.com, Port 465, Force Secure enabled.</li>
+                  <li><strong className="text-slate-655 dark:text-slate-400">Gmail:</strong> smtp.gmail.com, Port 587, Secure disabled, Auth via App Passwords.</li>
+                  <li><strong className="text-slate-655 dark:text-slate-400">SendGrid:</strong> smtp.sendgrid.net, Port 587, User: apikey.</li>
+                  <li><strong className="text-slate-655 dark:text-slate-400">Zoho:</strong> smtp.zoho.com, Port 465, Force Secure enabled.</li>
                 </ul>
               </div>
             </div>
@@ -987,6 +921,63 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
         )}
 
       </div>
+
+      {/* ── Send Invitation Modal Drawer overlay ── */}
+      {sendInviteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setSendInviteModalOpen(false)}>
+          <div className="bg-white dark:bg-[#161b22] border border-slate-250 dark:border-[#30363d] rounded-2xl p-5 w-full max-w-md shadow-2xl animate-scale-in text-xs" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-205">Dispatch Workspace Invites</h3>
+              <button onClick={() => setSendInviteModalOpen(false)} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/5 text-slate-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={(e) => { handleSendInvitations(e).then(() => { setSendInviteModalOpen(false); }); }} className="space-y-4 pt-4">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500 mb-1">Emails / Usernames (separated by comma, semicolon or newline)</label>
+                <textarea
+                  value={emailsInput}
+                  onChange={e => setEmailsInput(e.target.value)}
+                  placeholder="colleague@example.com, support@team.org"
+                  className="w-full pl-3 pr-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-850 dark:text-slate-200 text-xs font-semibold h-24 resize-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500 mb-1">Collaborator Role</label>
+                <select
+                  value={inviteRole}
+                  onChange={e => setInviteRole(e.target.value as any)}
+                  className="w-full pl-3 pr-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-850 dark:text-slate-200 text-xs font-semibold cursor-pointer"
+                >
+                  <option value="MEMBER">Member (standard collaborate, create cards/lists)</option>
+                  <option value="ADMIN">Admin (managing boards, members, integrations)</option>
+                  <option value="VIEWER">Guest (read-only, view boards/wiki docs)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500 mb-1">Custom Message (Included in email template)</label>
+                <textarea
+                  value={customMessage}
+                  onChange={e => setCustomMessage(e.target.value)}
+                  placeholder="Hi! Join our team workspace to collaborate on tasks."
+                  className="w-full pl-3 pr-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-850 dark:text-slate-200 text-xs font-semibold h-20 resize-none"
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2 border-t border-slate-100 dark:border-slate-850">
+                <button type="button" onClick={() => setSendInviteModalOpen(false)} className="btn-secondary py-2 px-4 rounded-xl text-xs font-bold">Cancel</button>
+                <button type="submit" disabled={sendingInvites} className="btn-primary py-2 px-4 rounded-xl text-xs font-bold">
+                  {sendingInvites ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Dispatch Invites
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -351,10 +351,11 @@ interface AppState {
   deleteBoard: (boardId: string) => Promise<void>;
   duplicateBoard: (boardId: string) => Promise<Board>;
   setCurrentBoard: (board: Board | null) => void;
+  fetchArchivedItems: (boardId: string) => Promise<{ lists: any[]; cards: any[] }>;
   
   // Lists
   createList: (boardId: string, name: string, position: number) => Promise<void>;
-  updateList: (boardId: string, listId: string, name: string, position?: number) => Promise<void>;
+  updateList: (boardId: string, listId: string, name?: string, position?: number, isArchived?: boolean) => Promise<void>;
   deleteList: (boardId: string, listId: string) => Promise<void>;
   archiveList: (boardId: string, listId: string) => Promise<void>;
   
@@ -400,6 +401,9 @@ interface AppState {
   mockIncomingInboxItems: (workspaceId: string) => Promise<void>;
   fetchEmailLogs: (workspaceId: string, boardId: string) => Promise<any[]>;
   sendTestEmail: (workspaceId: string, boardId: string) => Promise<void>;
+  parseEmailIntelligently: (title: string, text: string, html: string) => Promise<any>;
+  checkDuplicates: (boardId: string, title: string) => Promise<any>;
+  mergeCard: (data: { cardId: string; inboxItemId: string; description?: string; checklist?: string[]; labels?: string[] }) => Promise<any>;
 
   // Gmail Integration Actions
   fetchGmailProfile: () => Promise<void>;
@@ -1113,14 +1117,25 @@ export const useStore = create<AppState>((set, get) => ({
     await get().fetchBoardDetails(boardId);
   },
 
-  updateList: async (boardId, listId, name, position) => {
+  updateList: async (boardId, listId, name, position, isArchived) => {
     const res = await fetch(`${API_URL}/boards/${boardId}/lists/${listId}`, {
       method: 'PUT',
       headers: getHeaders(get().token),
-      body: JSON.stringify({ name, position })
+      body: JSON.stringify({ name, position, isArchived })
     });
     if (!res.ok) throw new Error('Error updating list');
     await get().fetchBoardDetails(boardId);
+  },
+
+  fetchArchivedItems: async (boardId) => {
+    const res = await fetch(`${API_URL}/boards/${boardId}/archived-items`, {
+      headers: getHeaders(get().token)
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Server returned ${res.status}: ${errText || res.statusText}`);
+    }
+    return await res.json();
   },
 
   deleteList: async (boardId, listId) => {
@@ -1408,6 +1423,46 @@ export const useStore = create<AppState>((set, get) => ({
     if (currentWorkspace) {
       await get().fetchWorkspaceDetails(currentWorkspace.id);
     }
+  },
+
+  parseEmailIntelligently: async (title, text, html) => {
+    const res = await fetch(`${API_URL}/inbox/parse-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ title, text, html })
+    });
+    if (!res.ok) throw new Error('Failed to parse email');
+    return await res.json();
+  },
+
+  checkDuplicates: async (boardId, title) => {
+    const res = await fetch(`${API_URL}/inbox/check-duplicates`, {
+      method: 'POST',
+      headers: getHeaders(get().token),
+      body: JSON.stringify({ boardId, title })
+    });
+    if (!res.ok) throw new Error('Failed to check duplicates');
+    return await res.json();
+  },
+
+  mergeCard: async (data) => {
+    const res = await fetch(`${API_URL}/inbox/merge-card`, {
+      method: 'POST',
+      headers: getHeaders(get().token),
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to merge card');
+    const result = await res.json();
+    
+    // Refresh workspace details to show card changes
+    const currentWorkspace = get().currentWorkspace;
+    if (currentWorkspace) {
+      await get().fetchWorkspaceDetails(currentWorkspace.id);
+    }
+    
+    return result;
   },
 
   fetchEmailLogs: async (workspaceId, boardId) => {

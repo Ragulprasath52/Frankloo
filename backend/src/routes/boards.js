@@ -361,16 +361,30 @@ router.post('/:boardId/lists', authenticate, checkBoardAccess, async (req, res) 
 router.put('/:boardId/lists/:listId', authenticate, checkBoardAccess, async (req, res) => {
   try {
     const { listId, boardId } = req.params;
-    const { name, position } = req.body;
+    const { name, position, isArchived } = req.body;
+
+    const dataObj = {};
+    if (name !== undefined) dataObj.name = name;
+    if (position !== undefined) dataObj.position = position;
+    if (isArchived !== undefined) dataObj.isArchived = isArchived;
 
     const list = await prisma.list.update({
       where: { id: listId },
-      data: { name, position }
+      data: dataObj
     });
+
+    if (isArchived === false) {
+      // Also unarchive all cards in this list
+      await prisma.card.updateMany({
+        where: { listId },
+        data: { isArchived: false }
+      });
+    }
 
     notifyBoardUpdate(boardId, 'LIST_UPDATE', list);
     res.json(list);
   } catch (error) {
+    console.error('Update list error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -395,6 +409,7 @@ router.delete('/:boardId/lists/:listId', authenticate, checkBoardAccess, async (
 router.patch('/:boardId/lists/:listId/archive', authenticate, checkBoardAccess, async (req, res) => {
   try {
     const { listId, boardId } = req.params;
+    console.log(`[ARCHIVE LIST] boardId = ${boardId}, listId = ${listId}`);
 
     const list = await prisma.list.update({
       where: { id: listId },
@@ -483,7 +498,7 @@ router.post('/:boardId/lists/:listId/cards', authenticate, checkBoardAccess, asy
 router.put('/:boardId/cards/:cardId', authenticate, checkBoardAccess, async (req, res) => {
   try {
     const { boardId, cardId } = req.params;
-    const { 
+    let { 
       title, description, position, listId, isArchived, dueDate, priority, 
       coverImage, estimatedTime, loggedTime, customFields, recurringCron, milestoneId, sprintId,
       githubPrUrl, githubCommits
@@ -492,6 +507,22 @@ router.put('/:boardId/cards/:cardId', authenticate, checkBoardAccess, async (req
     const oldCard = await prisma.card.findUnique({
       where: { id: cardId }
     });
+
+    if (isArchived === false) {
+      const currentListId = listId || oldCard.listId;
+      const list = await prisma.list.findUnique({
+        where: { id: currentListId }
+      });
+      if (list && list.isArchived) {
+        const activeList = await prisma.list.findFirst({
+          where: { boardId, isArchived: false },
+          orderBy: { position: 'asc' }
+        });
+        if (activeList) {
+          listId = activeList.id;
+        }
+      }
+    }
 
     const updated = await prisma.card.update({
       where: { id: cardId },
@@ -982,6 +1013,36 @@ router.post('/:boardId/cards/:cardId/pomodoro', authenticate, checkBoardAccess, 
     res.status(201).json(session);
   } catch (error) {
     res.status(500).json({ error: 'Error saving Pomodoro session' });
+  }
+});
+
+// GET archived items (lists and cards)
+router.get('/:boardId/archived-items', authenticate, checkBoardAccess, async (req, res) => {
+  try {
+    const { boardId } = req.params;
+    console.log(`[GET ARCHIVED ITEMS] boardId = ${boardId}`);
+
+    const lists = await prisma.list.findMany({
+      where: { boardId, isArchived: true },
+      orderBy: { position: 'asc' }
+    });
+
+    const cards = await prisma.card.findMany({
+      where: {
+        isArchived: true,
+        list: { boardId }
+      },
+      include: {
+        list: { select: { name: true } }
+      },
+      orderBy: { position: 'asc' }
+    });
+
+    console.log(`[GET ARCHIVED ITEMS] Found ${lists.length} lists, ${cards.length} cards`);
+    res.json({ lists, cards });
+  } catch (error) {
+    console.error('Get archived items error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

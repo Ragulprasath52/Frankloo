@@ -21,7 +21,8 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
   const { 
     currentWorkspace, inboxItems, fetchInboxItems, convertInboxItem, 
     sendTestEmail, fetchEmailLogs, addToast, deleteInboxItem, updateInboxItem,
-    gmailRules, fetchGmailRules, createGmailRule, deleteGmailRule, updateBoard
+    gmailRules, fetchGmailRules, createGmailRule, deleteGmailRule, updateBoard,
+    parseEmailIntelligently, checkDuplicates, mergeCard
   } = useStore();
 
   const [selectedBoardId, setSelectedBoardId] = useState<string>('');
@@ -48,6 +49,15 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
   const [convertedCardId, setConvertedCardId] = useState<string | null>(null);
   const [converting, setConverting] = useState(false);
   const [saveAsDefaultPreferences, setSaveAsDefaultPreferences] = useState(false);
+
+  // Advanced Parser & Duplicate Check states
+  const [convertItemTitle, setConvertItemTitle] = useState('');
+  const [convertItemDescription, setConvertItemDescription] = useState('');
+  const [loadingParsing, setLoadingParsing] = useState(false);
+  const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
+  const [duplicateList, setDuplicateList] = useState<any[]>([]);
+  const [highlights, setHighlights] = useState<any>(null);
+  const [hoveredField, setHoveredField] = useState<string | null>(null);
 
   // Settings states
   const [emailEnabled, setEmailEnabled] = useState(true);
@@ -248,30 +258,66 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
     }
   };
 
-  const handleOpenConvert = (item: any) => {
+  const handleOpenConvert = async (item: any) => {
     const details = JSON.parse(item.sourceDetails || '{}');
     setConvertItem(item);
-    setConvertBoardId(item.boardId || selectedBoardId || '');
-    
-    // Autofill defaults from board settings
-    const bId = item.boardId || selectedBoardId;
-    const matchedBoard = currentWorkspace?.boards?.find(b => b.id === bId);
-    
-    setConvertPriority(matchedBoard?.incomingEmailDefaultPriority || item.priority || 'MEDIUM');
-    setConvertLabels(matchedBoard?.incomingEmailDefaultLabelIds || '');
-    setConvertAssignees(matchedBoard?.incomingEmailAutoAssigneeIds ? matchedBoard.incomingEmailAutoAssigneeIds.split(',').filter(Boolean) : []);
-    setConvertDueDate('');
+    setConvertModalOpen(true);
     setConvertedCardId(null);
-    setConvertChecklist(details.checklists || []);
-    setSaveAsDefaultPreferences(false);
-    
+    setHighlights(null);
+    setHoveredField(null);
+    setDuplicateList([]);
+    setDuplicateWarningOpen(false);
+
+    const bId = item.boardId || selectedBoardId || currentWorkspace?.boards?.[0]?.id || '';
+    setConvertBoardId(bId);
+
+    const matchedBoard = currentWorkspace?.boards?.find(b => b.id === bId);
     if (matchedBoard && matchedBoard.lists && matchedBoard.lists.length > 0) {
       setConvertListId(matchedBoard.incomingEmailListId || matchedBoard.lists[0].id);
     } else {
       setConvertListId('');
     }
 
-    setConvertModalOpen(true);
+    setLoadingParsing(true);
+
+    try {
+      const parsedData = await parseEmailIntelligently(item.title, details.text || '', details.html || '');
+
+      setConvertItemTitle(parsedData.title || item.title);
+      setConvertItemDescription(parsedData.description || '');
+      setConvertPriority(parsedData.priority || matchedBoard?.incomingEmailDefaultPriority || 'MEDIUM');
+      
+      if (parsedData.dueDate) {
+        setConvertDueDate(parsedData.dueDate.substring(0, 16));
+      } else {
+        setConvertDueDate('');
+      }
+
+      setConvertLabels(parsedData.labels && parsedData.labels.length > 0 ? parsedData.labels.join(', ') : (matchedBoard?.incomingEmailDefaultLabelIds || ''));
+      setConvertAssignees(matchedBoard?.incomingEmailAutoAssigneeIds ? matchedBoard.incomingEmailAutoAssigneeIds.split(',').filter(Boolean) : []);
+      setConvertChecklist(parsedData.checklist && parsedData.checklist.length > 0 ? parsedData.checklist : (details.checklists || []));
+      setHighlights(parsedData.highlights || null);
+
+      if (bId) {
+        const dupResult = await checkDuplicates(bId, parsedData.title || item.title);
+        if (dupResult.hasDuplicates) {
+          setDuplicateList(dupResult.duplicates);
+          setDuplicateWarningOpen(true);
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      addToast('Parser Notice', 'Failed to intelligently parse email. Reverting to basic details.', 'info');
+      setConvertItemTitle(item.title);
+      setConvertItemDescription(item.description || '');
+      setConvertPriority(matchedBoard?.incomingEmailDefaultPriority || 'MEDIUM');
+      setConvertLabels(matchedBoard?.incomingEmailDefaultLabelIds || '');
+      setConvertAssignees(matchedBoard?.incomingEmailAutoAssigneeIds ? matchedBoard.incomingEmailAutoAssigneeIds.split(',').filter(Boolean) : []);
+      setConvertDueDate('');
+      setConvertChecklist(details.checklists || []);
+    } finally {
+      setLoadingParsing(false);
+    }
   };
 
   useEffect(() => {
@@ -282,8 +328,48 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
       } else {
         setConvertListId('');
       }
+
+      if (convertItemTitle) {
+        const recheck = async () => {
+          try {
+            const dupResult = await checkDuplicates(convertBoardId, convertItemTitle);
+            if (dupResult.hasDuplicates) {
+              setDuplicateList(dupResult.duplicates);
+              setDuplicateWarningOpen(true);
+            } else {
+              setDuplicateList([]);
+              setDuplicateWarningOpen(false);
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        };
+        recheck();
+      }
     }
-  }, [convertBoardId]);
+  }, [convertBoardId, convertItemTitle]);
+
+  const handleMergeSubmit = async (existingCardId: string) => {
+    if (!convertItem) return;
+    setConverting(true);
+    try {
+      await mergeCard({
+        cardId: existingCardId,
+        inboxItemId: convertItem.id,
+        description: convertItemDescription,
+        checklist: convertChecklist,
+        labels: convertLabels.split(',').map(l => l.trim()).filter(Boolean)
+      });
+      addToast('Card Merged', 'Email successfully merged into the existing card.', 'success');
+      setConvertModalOpen(false);
+      setDuplicateWarningOpen(false);
+      fetchInboxItems(workspaceId);
+    } catch (err: any) {
+      addToast('Merge Failed', err.message || 'Server error merging card', 'error');
+    } finally {
+      setConverting(false);
+    }
+  };
 
   const handleAddConvertChecklist = () => {
     if (newChecklistItem.trim()) {
@@ -307,7 +393,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
       const labelsArray = convertLabels.split(',')
         .map(l => l.trim())
         .filter(Boolean)
-        .map(name => ({ name, color: '#36b37e' }));
+        .map(name => ({ name, color: '#0969da' }));
 
       const payload = {
         boardId: convertBoardId,
@@ -316,7 +402,9 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
         labels: labelsArray,
         priority: convertPriority,
         dueDate: convertDueDate ? new Date(convertDueDate).toISOString() : null,
-        checklist: convertChecklist
+        checklist: convertChecklist,
+        title: convertItemTitle,
+        description: convertItemDescription
       };
 
       // Save defaults if toggled
@@ -336,7 +424,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
 
       setTimeout(async () => {
         const boardDetail = await useStore.getState().fetchBoardDetails(convertBoardId);
-        const card = boardDetail.lists.flatMap(l => l.cards).find(c => c.title === convertItem.title);
+        const card = boardDetail.lists.flatMap(l => l.cards).find(c => c.title === convertItemTitle);
         if (card) {
           setConvertedCardId(card.id);
         } else {
@@ -1263,8 +1351,9 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="px-4 py-3.5 border-b border-gray-150 dark:border-gray-850 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 bg-slate-50 dark:bg-[#161a22]">
-              <div className="flex items-center justify-between sm:justify-start gap-3">
+            <div className="px-4 py-3 border-b border-gray-150 dark:border-gray-850 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 bg-slate-50 dark:bg-[#161a22]">
+              {/* Left metadata container */}
+              <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
                 <div className="flex items-center gap-2">
                   <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-655 dark:text-indigo-400 font-bold rounded-full text-[10px]">
                     Email Preview
@@ -1280,23 +1369,24 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                   <X className="w-4 h-4 shrink-0" />
                 </button>
               </div>
-              
-              <div className="flex flex-wrap items-center gap-1.5">
+
+              {/* Right action buttons container */}
+              <div className="flex items-center gap-1.5 w-full sm:w-auto">
                 {selectedEmail.status === 'NEW' ? (
                   <button
                     onClick={() => { handleOpenConvert(selectedEmail); }}
-                    className="btn-primary py-1.5 px-3 text-xs rounded-xl font-bold flex items-center gap-1 shadow-sm flex-1 sm:flex-initial justify-center"
+                    className="btn-primary py-1.5 px-3 text-xs rounded-xl font-bold flex items-center justify-center gap-1 shadow-sm flex-1 sm:flex-initial"
                   >
                     <Plus className="w-4 h-4" /> Convert
                   </button>
                 ) : (
-                  <span className="px-3 py-1 bg-emerald-500/10 text-emerald-655 dark:text-emerald-450 text-xs font-bold rounded-xl inline-flex items-center gap-1 border border-emerald-500/20">
+                  <span className="px-3 py-1.5 bg-emerald-500/10 text-emerald-655 dark:text-emerald-450 text-xs font-bold rounded-xl inline-flex items-center justify-center gap-1 border border-emerald-500/20 flex-1 sm:flex-initial">
                     <Check className="w-4 h-4" /> Converted
                   </span>
                 )}
                 <button
                   onClick={(e) => handleArchiveInboxItem(selectedEmail.id, e)}
-                  className="btn-secondary py-1.5 px-2.5 text-xs rounded-xl flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                  className="btn-secondary py-1.5 px-2.5 text-xs rounded-xl flex items-center justify-center gap-1 flex-1 sm:flex-initial"
                   title="Archive email"
                 >
                   <Archive className="w-3.5 h-3.5" /> Archive
@@ -1304,7 +1394,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                 {isEditor && (
                   <button
                     onClick={(e) => handleDeleteInboxItem(selectedEmail.id, e)}
-                    className="btn-secondary py-1.5 px-2.5 text-xs rounded-xl text-red-500 border-red-500/10 hover:bg-red-500/5 hover:border-red-500/20 flex items-center gap-1 flex-1 sm:flex-initial justify-center"
+                    className="btn-secondary py-1.5 px-2.5 text-xs rounded-xl text-red-500 border-red-500/10 hover:bg-red-500/5 hover:border-red-500/20 flex items-center justify-center gap-1 flex-1 sm:flex-initial"
                     title="Delete permanently"
                   >
                     <Trash2 className="w-3.5 h-3.5" /> Delete
@@ -1393,7 +1483,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                 </pre>
               ) : (
                 <div 
-                  className="bg-white p-4 rounded-xl border border-gray-200 text-black overflow-x-auto min-h-[160px] select-text"
+                  className="bg-white p-4 rounded-xl border border-gray-250 text-black overflow-x-auto min-h-[160px] select-text email-content-wrapper"
                   dangerouslySetInnerHTML={{ __html: JSON.parse(selectedEmail.sourceDetails || '{}').html || selectedEmail.description }}
                 />
               )}
@@ -1406,23 +1496,28 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
       {convertModalOpen && convertItem && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-[999] flex items-center justify-center p-4">
           <div 
-            className="w-full max-w-lg bg-white dark:bg-[#161a22] border border-gray-250 dark:border-[#30363d] rounded-2xl shadow-2xl p-5 md:p-6 animate-scale-in relative text-xs"
+            className="w-full max-w-lg md:max-w-5xl bg-white dark:bg-[#161a22] border border-gray-250 dark:border-[#30363d] rounded-2xl shadow-2xl p-4 md:p-6 animate-scale-in relative text-xs max-h-[90vh] flex flex-col overflow-y-auto md:overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             <button 
               onClick={() => setConvertModalOpen(false)}
-              className="absolute right-4 top-4 btn-icon p-1 rounded-lg"
+              className="absolute right-4 top-4 btn-icon p-1 rounded-lg z-10"
             >
               <X className="w-4.5 h-4.5" />
             </button>
 
-            <h3 className="font-bold text-sm text-[#172b4d] dark:text-[#b6c2cf] mb-3 flex items-center gap-2 border-b border-gray-100 dark:border-gray-850 pb-2">
+            <h3 className="font-bold text-sm text-[#172b4d] dark:text-[#b6c2cf] mb-3 flex items-center gap-2 border-b border-gray-100 dark:border-gray-850 pb-2 shrink-0">
               <CheckSquare className="w-4.5 h-4.5 text-indigo-500" /> Convert Email to Task Card
             </h3>
 
-            {convertedCardId ? (
-              <div className="py-6 text-center space-y-4 animate-scale-in">
-                <div className="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-650 dark:text-emerald-450 flex items-center justify-center mx-auto text-xl font-bold animate-bounce border border-emerald-500/20">
+            {loadingParsing ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-3 flex-grow">
+                <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
+                <span className="text-gray-500 font-bold">Intelligently parsing email body and detecting entities...</span>
+              </div>
+            ) : convertedCardId ? (
+              <div className="py-6 text-center space-y-4 animate-scale-in flex-grow flex flex-col justify-center">
+                <div className="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-655 dark:text-emerald-450 flex items-center justify-center mx-auto text-xl font-bold animate-bounce border border-emerald-500/20">
                   ✓
                 </div>
                 <div>
@@ -1447,162 +1542,341 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                   </button>
                 </div>
               </div>
-            ) : (
-              <form onSubmit={handleConvertSubmit} className="space-y-4">
-                <div className="bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-gray-200 dark:border-gray-800">
-                  <span className="text-[9px] text-gray-400 font-bold block uppercase mb-1">Card Subject Title</span>
-                  <span className="font-bold text-slate-800 dark:text-slate-200 block text-xs truncate leading-snug">{convertItem.title}</span>
+            ) : duplicateWarningOpen && duplicateList.length > 0 ? (
+              <div className="py-6 space-y-4 flex-grow flex flex-col justify-center overflow-y-auto text-slate-800 dark:text-[#c9d1d9]">
+                <div className="bg-amber-500/10 border border-amber-500/35 p-4 rounded-xl space-y-2 text-[#b07b1d] dark:text-amber-450">
+                  <div className="flex items-center gap-2 font-bold text-sm">
+                    <ShieldAlert className="w-5 h-5 shrink-0" />
+                    <span>Similar task already exists on this board</span>
+                  </div>
+                  <p className="text-xs">We detected existing cards with similar titles. You can merge this email into an existing card or create a new card anyway.</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="tf-label font-bold">Target Board</label>
-                    <select
-                      value={convertBoardId}
-                      onChange={e => setConvertBoardId(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-white/5 border border-slate-250 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none"
-                      required
-                    >
-                      {currentWorkspace?.boards?.map(b => (
-                        <option key={b.id} value={b.id}>{b.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="tf-label font-bold">Target Column</label>
-                    <select
-                      value={convertListId}
-                      onChange={e => setConvertListId(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-white/5 border border-slate-250 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none"
-                      required
-                    >
-                      <option value="">-- Choose Column --</option>
-                      {currentWorkspace?.boards?.find(b => b.id === convertBoardId)?.lists?.map(l => (
-                        <option key={l.id} value={l.id}>{l.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="tf-label font-bold">Priority</label>
-                    <select
-                      value={convertPriority}
-                      onChange={e => setConvertPriority(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-white/5 border border-slate-250 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none"
-                    >
-                      <option value="LOW">Low</option>
-                      <option value="MEDIUM">Medium</option>
-                      <option value="HIGH">High</option>
-                      <option value="URGENT">Urgent</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="tf-label font-bold">Due Date (Optional)</label>
-                    <input
-                      type="datetime-local"
-                      value={convertDueDate}
-                      onChange={e => setConvertDueDate(e.target.value)}
-                      className="tf-input rounded-xl py-2"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="tf-label font-bold">Card Labels (Comma-separated)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Client, Urgent, Redesign"
-                    value={convertLabels}
-                    onChange={e => setConvertLabels(e.target.value)}
-                    className="tf-input rounded-xl"
-                  />
-                </div>
-
-                {/* Checklist block */}
-                <div>
-                  <label className="tf-label font-bold mb-1 block">Checklist Items ({convertChecklist.length})</label>
-                  <div className="space-y-1.5 max-h-24 overflow-y-auto mb-2 border border-gray-200 dark:border-gray-800 p-2.5 rounded-xl bg-slate-50 dark:bg-white/5">
-                    {convertChecklist.map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between gap-2 p-1 px-2.5 bg-white dark:bg-[#1d2125] border border-gray-150 dark:border-gray-800 rounded-lg">
-                        <span className="truncate flex-1 pr-1 font-medium">{item}</span>
-                        <button 
-                          type="button" 
-                          onClick={() => handleRemoveConvertChecklist(idx)}
-                          className="text-red-500 hover:text-red-700 font-bold shrink-0 px-1"
+                <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-150 dark:border-gray-800 p-3 rounded-xl">
+                  {duplicateList.map(dup => (
+                    <div key={dup.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-slate-50 dark:bg-white/5 border border-gray-150 dark:border-gray-800 rounded-xl hover:border-gray-300 dark:hover:border-gray-700 transition-all">
+                      <div className="space-y-1">
+                        <span className="font-bold text-slate-800 dark:text-slate-200 block text-xs">{dup.title}</span>
+                        <span className="text-[10px] text-gray-450 block">Column: {dup.listName} • Similarity: <span className="font-bold text-indigo-500">{dup.similarity}%</span></span>
+                      </div>
+                      <div className="flex gap-1.5 shrink-0 w-full sm:w-auto">
+                        <button
+                          type="button"
+                          onClick={() => handleMergeSubmit(dup.id)}
+                          className="btn-primary py-1.5 px-3 text-[10px] rounded-lg bg-amber-600 hover:bg-amber-700 flex-1 sm:flex-initial"
                         >
-                          ✕
+                          Merge
                         </button>
                       </div>
-                    ))}
-                    {convertChecklist.length === 0 && (
-                      <span className="text-[10px] text-gray-400 block text-center py-2">No checklist items. Add one below.</span>
-                    )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-2.5 justify-end border-t border-gray-100 dark:border-gray-850 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setDuplicateWarningOpen(false)}
+                    className="btn-secondary py-2 px-4 rounded-xl font-bold text-indigo-655 dark:text-indigo-400 border border-indigo-500/10 bg-indigo-500/5 hover:bg-indigo-500/10"
+                  >
+                    Create Anyway
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConvertModalOpen(false)}
+                    className="btn-secondary py-2 px-4 rounded-xl"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col md:flex-row gap-5 md:overflow-hidden flex-grow text-slate-800 dark:text-[#c9d1d9] min-h-0">
+                {/* Left Side: Email Plain Text Reference (Hidden on Mobile) */}
+                <div className="hidden md:flex flex-col md:w-5/12 border-r border-gray-150 dark:border-gray-800 pr-5 h-full overflow-hidden">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 shrink-0">
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Email Source Reference</span>
                   </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Add checklist item..."
-                      value={newChecklistItem}
-                      onChange={e => setNewChecklistItem(e.target.value)}
-                      className="tf-input rounded-xl"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddConvertChecklist}
-                      className="btn-secondary py-1 px-3.5 rounded-xl font-bold shrink-0 text-indigo-650 dark:text-indigo-400"
+                  <div className="flex-grow bg-slate-50 dark:bg-white/5 border border-gray-150 dark:border-gray-800 p-3.5 rounded-xl overflow-y-auto font-mono text-[10px]">
+                    {(() => {
+                      const details = JSON.parse(convertItem.sourceDetails || '{}');
+                      const emailText = details.text || convertItem.description || '';
+                      
+                      let escaped = emailText
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;');
+                        
+                      if (!hoveredField || !highlights) {
+                        return <pre className="whitespace-pre-wrap font-sans text-xs text-slate-700 dark:text-[#8d96a0] leading-relaxed select-text">{escaped}</pre>;
+                      }
+                      
+                      let targetText = '';
+                      if (hoveredField === 'title' && highlights.title) {
+                        targetText = highlights.title.text;
+                      } else if (hoveredField === 'priority' && highlights.priority) {
+                        targetText = highlights.priority.text;
+                      } else if (hoveredField === 'dueDate' && highlights.dueDate) {
+                        targetText = highlights.dueDate.text;
+                      } else if (hoveredField.startsWith('labels.') && highlights.labels) {
+                        const labelKey = hoveredField.split('.')[1];
+                        if (highlights.labels[labelKey]) {
+                          targetText = highlights.labels[labelKey].text;
+                        }
+                      } else if (hoveredField.startsWith('checklist.') && highlights.checklist) {
+                        const idx = parseInt(hoveredField.split('.')[1]);
+                        if (highlights.checklist[idx]) {
+                          targetText = highlights.checklist[idx].text;
+                        }
+                      }
+                      
+                      if (!targetText) {
+                        return <pre className="whitespace-pre-wrap font-sans text-xs text-slate-700 dark:text-[#8d96a0] leading-relaxed select-text">{escaped}</pre>;
+                      }
+                      
+                      const idx = escaped.toLowerCase().indexOf(targetText.toLowerCase());
+                      if (idx === -1) {
+                        return <pre className="whitespace-pre-wrap font-sans text-xs text-slate-700 dark:text-[#8d96a0] leading-relaxed select-text">{escaped}</pre>;
+                      }
+                      
+                      const before = escaped.substring(0, idx);
+                      const match = escaped.substring(idx, idx + targetText.length);
+                      const after = escaped.substring(idx + targetText.length);
+                      
+                      return (
+                        <pre className="whitespace-pre-wrap font-sans text-xs text-slate-700 dark:text-[#8d96a0] leading-relaxed select-text">
+                          {before}
+                          <mark className="bg-amber-400/30 dark:bg-amber-500/20 text-amber-900 dark:text-amber-250 px-1 py-0.5 rounded font-semibold border-b border-amber-500 shadow-sm animate-pulse">
+                            {match}
+                          </mark>
+                          {after}
+                        </pre>
+                      );
+                    })()}
+                  </div>
+                  <span className="text-[9px] text-gray-400 mt-2 shrink-0">Hovering over fields in the form will highlight their parsed origin in the email text above.</span>
+                </div>
+
+                {/* Right Side: Actionable Card Preview Form */}
+                <form onSubmit={handleConvertSubmit} className="flex-1 flex flex-col min-h-0 h-full overflow-hidden">
+                  <div className="space-y-3 flex-grow overflow-y-auto pr-2 min-h-0 max-h-[40vh] md:max-h-[50vh]">
+                    <div 
+                      className="bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-gray-200 dark:border-gray-800 transition-all hover:border-indigo-500"
+                      onMouseEnter={() => setHoveredField('title')}
+                      onMouseLeave={() => setHoveredField(null)}
                     >
-                      Add
+                      <label className="text-[9px] text-gray-400 font-bold block uppercase mb-1">Task Title</label>
+                      <input
+                        type="text"
+                        value={convertItemTitle}
+                        onChange={e => setConvertItemTitle(e.target.value)}
+                        className="w-full bg-transparent font-bold text-slate-800 dark:text-slate-200 text-xs focus:outline-none border-b border-transparent focus:border-indigo-500 pb-0.5"
+                        required
+                        placeholder="Task title"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="tf-label font-bold">Description</label>
+                      <textarea
+                        value={convertItemDescription}
+                        onChange={e => setConvertItemDescription(e.target.value)}
+                        rows={3}
+                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-250 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none font-sans text-xs text-slate-805 dark:text-slate-205"
+                        placeholder="Describe the task details..."
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="tf-label font-bold">Target Board</label>
+                        <select
+                          value={convertBoardId}
+                          onChange={e => setConvertBoardId(e.target.value)}
+                          className="w-full bg-slate-50 dark:bg-white/5 border border-slate-250 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none text-slate-800 dark:text-slate-200"
+                          required
+                        >
+                          {currentWorkspace?.boards?.map(b => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="tf-label font-bold">Target Column</label>
+                        <select
+                          value={convertListId}
+                          onChange={e => setConvertListId(e.target.value)}
+                          className="w-full bg-slate-50 dark:bg-white/5 border border-slate-250 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none text-slate-800 dark:text-slate-200"
+                          required
+                        >
+                          <option value="">-- Choose Column --</option>
+                          {currentWorkspace?.boards?.find(b => b.id === convertBoardId)?.lists?.map(l => (
+                            <option key={l.id} value={l.id}>{l.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div
+                        onMouseEnter={() => setHoveredField('priority')}
+                        onMouseLeave={() => setHoveredField(null)}
+                        className="transition-all rounded-xl"
+                      >
+                        <label className="tf-label font-bold">Priority</label>
+                        <select
+                          value={convertPriority}
+                          onChange={e => setConvertPriority(e.target.value)}
+                          className="w-full bg-slate-50 dark:bg-white/5 border border-slate-250 dark:border-slate-800 p-2.5 rounded-xl focus:outline-none text-slate-800 dark:text-slate-200"
+                        >
+                          <option value="LOW">Low</option>
+                          <option value="MEDIUM">Medium</option>
+                          <option value="HIGH">High</option>
+                          <option value="URGENT">Urgent</option>
+                        </select>
+                      </div>
+
+                      <div
+                        onMouseEnter={() => setHoveredField('dueDate')}
+                        onMouseLeave={() => setHoveredField(null)}
+                      >
+                        <label className="tf-label font-bold">Due Date (Optional)</label>
+                        <input
+                          type="datetime-local"
+                          value={convertDueDate}
+                          onChange={e => setConvertDueDate(e.target.value)}
+                          className="tf-input rounded-xl py-2 text-slate-800 dark:text-slate-200"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="tf-label font-bold">Card Labels (Comma-separated)</label>
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {convertLabels.split(',').map(l => l.trim()).filter(Boolean).map(lbl => (
+                          <span 
+                            key={lbl} 
+                            onMouseEnter={() => setHoveredField(`labels.${lbl}`)}
+                            onMouseLeave={() => setHoveredField(null)}
+                            className="px-2 py-0.5 bg-blue-500/10 text-blue-655 dark:text-blue-400 font-semibold rounded-lg text-[10px] border border-blue-500/20 flex items-center gap-1 transition-all hover:bg-blue-500/25"
+                          >
+                            <span>{lbl}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newLabels = convertLabels.split(',')
+                                  .map(l => l.trim())
+                                  .filter(l => l.toLowerCase() !== lbl.toLowerCase())
+                                  .join(', ');
+                                setConvertLabels(newLabels);
+                              }}
+                              className="text-blue-550 hover:text-blue-700 font-bold ml-0.5"
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="e.g. Client, Urgent, Redesign"
+                        value={convertLabels}
+                        onChange={e => setConvertLabels(e.target.value)}
+                        className="tf-input rounded-xl"
+                      />
+                    </div>
+
+                    {/* Checklist block */}
+                    <div>
+                      <label className="tf-label font-bold mb-1 block">Checklist Items ({convertChecklist.length})</label>
+                      <div className="space-y-1.5 max-h-24 overflow-y-auto mb-2 border border-gray-200 dark:border-gray-800 p-2.5 rounded-xl bg-slate-50 dark:bg-white/5">
+                        {convertChecklist.map((item, idx) => (
+                          <div 
+                            key={idx} 
+                            onMouseEnter={() => setHoveredField(`checklist.${idx}`)}
+                            onMouseLeave={() => setHoveredField(null)}
+                            className="flex items-center justify-between gap-2 p-1 px-2.5 bg-white dark:bg-[#1d2125] border border-gray-150 dark:border-gray-800 rounded-lg hover:border-indigo-500 transition-all text-slate-805 dark:text-slate-205"
+                          >
+                            <span className="truncate flex-1 pr-1 font-medium">{item}</span>
+                            <button 
+                              type="button" 
+                              onClick={() => handleRemoveConvertChecklist(idx)}
+                              className="text-red-500 hover:text-red-700 font-bold shrink-0 px-1"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                        {convertChecklist.length === 0 && (
+                          <span className="text-[10px] text-gray-405 block text-center py-2">No checklist items. Add one below.</span>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Add checklist item..."
+                          value={newChecklistItem}
+                          onChange={e => setNewChecklistItem(e.target.value)}
+                          className="tf-input rounded-xl"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddConvertChecklist}
+                          className="btn-secondary py-1 px-3.5 rounded-xl font-bold shrink-0 text-indigo-655 dark:text-indigo-400"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Member selection block */}
+                    <div>
+                      <label className="tf-label font-bold mb-1 block">Assign Members</label>
+                      <div className="max-h-24 overflow-y-auto border border-gray-250 dark:border-gray-800 rounded-xl p-2.5 space-y-1.5 bg-slate-50 dark:bg-white/5">
+                        {currentWorkspace?.members.map(m => (
+                          <label key={m.user.id} className="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-slate-350">
+                            <input 
+                              type="checkbox"
+                              checked={convertAssignees.includes(m.user.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setConvertAssignees([...convertAssignees, m.user.id]);
+                                } else {
+                                  setConvertAssignees(convertAssignees.filter(id => id !== m.user.id));
+                                }
+                              }}
+                              className="rounded border-gray-300 text-indigo-655 focus:ring-indigo-500 w-3.5 h-3.5"
+                            />
+                            <span>{m.user.name || m.user.username}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions footer */}
+                  <div className="border-t border-gray-100 dark:border-gray-850 pt-3 mt-4 space-y-3 shrink-0">
+                    <label className="flex items-center gap-2 cursor-pointer p-1">
+                      <input
+                        type="checkbox"
+                        checked={saveAsDefaultPreferences}
+                        onChange={(e) => setSaveAsDefaultPreferences(e.target.checked)}
+                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                      />
+                      <span className="text-[10px] text-gray-500 font-semibold">Save these selections as default settings for this board</span>
+                    </label>
+
+                    <button
+                      type="submit"
+                      disabled={converting}
+                      className="btn-primary w-full justify-center py-2.5 rounded-xl font-bold"
+                    >
+                      {converting ? 'Converting to card...' : 'Convert to Card'}
                     </button>
                   </div>
-                </div>
-
-                {/* Member selection block */}
-                <div>
-                  <label className="tf-label font-bold mb-1 block">Assign Members</label>
-                  <div className="max-h-24 overflow-y-auto border border-gray-250 dark:border-gray-800 rounded-xl p-2.5 space-y-1.5 bg-slate-50 dark:bg-white/5">
-                    {currentWorkspace?.members.map(m => (
-                      <label key={m.user.id} className="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-slate-350">
-                        <input 
-                          type="checkbox"
-                          checked={convertAssignees.includes(m.user.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setConvertAssignees([...convertAssignees, m.user.id]);
-                            } else {
-                              setConvertAssignees(convertAssignees.filter(id => id !== m.user.id));
-                            }
-                          }}
-                          className="rounded border-gray-300 text-indigo-650 focus:ring-indigo-500 w-3.5 h-3.5"
-                        />
-                        <span>{m.user.name || m.user.username}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Default Conversion preferences toggler */}
-                <label className="flex items-center gap-2 cursor-pointer p-1">
-                  <input
-                    type="checkbox"
-                    checked={saveAsDefaultPreferences}
-                    onChange={(e) => setSaveAsDefaultPreferences(e.target.checked)}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
-                  />
-                  <span className="text-[10px] text-gray-500 font-semibold">Save these selections as default settings for this board</span>
-                </label>
-
-                <button
-                  type="submit"
-                  disabled={converting}
-                  className="btn-primary w-full justify-center py-2.5 rounded-xl font-bold mt-2"
-                >
-                  {converting ? 'Converting to card...' : 'Convert to Card'}
-                </button>
-              </form>
+                </form>
+              </div>
             )}
           </div>
         </div>

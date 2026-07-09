@@ -3,7 +3,7 @@ import { useStore, getAvatarUrl } from '../store/useStore';
 import type { Card } from '../store/useStore';
 import {
   X, AlignLeft, CheckSquare, Link2, MessageSquare,
-  Trash2, Plus, User, Tag, Calendar, Clock
+  Trash2, Plus, User, Tag, Calendar, Clock, Archive, Pencil
 } from 'lucide-react';
 
 interface CardModalProps { card: Card; onClose: () => void; }
@@ -234,13 +234,19 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                 ))}
               </div>
 
-              <textarea
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                onBlur={() => save({ title })}
-                className="w-full bg-transparent text-xl font-bold text-[#172b4d] dark:text-[#b6c2cf] resize-none focus:outline-none border-0 p-0 leading-snug"
-                rows={2}
-              />
+              <div className="relative group/title w-full">
+                <textarea
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  onBlur={() => save({ title })}
+                  className="w-full bg-transparent hover:bg-slate-200/50 dark:hover:bg-slate-800/30 focus:bg-white dark:focus:bg-[#22272b] text-xl font-bold text-[#172b4d] dark:text-[#b6c2cf] resize-none focus:outline-none border border-transparent focus:border-blue-400 dark:focus:border-blue-500 rounded-md px-2 py-1 leading-snug transition-all"
+                  rows={2}
+                  placeholder="Card title..."
+                />
+                <div className="absolute right-2 top-2 opacity-0 group-hover/title:opacity-100 pointer-events-none text-slate-400 transition-opacity">
+                  <Pencil className="w-4 h-4" />
+                </div>
+              </div>
               <p className="text-xs text-[#8590a2]">
                 in <span className="font-medium text-[#44546f] dark:text-[#9fadbc]">{columnName}</span>
               </p>
@@ -587,6 +593,27 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                   );
                 })}
               </div>
+            </div>
+
+            {/* Actions */}
+            <div className="mb-3 border-t border-[#dfe1e6] dark:border-[#a6c5e229] pt-3">
+              <label className="tf-label flex items-center gap-1.5"><Archive className="w-3.5 h-3.5" /> Actions</label>
+              <button
+                onClick={async () => {
+                  if (!currentBoard) return;
+                  try {
+                    await updateCard(currentBoard.id, card.id, { isArchived: true });
+                    addToast('Card Archived', `"${card.title}" has been archived.`, 'success');
+                    onClose();
+                  } catch (err: any) {
+                    addToast('Error', err.message || 'Failed to archive card', 'error');
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-[4px] text-xs font-semibold transition-all mt-1.5"
+              >
+                <Archive className="w-3.5 h-3.5" />
+                <span>Archive Card</span>
+              </button>
             </div>
           </div>
         </div>
