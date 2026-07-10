@@ -37,7 +37,7 @@ interface KanbanCardProps {
   setEditingCardId: (id: string | null) => void;
   editingCardTitle: string;
   setEditingCardTitle: (title: string) => void;
-  onOpenCardDetails: (card: Card) => void;
+  onCardClick: (card: Card) => void;
   saveCardQuickRename: (cardId: string) => void;
   handleCardQuickRenameKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>, cardId: string) => void;
 }
@@ -50,7 +50,7 @@ const KanbanCard = React.memo(({
   setEditingCardId,
   editingCardTitle,
   setEditingCardTitle,
-  onOpenCardDetails,
+  onCardClick,
   saveCardQuickRename,
   handleCardQuickRenameKeyDown
 }: KanbanCardProps) => {
@@ -72,7 +72,7 @@ const KanbanCard = React.memo(({
       onPointerDown={(e) => onPointerDown(e, card, listId)}
       onClick={() => {
         if (editingCardId !== card.id) {
-          onOpenCardDetails(card);
+          onCardClick(card);
         }
       }}
       className={`kb-card space-y-2 animate-fade-in group/card relative ${
@@ -665,7 +665,7 @@ const KanbanColumn = React.memo(({
               setEditingCardId={setEditingCardId}
               editingCardTitle={editingCardTitle}
               setEditingCardTitle={setEditingCardTitle}
-              onOpenCardDetails={onOpenCardDetails}
+              onCardClick={onOpenCardDetails}
               saveCardQuickRename={saveCardQuickRename}
               handleCardQuickRenameKeyDown={handleCardQuickRenameKeyDown}
             />
@@ -775,6 +775,17 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
   const boardInboxUnreadCount = boardInboxStagedItems.length;
 
   const boardScrollRef = useRef<HTMLDivElement>(null);
+  
+  const blockCardClickRef = useRef(false);
+  const handleCardClick = (card: Card) => {
+    if (blockCardClickRef.current) {
+      blockCardClickRef.current = false;
+      return;
+    }
+    if (editingCardId !== card.id) {
+      onOpenCardDetails(card);
+    }
+  };
   
   const handleBoardWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('.overflow-y-auto')) {
@@ -1343,6 +1354,11 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
       return;
     }
     
+    blockCardClickRef.current = true;
+    setTimeout(() => {
+      blockCardClickRef.current = false;
+    }, 50);
+    
     const targetListId = drag.targetListId;
     const placeholder = drag.placeholder;
     const parent = placeholder?.parentNode;
@@ -1361,18 +1377,19 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
       
       const targetList = stateRef.current.currentBoard?.lists.find(l => l.id === targetListId);
       if (targetList) {
-        const targetCards = targetList.cards || [];
+        // Filter out the dragged card itself to compute correct relative index positions
+        const remainingCards = (targetList.cards || []).filter(c => c.id !== drag.cardId);
         
         let newPosition: number;
-        if (targetCards.length === 0) {
+        if (remainingCards.length === 0) {
           newPosition = 1000;
         } else if (targetIndex === 0) {
-          newPosition = targetCards[0].position / 2;
-        } else if (targetIndex >= targetCards.length) {
-          newPosition = targetCards[targetCards.length - 1].position + 1000;
+          newPosition = remainingCards[0].position / 2;
+        } else if (targetIndex >= remainingCards.length) {
+          newPosition = remainingCards[remainingCards.length - 1].position + 1000;
         } else {
-          const prevPos = targetCards[targetIndex - 1].position;
-          const nextPos = targetCards[targetIndex].position;
+          const prevPos = remainingCards[targetIndex - 1].position;
+          const nextPos = remainingCards[targetIndex].position;
           newPosition = (prevPos + nextPos) / 2;
         }
         
@@ -1461,7 +1478,8 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
 
 
   const handleListDragStart = (e: React.DragEvent, listId: string) => {
-    if ((e.target as HTMLElement).closest('.kb-card')) {
+    if ((e.target as HTMLElement).closest('.kb-card') || (e.target as HTMLElement).closest('button')) {
+      e.preventDefault();
       return;
     }
     e.dataTransfer.setData('listId', listId);
@@ -1918,7 +1936,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                   setEditingCardId={setEditingCardId}
                   editingCardTitle={editingCardTitle}
                   setEditingCardTitle={setEditingCardTitle}
-                  onOpenCardDetails={onOpenCardDetails}
+                  onOpenCardDetails={handleCardClick}
                   saveCardQuickRename={saveCardQuickRename}
                   handleCardQuickRenameKeyDown={handleCardQuickRenameKeyDown}
                   handleCardPointerDown={handleCardPointerDown}

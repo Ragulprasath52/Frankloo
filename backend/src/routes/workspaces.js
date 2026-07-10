@@ -1052,12 +1052,6 @@ router.post('/:id/invitations', authenticate, checkWorkspaceRole(['OWNER', 'ADMI
 
       // Sign token with JWT
       const signedToken = jwt.sign({ invitationId: invitation.id }, JWT_SECRET, { expiresIn: '7d' });
-      
-      // Update invitation with signed token
-      invitation = await prisma.workspaceInvitation.update({
-        where: { id: invitation.id },
-        data: { token: signedToken }
-      });
 
       // Audit Log entry
       await prisma.invitationAuditLog.create({
@@ -1219,7 +1213,6 @@ router.post('/:id/invitations/:invitationId/resend', authenticate, checkWorkspac
     const updated = await prisma.workspaceInvitation.update({
       where: { id: invitationId },
       data: {
-        token: signedToken,
         status: 'PENDING',
         expiresAt: expiryDate,
         resentCount: invitation.resentCount + 1,
