@@ -266,9 +266,9 @@ export default function CalendarModule({ board, onOpenCardDetails, onOpenSyncMod
       <div className="flex-1 flex flex-col bg-white dark:bg-[#161a22] border border-[#dfe1e6] dark:border-[#30363d] rounded-2xl overflow-hidden shadow-2xl">
         
         {/* TOP TOOLBAR */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 gap-4 bg-slate-50/50 dark:bg-[#0d1117] border-b border-[#dfe1e6] dark:border-[#30363d]">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 bg-slate-50/50 dark:bg-[#0d1117] border-b border-[#dfe1e6] dark:border-[#30363d]">
           {/* Title & Navigation */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between md:justify-start gap-3 w-full md:w-auto">
             <div className="flex items-center bg-slate-100 dark:bg-[#21262d] rounded-xl p-0.5 border border-[#dfe1e6] dark:border-[#30363d]">
               <button onClick={handlePrev} className="p-1.5 hover:bg-slate-200 dark:hover:bg-[#30363d] rounded-lg transition-colors text-slate-600 dark:text-inherit" title="Previous">
                 <ChevronLeft className="w-4 h-4" />
@@ -284,7 +284,7 @@ export default function CalendarModule({ board, onOpenCardDetails, onOpenSyncMod
           </div>
  
           {/* Quick Stats & View Mode Selectors */}
-          <div className="flex flex-wrap items-center gap-3 sm:gap-4 w-full sm:w-auto sm:justify-end">
+          <div className="flex flex-wrap items-center gap-3 md:gap-4 w-full md:w-auto md:justify-end">
             
             {/* counters */}
             <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-500 dark:text-[#8d96a0] shrink-0">
