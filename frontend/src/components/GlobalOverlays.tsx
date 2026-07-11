@@ -15,7 +15,7 @@ export default function GlobalOverlays() {
 
     const handleDragOver = (e: DragEvent) => {
       if (previewRef.current) {
-        previewRef.current.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;
+        previewRef.current.style.transform = `translate3d(${e.clientX - 120}px, ${e.clientY - 40}px, 0) scale(1.03) rotate(2.5deg)`;
       }
     };
 
@@ -53,9 +53,9 @@ export default function GlobalOverlays() {
           style={{
             left: 0,
             top: 0,
-            transform: 'translate3d(-1000px, -1000px, 0)',
+            transform: 'translate3d(-1000px, -1000px, 0) scale(1.03) rotate(2.5deg)',
             willChange: 'transform',
-            boxShadow: '0 20px 45px rgba(0, 0, 0, 0.3)',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.3)',
           }}
         >
           <div className="flex items-center justify-between gap-1.5 mb-1 border-b border-slate-200 dark:border-slate-800 pb-1">

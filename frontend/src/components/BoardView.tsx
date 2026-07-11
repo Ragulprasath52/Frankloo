@@ -8,7 +8,8 @@ import {
   BarChart3, UserCheck, Play, ArrowLeft, Plus, X, Trash2, MoreHorizontal,
   CalendarCheck, CheckCircle, PlusCircle, Copy, Check, Info, Lock, Paintbrush,
   AlertCircle, Sparkles, ChevronRight, Upload, HelpCircle, Users,
-  Pencil, Inbox, Mail, RotateCw
+  Pencil, Inbox, Mail, RotateCw, GripVertical,
+  Pin, Eye, Trash, Paperclip, Search, Archive
 } from 'lucide-react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -40,6 +41,8 @@ interface KanbanCardProps {
   onCardClick: (card: Card) => void;
   saveCardQuickRename: (cardId: string) => void;
   handleCardQuickRenameKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>, cardId: string) => void;
+  keyboardGrabbedCardId: string | null;
+  onCardKeyDown: (e: React.KeyboardEvent, card: Card, listId: string) => void;
 }
 
 const KanbanCard = React.memo(({
@@ -52,7 +55,9 @@ const KanbanCard = React.memo(({
   setEditingCardTitle,
   onCardClick,
   saveCardQuickRename,
-  handleCardQuickRenameKeyDown
+  handleCardQuickRenameKeyDown,
+  keyboardGrabbedCardId,
+  onCardKeyDown
 }: KanbanCardProps) => {
   let customData: any = {};
   try {
@@ -67,15 +72,23 @@ const KanbanCard = React.memo(({
   const completedChecklistCount = card.checklists?.filter(i => i.isCompleted).length || 0;
   const progressPercentage = checklistCount > 0 ? (completedChecklistCount / checklistCount) * 105 : 0;
 
+  const isGrabbed = keyboardGrabbedCardId === card.id;
   return (
     <div
+      data-card-id={card.id}
+      tabIndex={0}
+      role="button"
+      aria-grabbed={isGrabbed ? "true" : "false"}
+      onKeyDown={(e) => onCardKeyDown(e, card, listId)}
       onPointerDown={(e) => onPointerDown(e, card, listId)}
       onClick={() => {
         if (editingCardId !== card.id) {
           onCardClick(card);
         }
       }}
-      className={`kb-card space-y-2 animate-fade-in group/card relative ${
+      className={`kb-card space-y-2 animate-morph-in group/card relative focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 ${
+        isGrabbed ? 'ring-2 ring-indigo-500 scale-[1.03] shadow-xl' : ''
+      } ${
         card.priority === 'URGENT' ? 'priority-left-urgent' :
         card.priority === 'HIGH' ? 'priority-left-high' :
         card.priority === 'MEDIUM' ? 'priority-left-medium' : 'priority-left-low'
@@ -238,6 +251,7 @@ interface KanbanColumnProps {
   cardTitles: Record<string, string>;
   setCardTitles: (val: Record<string, string>) => void;
   handleListDragStart: (e: React.DragEvent, listId: string) => void;
+  handleListDragEnd?: () => void;
   handleDragOver: (e: React.DragEvent) => void;
   handleDrop: (e: React.DragEvent, listId: string) => void;
   editingCardId: string | null;
@@ -249,6 +263,8 @@ interface KanbanColumnProps {
   handleCardQuickRenameKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>, cardId: string) => void;
   handleCardPointerDown: (e: React.PointerEvent<HTMLDivElement>, card: Card, listId: string) => void;
   hasCustomBg: boolean;
+  keyboardGrabbedCardId: string | null;
+  handleCardKeyDown: (e: React.KeyboardEvent, card: Card, listId: string) => void;
 }
 
 const KanbanColumn = React.memo(({
@@ -268,6 +284,7 @@ const KanbanColumn = React.memo(({
   cardTitles,
   setCardTitles,
   handleListDragStart,
+  handleListDragEnd,
   handleDragOver,
   handleDrop,
   editingCardId,
@@ -278,12 +295,15 @@ const KanbanColumn = React.memo(({
   saveCardQuickRename,
   handleCardQuickRenameKeyDown,
   handleCardPointerDown,
-  hasCustomBg
+  hasCustomBg,
+  keyboardGrabbedCardId,
+  handleCardKeyDown
 }: KanbanColumnProps) => {
   const [isAddingCard, setIsAddingCard] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [moveMode, setMoveMode] = React.useState(false);
   const [sortMode, setSortMode] = React.useState(false);
+  const [isColumnDraggable, setIsColumnDraggable] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
   
   const { deleteList, updateList, updateCard, createCard, token } = useStore();
@@ -546,8 +566,12 @@ const KanbanColumn = React.memo(({
   return (
     <div
       data-list-id={list.id}
-      draggable={editingListId !== list.id}
+      draggable={isColumnDraggable && editingListId !== list.id}
       onDragStart={(e) => handleListDragStart(e, list.id)}
+      onDragEnd={() => {
+        setIsColumnDraggable(false);
+        if (handleListDragEnd) handleListDragEnd();
+      }}
       onDragOver={handleDragOver}
       onDrop={(e) => handleDrop(e, list.id)}
       className={`kb-column ${hasCustomBg ? 'kb-column-glass' : ''} ${
@@ -557,7 +581,7 @@ const KanbanColumn = React.memo(({
       } transition-all duration-200`}
     >
       {/* Column Header */}
-      <div className="flex items-center justify-between px-3 py-1.5 shrink-0 border-b border-gray-200/50 dark:border-gray-800/40 cursor-grab active:cursor-grabbing bg-slate-50/20 dark:bg-black/5">
+      <div className="flex items-center justify-between px-3 py-1.5 shrink-0 border-b border-gray-200/50 dark:border-gray-800/40 cursor-default bg-slate-50/20 dark:bg-black/5">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           {editingListId === list.id ? (
             <input
@@ -585,6 +609,21 @@ const KanbanColumn = React.memo(({
               <Pencil className="w-2.5 h-2.5 opacity-0 group-hover/list:opacity-60 transition-opacity text-slate-550 shrink-0" />
             </span>
           )}
+
+          {/* Dedicated Drag Handle for Columns */}
+          {editingListId !== list.id && (
+            <div
+              onMouseDown={() => setIsColumnDraggable(true)}
+              onMouseUp={() => setIsColumnDraggable(false)}
+              onTouchStart={() => setIsColumnDraggable(true)}
+              onTouchEnd={() => setIsColumnDraggable(false)}
+              className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded cursor-grab active:cursor-grabbing text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors shrink-0"
+              title="Drag column"
+            >
+              <GripVertical className="w-3.5 h-3.5" />
+            </div>
+          )}
+
           <span 
             className="text-[9px] font-bold px-1.5 py-0.25 rounded-full shrink-0"
             style={{ 
@@ -668,6 +707,8 @@ const KanbanColumn = React.memo(({
               onCardClick={onOpenCardDetails}
               saveCardQuickRename={saveCardQuickRename}
               handleCardQuickRenameKeyDown={handleCardQuickRenameKeyDown}
+              keyboardGrabbedCardId={keyboardGrabbedCardId}
+              onCardKeyDown={handleCardKeyDown}
             />
           ))
         )}
@@ -748,7 +789,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
     createList, archiveList, createCard, updateCard, updateBoard,
     createAutomationRule, deleteAutomationRule, currentWorkspace, convertInboxItem, token,
     addToast, showConfirm, fetchArchivedItems, updateList,
-    inboxItems, fetchInboxItems, updateInboxItem, draggedEmail, setDraggedEmail, batchConvertInboxItems
+    inboxItems, fetchInboxItems, updateInboxItem, deleteInboxItem, syncGmailInbox, draggedEmail, setDraggedEmail, batchConvertInboxItems
   } = useStore();
 
   const themeStore = useThemeStore();
@@ -764,12 +805,63 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
   const [calendarSyncOpen, setCalendarSyncOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showAllMembersModal, setShowAllMembersModal] = useState(false);
+  const [isColumnDragging, setIsColumnDragging] = useState(false);
+  const [keyboardGrabbedCardId, setKeyboardGrabbedCardId] = useState<string | null>(null);
   
   // Board & Card Renaming states
   const [isEditingBoardName, setIsEditingBoardName] = useState(false);
   
   // Board Inbox Panel states
-  const [isBoardInboxOpen, setIsBoardInboxOpen] = useState(false);
+  const [isBoardInboxOpen, setIsBoardInboxOpen] = useState(true);
+  const [isInboxCollapsed, setIsInboxCollapsed] = useState(() => localStorage.getItem('frankloo-inbox-collapsed') === 'true');
+  const [inboxWidth, setInboxWidth] = useState(() => parseInt(localStorage.getItem('frankloo-inbox-width') || '360', 10));
+  const [isResizingInbox, setIsResizingInbox] = useState(false);
+  const [inboxSearchQuery, setInboxSearchQuery] = useState('');
+  const [inboxSourceFilter, setInboxSourceFilter] = useState('ALL');
+  const [inboxPriorityFilter, setInboxPriorityFilter] = useState('ALL');
+  const [previewInboxItem, setPreviewInboxItem] = useState<any | null>(null);
+  const [pinnedInboxItemIds, setPinnedInboxItemIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('frankloo-pinned-inbox-items') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const togglePinInboxItem = (itemId: string) => {
+    setPinnedInboxItemIds(prev => {
+      const next = prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId];
+      localStorage.setItem('frankloo-pinned-inbox-items', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const startResizingInbox = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizingInbox(true);
+  };
+
+  useEffect(() => {
+    if (!isResizingInbox) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const calculatedWidth = window.innerWidth - e.clientX;
+      if (calculatedWidth >= 280 && calculatedWidth <= 500) {
+        setInboxWidth(calculatedWidth);
+        localStorage.setItem('frankloo-inbox-width', calculatedWidth.toString());
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingInbox(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizingInbox]);
 
   const boardInboxStagedItems = inboxItems.filter(item => item.status !== 'ARCHIVED' && item.status !== 'CONVERTED');
   const boardInboxUnreadCount = boardInboxStagedItems.length;
@@ -1136,7 +1228,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
   };
 
   const handleCardPointerDown = (e: React.PointerEvent<HTMLDivElement>, card: Card, listId: string) => {
-    if (e.button !== 0) return;
+    if (isColumnDragging || e.button !== 0) return;
     
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.closest('textarea') || target.closest('input') || target.closest('a')) {
@@ -1200,7 +1292,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
     clone.style.height = `${rect.height}px`;
     clone.style.left = '0px';
     clone.style.top = '0px';
-    clone.style.transform = `translate3d(${clientX - drag.offsetX}px, ${clientY - drag.offsetY}px, 0) scale(1.03)`;
+    clone.style.transform = `translate3d(${clientX - drag.offsetX}px, ${clientY - drag.offsetY}px, 0) scale(1.03) rotate(2deg)`;
     document.body.appendChild(clone);
     drag.clone = clone;
     
@@ -1239,7 +1331,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
     
     requestAnimationFrame(() => {
       if (drag.clone && drag.isDragging) {
-        drag.clone.style.transform = `translate3d(${drag.currentX - drag.offsetX}px, ${drag.currentY - drag.offsetY}px, 0) scale(1.03)`;
+        drag.clone.style.transform = `translate3d(${drag.currentX - drag.offsetX}px, ${drag.currentY - drag.offsetY}px, 0) scale(1.03) rotate(2deg)`;
       }
     });
     
@@ -1450,6 +1542,86 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
     cleanupDragging();
   };
 
+  const handleCardKeyDown = async (e: React.KeyboardEvent, card: Card, listId: string) => {
+    const isGrabbed = keyboardGrabbedCardId === card.id;
+
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      if (!isGrabbed) {
+        setKeyboardGrabbedCardId(card.id);
+        addToast('Card Grabbed', 'Use Arrow keys to move, Space or Enter to drop, Escape to cancel.', 'info');
+      } else {
+        setKeyboardGrabbedCardId(null);
+        addToast('Card Dropped', 'Card dropped at current position.', 'success');
+      }
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      if (isGrabbed) {
+        e.preventDefault();
+        setKeyboardGrabbedCardId(null);
+        addToast('Drag Cancelled', 'Card movement cancelled.', 'info');
+      }
+      return;
+    }
+
+    if (isGrabbed) {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        
+        const lists = currentBoard?.lists || [];
+        const currentListIdx = lists.findIndex(l => l.id === listId);
+        if (currentListIdx === -1) return;
+        
+        const currentList = lists[currentListIdx];
+        const cardIdx = currentList.cards.findIndex(c => c.id === card.id);
+        if (cardIdx === -1) return;
+
+        let targetListId = listId;
+        let newPosition = card.position;
+
+        if (e.key === 'ArrowUp') {
+          if (cardIdx > 0) {
+            const sibling = currentList.cards[cardIdx - 1];
+            const prevSibling = cardIdx > 1 ? currentList.cards[cardIdx - 2] : null;
+            newPosition = prevSibling ? (sibling.position + prevSibling.position) / 2 : sibling.position / 2;
+          }
+        } else if (e.key === 'ArrowDown') {
+          if (cardIdx < currentList.cards.length - 1) {
+            const sibling = currentList.cards[cardIdx + 1];
+            const nextSibling = cardIdx < currentList.cards.length - 2 ? currentList.cards[cardIdx + 2] : null;
+            newPosition = nextSibling ? (sibling.position + nextSibling.position) / 2 : sibling.position + 1000;
+          }
+        } else if (e.key === 'ArrowLeft') {
+          if (currentListIdx > 0) {
+            const targetList = lists[currentListIdx - 1];
+            targetListId = targetList.id;
+            newPosition = targetList.cards.length > 0 ? targetList.cards[targetList.cards.length - 1].position + 1000 : 1000;
+          }
+        } else if (e.key === 'ArrowRight') {
+          if (currentListIdx < lists.length - 1) {
+            const targetList = lists[currentListIdx + 1];
+            targetListId = targetList.id;
+            newPosition = targetList.cards.length > 0 ? targetList.cards[targetList.cards.length - 1].position + 1000 : 1000;
+          }
+        }
+
+        if (targetListId !== listId || newPosition !== card.position) {
+          try {
+            await updateCard(boardId, card.id, { listId: targetListId, position: newPosition });
+            setTimeout(() => {
+              const cardEl = document.querySelector(`[data-card-id="${card.id}"]`) as HTMLElement;
+              if (cardEl) cardEl.focus();
+            }, 100);
+          } catch (err: any) {
+            addToast('Error', err.message || 'Failed to move card', 'error');
+          }
+        }
+      }
+    }
+  };
+
   const saveListName = async (listId: string) => {
     if (!editingListName.trim()) {
       setEditingListId(null);
@@ -1478,11 +1650,16 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
 
 
   const handleListDragStart = (e: React.DragEvent, listId: string) => {
-    if ((e.target as HTMLElement).closest('.kb-card') || (e.target as HTMLElement).closest('button')) {
+    if (dragRef.current.isDragging || (e.target as HTMLElement).closest('.kb-card') || (e.target as HTMLElement).closest('button')) {
       e.preventDefault();
       return;
     }
+    setIsColumnDragging(true);
     e.dataTransfer.setData('listId', listId);
+  };
+
+  const handleListDragEnd = () => {
+    setIsColumnDragging(false);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -1900,16 +2077,18 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
       )}
 
       {/* Main Tab View Port */}
-      <div className="flex-1 overflow-auto p-2.5 sm:p-3 md:p-4 z-10">
+      <div className={`flex-1 flex flex-col min-h-0 z-10 ${
+        activeTab === 'kanban' ? 'p-0 overflow-hidden' : 'p-2.5 sm:p-3 md:p-4 overflow-auto'
+      }`}>
         
         {/* Kanban View */}
         {activeTab === 'kanban' && (
-          <div className="flex gap-0 w-full h-full items-start overflow-hidden relative">
+          <div className="flex gap-0 w-full h-full items-stretch overflow-hidden relative">
             <div 
               ref={boardScrollRef}
               onPointerDown={handleBoardPointerDown}
               onWheel={handleBoardWheel}
-              className="flex-1 flex gap-2.5 sm:gap-3 h-full items-start select-none pb-4 overflow-x-auto snap-x snap-mandatory md:snap-none scrollbar-thin"
+              className="flex-1 flex gap-2.5 sm:gap-3 h-full items-start select-none pt-4 pb-4 px-4 overflow-x-auto snap-x snap-mandatory md:snap-none scrollbar-thin"
             >
               {currentBoard.lists.map((list) => (
                 <KanbanColumn
@@ -1930,6 +2109,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                   cardTitles={cardTitles}
                   setCardTitles={setCardTitles}
                   handleListDragStart={handleListDragStart}
+                  handleListDragEnd={handleListDragEnd}
                   handleDragOver={handleDragOver}
                   handleDrop={handleDrop}
                   editingCardId={editingCardId}
@@ -1941,6 +2121,8 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                   handleCardQuickRenameKeyDown={handleCardQuickRenameKeyDown}
                   handleCardPointerDown={handleCardPointerDown}
                   hasCustomBg={hasCustomBg}
+                  keyboardGrabbedCardId={keyboardGrabbedCardId}
+                  handleCardKeyDown={handleCardKeyDown}
                 />
               ))}
 
@@ -1990,105 +2172,349 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
 
         {/* Board Staging Inbox Drawer */}
         {isBoardInboxOpen && (
-          <div className="fixed md:relative inset-x-0 bottom-0 md:top-0 md:inset-x-auto md:right-0 w-full sm:w-80 md:w-80 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-[#101214] flex flex-col h-[75vh] md:h-full shrink-0 z-[100] md:z-30 shadow-2xl md:shadow-none rounded-t-2xl md:rounded-t-none animate-slide-in-up md:animate-slide-in-right overflow-hidden">
-            {/* Grab handle for mobile swipe down to close */}
-            <div className="md:hidden flex items-center justify-center py-2.5 shrink-0 cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors" onClick={() => setIsBoardInboxOpen(false)}>
-              <div className="w-12 h-1 bg-slate-350 dark:bg-slate-700 rounded-full" />
-            </div>
-            {/* Header */}
-            <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-55 dark:bg-[#161a1d] shrink-0">
-              <span className="font-bold text-xs flex items-center gap-1.5 text-slate-800 dark:text-[#f0f6fc]">
-                <Inbox className="w-4 h-4 text-indigo-500" /> Staging Area
-              </span>
-              
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  onClick={async () => {
-                    if (currentWorkspace) {
-                      await fetchInboxItems(currentWorkspace.id);
-                      await fetchBoardDetails(boardId);
-                    }
-                  }}
-                  className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-550 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
-                  title="Sync Staging Area"
-                >
-                  <RotateCw className="w-3.5 h-3.5" />
-                </button>
-                
+          <div 
+            style={{ 
+              width: isInboxCollapsed ? '48px' : `${inboxWidth}px`,
+              transition: isResizingInbox ? 'none' : 'width 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+            className="fixed md:relative inset-x-0 bottom-0 md:top-0 md:inset-x-auto md:right-0 h-[75vh] md:h-full flex flex-col shrink-0 z-[100] md:z-30 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c0e12] shadow-2xl md:shadow-none overflow-hidden"
+          >
+            {/* Divider resize handle - Desktop relative mode only */}
+            {!isInboxCollapsed && (
+              <div 
+                onMouseDown={startResizingInbox}
+                className="hidden md:block absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-indigo-500/40 bg-transparent transition-colors z-50"
+              />
+            )}
+
+            {/* Collapsed view content */}
+            {isInboxCollapsed ? (
+              <div className="flex flex-col items-center py-4 h-full w-full select-none justify-start bg-white dark:bg-[#0c0e12]">
                 <button 
-                  onClick={() => setIsBoardInboxOpen(false)}
-                  className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-555 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
-                  title="Close Staging Area"
+                  onClick={() => {
+                    setIsInboxCollapsed(false);
+                    localStorage.setItem('frankloo-inbox-collapsed', 'false');
+                  }}
+                  className="p-2 rounded-xl text-indigo-650 dark:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#161a22] transition-all relative cursor-pointer bg-transparent border-0 flex items-center justify-center"
+                  title="Expand Inbox"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <Inbox className="w-5 h-5" />
+                  {boardInboxUnreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0">
+                      {boardInboxUnreadCount}
+                    </span>
+                  )}
                 </button>
               </div>
-            </div>
-            
-            {/* List of Board specific emails */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
-              {inboxItems.filter(item => item.status !== 'ARCHIVED' && item.status !== 'CONVERTED').length === 0 ? (
-                <div className="border border-dashed border-slate-200 dark:border-slate-800 rounded-xl py-12 text-center text-slate-500 text-xs">
-                  <Mail className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                  No emails staged
+            ) : (
+              <div className="flex flex-col h-full w-full select-none">
+                {/* Mobile drag handle */}
+                <div className="md:hidden flex items-center justify-center py-2 shrink-0 cursor-pointer hover:bg-slate-150/40" onClick={() => setIsBoardInboxOpen(false)}>
+                  <div className="w-12 h-1 bg-slate-300 dark:bg-slate-700 rounded-full" />
                 </div>
-              ) : (
-                inboxItems
-                  .filter(item => item.status !== 'ARCHIVED' && item.status !== 'CONVERTED')
-                  .map(item => {
-                    const sourceDetailsObj = JSON.parse(item.sourceDetails || '{}');
-                    return (
-                      <div
-                        key={item.id}
-                        draggable
-                        onDragStart={e => {
-                          e.dataTransfer.setData('inboxItemId', item.id);
-                          e.dataTransfer.setDragImage(transparentDragImg, 0, 0);
-                          setDraggedEmail(item);
-                        }}
-                        onDragEnd={() => {
-                          setDraggedEmail(null);
-                        }}
-                        className="bg-slate-50 dark:bg-[#181a1c] border border-slate-200 dark:border-slate-800 rounded-xl p-3 hover:border-indigo-400 dark:hover:border-indigo-700 hover:shadow-md transition cursor-grab active:cursor-grabbing text-xs space-y-2 relative"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] bg-red-500/10 text-red-500 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                            {item.source}
-                          </span>
-                          <button
-                            onClick={async () => {
-                              if (!currentWorkspace) return;
-                              try {
-                                await updateInboxItem(currentWorkspace.id, item.id, { status: 'ARCHIVED' });
-                                addToast('Item Archived', 'Staged item archived successfully.', 'success');
-                              } catch (e) {}
-                            }}
-                            className="text-[10px] text-slate-400 hover:text-red-500 cursor-pointer bg-transparent border-0"
-                          >
-                            Archive
-                          </button>
+
+                {/* Header */}
+                <div className="p-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/20 dark:bg-[#161a22]/30 shrink-0 gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Inbox className="w-4 h-4 text-indigo-500 shrink-0" />
+                    <span className="font-extrabold text-sm text-slate-800 dark:text-[#f0f6fc] truncate">Inbox</span>
+                    <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">
+                      {boardInboxUnreadCount} Pending
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => setInboxSearchQuery(q => q ? '' : ' ')}
+                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0"
+                      title="Search"
+                    >
+                      <Search className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (currentWorkspace) {
+                          addToast('Syncing', 'Fetching latest Gmail messages...', 'info');
+                          try {
+                            await syncGmailInbox(currentWorkspace.id);
+                            await fetchInboxItems(currentWorkspace.id);
+                            addToast('Synced', 'Inbox updated successfully.', 'success');
+                          } catch (err: any) {
+                            addToast('Sync Failed', err.message || 'Error updating inbox.', 'error');
+                          }
+                        }
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0"
+                      title="Refresh & Sync Gmail"
+                    >
+                      <RotateCw className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsInboxCollapsed(true);
+                        localStorage.setItem('frankloo-inbox-collapsed', 'true');
+                      }}
+                      className="hidden md:inline-flex p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0"
+                      title="Collapse Inbox"
+                    >
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setIsBoardInboxOpen(false)}
+                      className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0"
+                      title="Close"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter and Search controls */}
+                <div className="p-3 bg-slate-50/10 dark:bg-slate-900/10 border-b border-slate-200 dark:border-slate-850 shrink-0 space-y-2">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        value={inboxSearchQuery}
+                        onChange={e => setInboxSearchQuery(e.target.value)}
+                        placeholder="Search emails or sender..."
+                        className="tf-input w-full text-xs py-1.5 !pl-7 !pr-7 rounded-lg"
+                      />
+                      <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
+                      {inboxSearchQuery.trim() && (
+                        <button
+                          onClick={() => setInboxSearchQuery('')}
+                          className="absolute right-2.5 top-2 text-gray-400 hover:text-gray-600 text-xs bg-transparent border-0 cursor-pointer"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 text-[10px] items-center">
+                    <span className="text-slate-400 font-bold shrink-0">Source:</span>
+                    <select
+                      value={inboxSourceFilter}
+                      onChange={e => setInboxSourceFilter(e.target.value)}
+                      className="bg-transparent border border-slate-200 dark:border-slate-800 rounded px-1.5 py-0.5 text-slate-600 dark:text-slate-300 font-semibold"
+                    >
+                      <option value="ALL">All</option>
+                      <option value="GMAIL">Gmail</option>
+                      <option value="EMAIL">Email</option>
+                      <option value="SLACK">Slack</option>
+                      <option value="GITHUB">GitHub</option>
+                    </select>
+
+                    <span className="text-slate-400 font-bold shrink-0 ml-auto">Priority:</span>
+                    <select
+                      value={inboxPriorityFilter}
+                      onChange={e => setInboxPriorityFilter(e.target.value)}
+                      className="bg-transparent border border-slate-200 dark:border-slate-800 rounded px-1.5 py-0.5 text-slate-600 dark:text-slate-300 font-semibold"
+                    >
+                      <option value="ALL">All</option>
+                      <option value="LOW">Low</option>
+                      <option value="MEDIUM">Medium</option>
+                      <option value="HIGH">High</option>
+                      <option value="URGENT">Urgent</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Email Cards List */}
+                <div className="flex-1 overflow-y-auto p-3 space-y-2.5 scrollbar-thin bg-slate-50/5">
+                  {(() => {
+                    const filtered = inboxItems
+                      .filter(item => item.status !== 'ARCHIVED' && item.status !== 'CONVERTED')
+                      .filter(item => {
+                        if (inboxSourceFilter !== 'ALL' && item.source !== inboxSourceFilter) return false;
+                        if (inboxPriorityFilter !== 'ALL' && item.priority !== inboxPriorityFilter) return false;
+                        if (inboxSearchQuery.trim()) {
+                          const query = inboxSearchQuery.toLowerCase();
+                          const details = JSON.parse(item.sourceDetails || '{}');
+                          const matchTitle = item.title?.toLowerCase().includes(query);
+                          const matchDesc = item.description?.toLowerCase().includes(query);
+                          const matchSender = details.sender?.toLowerCase().includes(query);
+                          const matchSubject = details.subject?.toLowerCase().includes(query);
+                          return matchTitle || matchDesc || matchSender || matchSubject;
+                        }
+                        return true;
+                      });
+
+                    // Sort: pinned items first
+                    const sorted = [...filtered].sort((a, b) => {
+                      const aPinned = pinnedInboxItemIds.includes(a.id);
+                      const bPinned = pinnedInboxItemIds.includes(b.id);
+                      if (aPinned && !bPinned) return -1;
+                      if (!aPinned && bPinned) return 1;
+                      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                    });
+
+                    if (sorted.length === 0) {
+                      return (
+                        <div className="border border-dashed border-slate-200 dark:border-slate-800 rounded-xl py-12 text-center text-slate-500 text-xs">
+                          <Mail className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                          No staging messages
                         </div>
-                        
-                        <h4 className="font-bold text-slate-855 dark:text-white leading-snug">
-                          {item.title}
-                        </h4>
-                        
-                        {item.description && (
-                          <p className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
-                            {item.description}
-                          </p>
-                        )}
-                        
-                        {sourceDetailsObj.sender && (
-                          <div className="text-[9px] text-slate-450 dark:text-slate-500 truncate font-semibold">
-                            From: {sourceDetailsObj.sender}
+                      );
+                    }
+
+                    return sorted.map(item => {
+                      const sourceDetailsObj = JSON.parse(item.sourceDetails || '{}');
+                      const hasAttachments = sourceDetailsObj.attachments && sourceDetailsObj.attachments.length > 0;
+                      const isPinned = pinnedInboxItemIds.includes(item.id);
+                      const isUnread = item.status === 'NEW';
+                      const formattedTime = new Date(item.createdAt).toLocaleDateString([], {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      });
+
+                      return (
+                        <div
+                          key={item.id}
+                          draggable
+                          onDragStart={e => {
+                            e.dataTransfer.setData('inboxItemId', item.id);
+                            e.dataTransfer.setDragImage(transparentDragImg, 0, 0);
+                            setDraggedEmail(item);
+                          }}
+                          onDragEnd={() => {
+                            setDraggedEmail(null);
+                          }}
+                          className={`group/inbox bg-white dark:bg-[#181a1c] border border-slate-200 dark:border-slate-800 rounded-xl p-3 hover:border-indigo-400 dark:hover:border-indigo-700 hover:shadow-md transition cursor-grab active:cursor-grabbing text-xs space-y-2 relative ${
+                            draggedEmail?.id === item.id ? 'opacity-40' : ''
+                          }`}
+                        >
+                          {/* Unread Glow & Pin Banner */}
+                          <div className="flex items-center gap-1.5">
+                            {isUnread && (
+                              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" title="Unread" />
+                            )}
+                            <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                              item.source === 'GMAIL' || item.source === 'EMAIL' 
+                                ? 'bg-red-500/10 text-red-500' 
+                                : item.source === 'SLACK' 
+                                ? 'bg-amber-500/10 text-amber-500' 
+                                : 'bg-indigo-500/10 text-indigo-500'
+                            }`}>
+                              {item.source}
+                            </span>
+                            <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase ${
+                              item.priority === 'URGENT' 
+                                ? 'bg-red-600/10 text-red-600' 
+                                : item.priority === 'HIGH' 
+                                ? 'bg-orange-500/10 text-orange-500' 
+                                : item.priority === 'MEDIUM' 
+                                ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' 
+                                : 'bg-slate-400/10 text-slate-500'
+                            }`}>
+                              {item.priority}
+                            </span>
+
+                            {isPinned && (
+                              <Pin className="w-3 h-3 text-amber-500 shrink-0 rotate-45 ml-auto" />
+                            )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })
-              )}
-            </div>
+
+                          {/* Subject / Title */}
+                          <h4 className="font-extrabold text-slate-800 dark:text-white leading-snug line-clamp-1">
+                            {item.title}
+                          </h4>
+
+                          {/* Preview Text */}
+                          {item.description && (
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                              {item.description}
+                            </p>
+                          )}
+
+                          {/* Sender and Footer Meta */}
+                          <div className="flex items-center justify-between text-[9px] text-slate-400 font-semibold pt-1 border-t border-slate-100 dark:border-slate-900 gap-1.5">
+                            {sourceDetailsObj.sender && (
+                              <span className="truncate max-w-[120px] font-bold text-slate-500 dark:text-slate-400">
+                                {sourceDetailsObj.sender}
+                              </span>
+                            )}
+                            
+                            <div className="flex items-center gap-1 shrink-0 ml-auto">
+                              {hasAttachments && (
+                                <span title="Attachments"><Paperclip className="w-2.5 h-2.5 text-gray-400" /></span>
+                              )}
+                              <span>{formattedTime}</span>
+                            </div>
+                          </div>
+
+                          {/* Quick Triage Buttons - Reveal on Hover */}
+                          <div className="absolute inset-0 bg-slate-55/95 dark:bg-[#181a1c]/95 opacity-0 group-hover/inbox:opacity-100 transition-opacity flex items-center justify-center gap-2 rounded-xl px-2 py-1 select-none">
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!currentWorkspace) return;
+                                try {
+                                  await updateInboxItem(currentWorkspace.id, item.id, { status: 'ARCHIVED' });
+                                  addToast('Archived', 'Item archived successfully.', 'success');
+                                } catch (err: any) {
+                                  addToast('Error', err.message || 'Failed to archive.', 'error');
+                                }
+                              }}
+                              className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-350 transition-colors cursor-pointer bg-transparent border-0"
+                              title="Archive"
+                            >
+                              <Archive className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!currentWorkspace) return;
+                                try {
+                                  await deleteInboxItem(currentWorkspace.id, item.id);
+                                  addToast('Deleted', 'Staged item deleted.', 'success');
+                                } catch (err: any) {
+                                  addToast('Error', err.message || 'Failed to delete.', 'error');
+                                }
+                              }}
+                              className="p-2 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 transition-colors cursor-pointer bg-transparent border-0"
+                              title="Delete"
+                            >
+                              <Trash className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                togglePinInboxItem(item.id);
+                              }}
+                              className={`p-2 rounded-lg transition-colors cursor-pointer bg-transparent border-0 ${
+                                isPinned
+                                  ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
+                                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600'
+                              }`}
+                              title={isPinned ? 'Unpin' : 'Pin to Top'}
+                            >
+                              <Pin className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewInboxItem(item);
+                              }}
+                              className="p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 transition-colors cursor-pointer bg-transparent border-0"
+                              title="Full Preview"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -3022,6 +3448,107 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                   </div>
                 );
               })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Preview Modal */}
+      {previewInboxItem && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-[9999] flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-white dark:bg-[#161a22] border border-gray-250 dark:border-gray-800 rounded-3xl p-6 shadow-2xl space-y-4 animate-fade-in flex flex-col max-h-[85vh]">
+            <div className="flex justify-between items-start pb-3 border-b border-gray-200 dark:border-gray-800">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                    {previewInboxItem.source}
+                  </span>
+                  <span className="text-xs text-slate-400 font-semibold">
+                    Received: {new Date(previewInboxItem.createdAt).toLocaleString()}
+                  </span>
+                </div>
+                <h3 className="font-extrabold text-slate-900 dark:text-[#b6c2cf] text-base leading-snug">
+                  {previewInboxItem.title}
+                </h3>
+              </div>
+              <button 
+                onClick={() => setPreviewInboxItem(null)} 
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer text-slate-500 hover:text-slate-800 dark:hover:text-white bg-transparent border-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin text-xs text-slate-700 dark:text-slate-350">
+              {(() => {
+                const details = JSON.parse(previewInboxItem.sourceDetails || '{}');
+                return (
+                  <div className="space-y-3 col-span-2">
+                    <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-800/40">
+                      <div>
+                        <span className="block text-[9px] font-extrabold text-slate-400 uppercase">Sender</span>
+                        <span className="font-semibold text-slate-655 dark:text-slate-300 truncate block">{details.sender || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] font-extrabold text-slate-400 uppercase">Priority</span>
+                        <span className="font-semibold text-slate-655 dark:text-slate-300 block capitalize">{previewInboxItem.priority || 'MEDIUM'}</span>
+                      </div>
+                      {details.recipients && (
+                        <div className="col-span-2">
+                          <span className="block text-[9px] font-extrabold text-slate-400 uppercase">Recipients</span>
+                          <span className="font-semibold text-slate-655 dark:text-slate-300 truncate block">{details.recipients}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="block text-[9px] font-extrabold text-slate-400 uppercase">Message Body</span>
+                      <div className="bg-slate-50/20 dark:bg-slate-900/20 border border-slate-150 dark:border-slate-850 p-4 rounded-2xl whitespace-pre-wrap font-sans text-xs leading-relaxed max-h-[350px] overflow-y-auto">
+                        {previewInboxItem.description || 'No description provided.'}
+                      </div>
+                    </div>
+
+                    {details.attachments && details.attachments.length > 0 && (
+                      <div className="space-y-2">
+                        <span className="block text-[9px] font-extrabold text-slate-400 uppercase">Attachments ({details.attachments.length})</span>
+                        <div className="flex flex-wrap gap-2">
+                          {details.attachments.map((att: any, idx: number) => (
+                            <div key={idx} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700/50 text-[10px]">
+                              <Paperclip className="w-3.5 h-3.5 text-gray-400" />
+                              <span className="font-semibold max-w-[150px] truncate">{att.filename}</span>
+                              <span className="text-slate-400 text-[8px]">({Math.round(att.size / 1024)} KB)</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-250 dark:border-gray-850 select-none">
+              <button
+                onClick={async () => {
+                  if (!currentWorkspace) return;
+                  try {
+                    await updateInboxItem(currentWorkspace.id, previewInboxItem.id, { status: 'ARCHIVED' });
+                    addToast('Archived', 'Item archived successfully.', 'success');
+                    setPreviewInboxItem(null);
+                  } catch (err: any) {
+                    addToast('Error', err.message || 'Failed to archive.', 'error');
+                  }
+                }}
+                className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-750 dark:text-slate-250 py-2 px-4 text-xs font-semibold rounded-xl transition-colors cursor-pointer bg-transparent border-0"
+              >
+                Archive
+              </button>
+              <button
+                onClick={() => setPreviewInboxItem(null)}
+                className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-750 dark:text-slate-250 py-2 px-4 text-xs font-semibold rounded-xl transition-colors cursor-pointer bg-transparent border-0"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

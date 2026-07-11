@@ -1356,10 +1356,8 @@ body,
   z-index: 99999 !important;
   opacity: 0.92 !important;
   box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.15), 0 8px 10px -6px rgb(0 0 0 / 0.15) !important;
-  transform: scale(1.03) !important;
   transform-origin: center center !important;
   will-change: transform !important;
-  transition: transform 0.05s linear !important;
   border-radius: 12px !important;
 }
 
@@ -1399,4 +1397,56 @@ body,
 
 .animate-slide-up {
   animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Empty column hover enhancements when card is dragged over */
+.column-drag-over-glow .kb-empty-column-placeholder {
+  border-color: var(--accent, #6366f1) !important;
+  background: rgba(99, 102, 241, 0.05) !important;
+}
+
+.column-drag-over-glow .kb-empty-column-placeholder .empty-text {
+  visibility: hidden;
+  position: relative;
+}
+
+.column-drag-over-glow .kb-empty-column-placeholder .empty-text::after {
+  content: "Drop card here" !important;
+  visibility: visible;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  text-align: center;
+  color: var(--accent, #6366f1) !important;
+  font-weight: 700;
+  font-size: 10px;
+}
+
+/* Card morph in animation when email is dropped */
+@keyframes morphIn {
+  from {
+    transform: scale(0.9) translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+.animate-morph-in {
+  animation: morphIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+/* Custom email drag overlay card styling */
+.email-drag-overlay {
+  position: fixed !important;
+  z-index: 999999 !important;
+  pointer-events: none !important;
+  opacity: 0.9 !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+  transform: scale(1.03) rotate(2.5deg) !important;
+  transition: transform 0.05s ease-out !important;
+  border-color: rgba(99, 102, 241, 0.7) !important;
+  transform-origin: center center !important;
 }

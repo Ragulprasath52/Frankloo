@@ -377,7 +377,7 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
       `}</style>
       
       {/* ── Page Header Section ── */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 dark:border-slate-800/80 pb-6 shrink-0">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 dark:border-slate-800/80 pb-6 shrink-0">
         <div className="space-y-1.5">
           <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50 font-sans flex items-center gap-2">
             <Mail className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500 shrink-0" /> Workspace Invitations
@@ -389,7 +389,7 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
 
         <button 
           onClick={() => setSendInviteModalOpen(true)} 
-          className="btn-primary justify-center font-bold text-xs py-2.5 px-4.5 rounded-xl shadow-sm hover:translate-y-[-1px] transition-transform w-full sm:w-auto shrink-0"
+          className="btn-primary justify-center font-bold text-xs py-2.5 px-4.5 rounded-xl shadow-sm hover:translate-y-[-1px] transition-transform w-full md:w-auto shrink-0"
         >
           <Plus className="w-3.5 h-3.5" /> Send Invitation
         </button>
@@ -399,25 +399,25 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
       <div className="flex bg-slate-50 dark:bg-[#0d0d0f] p-1 rounded-xl border border-slate-100 dark:border-[#2d3139] overflow-x-auto whitespace-nowrap scrollbar-none shrink-0 max-w-full">
         <button
           onClick={() => setActiveTab('dashboard')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'dashboard' ? 'bg-white dark:bg-[#161b22] border border-slate-200/50 dark:border-[#2d3139] shadow-sm text-blue-600 dark:text-[#579dff]' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}`}
+          className={`shrink-0 px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'dashboard' ? 'bg-white dark:bg-[#161b22] border border-slate-200/50 dark:border-[#2d3139] shadow-sm text-blue-600 dark:text-[#579dff]' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}`}
         >
           Dashboard &amp; Feed
         </button>
         <button
           onClick={() => setActiveTab('history')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'history' ? 'bg-white dark:bg-[#161b22] border border-slate-200/50 dark:border-[#2d3139] shadow-sm text-blue-600 dark:text-[#579dff]' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}`}
+          className={`shrink-0 px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'history' ? 'bg-white dark:bg-[#161b22] border border-slate-200/50 dark:border-[#2d3139] shadow-sm text-blue-600 dark:text-[#579dff]' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}`}
         >
           Invitations List
         </button>
         <button
           onClick={() => setActiveTab('branding')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'branding' ? 'bg-white dark:bg-[#161b22] border border-slate-200/50 dark:border-[#2d3139] shadow-sm text-blue-600 dark:text-[#579dff]' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}`}
+          className={`shrink-0 px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'branding' ? 'bg-white dark:bg-[#161b22] border border-slate-200/50 dark:border-[#2d3139] shadow-sm text-blue-600 dark:text-[#579dff]' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}`}
         >
           Email Branding &amp; Template
         </button>
         <button
           onClick={() => setActiveTab('smtp')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'smtp' ? 'bg-white dark:bg-[#161b22] border border-slate-200/50 dark:border-[#2d3139] shadow-sm text-blue-600 dark:text-[#579dff]' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}`}
+          className={`shrink-0 px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'smtp' ? 'bg-white dark:bg-[#161b22] border border-slate-200/50 dark:border-[#2d3139] shadow-sm text-blue-600 dark:text-[#579dff]' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}`}
         >
           SMTP Server Configuration
         </button>
@@ -805,11 +805,11 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start animate-fade-in divide-y lg:divide-y-0 lg:divide-x divide-slate-200 dark:divide-slate-800">
             {/* SMTP Inputs form */}
             <form onSubmit={handleSaveSmtp} className="lg:col-span-2 space-y-6 pb-8 lg:pb-0 lg:pr-8">
-              <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-150 dark:border-slate-800">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center pb-3 mb-2 border-b border-slate-150 dark:border-slate-800 gap-4">
                 <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <Server className="w-4 h-4 text-blue-500" /> Server SMTP Connection
                 </h3>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 w-full md:w-auto">
                   <button
                     type="button"
                     onClick={handleTestSmtp}
@@ -828,7 +828,7 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500">SMTP Host Server</label>
                   <input
@@ -853,7 +853,7 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500">SMTP Username</label>
                   <input
@@ -878,7 +878,7 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500">Sender Email Address (From)</label>
                   <input
