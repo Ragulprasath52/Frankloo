@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Mail, Send, Activity, X, RefreshCw, AlertCircle,
   Eye, Moon, Sun, Laptop, Smartphone, Sparkles,
-  Server, Plus, Lock, Search
+  Server, Plus, Lock, Search, Info, CheckCircle
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 
@@ -24,7 +24,9 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
     testSmtpConnection,
     fetchInvitationDashboard,
     addToast,
-    showConfirm
+    showConfirm,
+    gmailProfile,
+    fetchGmailProfile
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'send' | 'history' | 'branding' | 'smtp'>('dashboard');
@@ -100,6 +102,7 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
       loadDashboardData();
       fetchWorkspaceInvitations(workspaceId);
       loadBrandingSettings();
+      fetchGmailProfile().catch(console.error);
     }
   }, [workspaceId]);
 
@@ -967,6 +970,28 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
                   className="w-full pl-3 pr-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-850 dark:text-slate-200 text-xs font-semibold h-20 resize-none"
                 />
               </div>
+
+              {gmailProfile?.googleEmail ? (
+                <div className="bg-emerald-500/10 dark:bg-emerald-500/5 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 p-3 rounded-xl flex items-start gap-2 animate-fade-in">
+                  <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <p className="font-bold text-[10px] uppercase tracking-wider leading-none">Google OAuth Active</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-normal">
+                      Invitations will send via your connected account: <strong className="text-slate-800 dark:text-slate-200">{gmailProfile.googleEmail}</strong>. SMTP server configuration is not required!
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-slate-50 dark:bg-[#0d0d0f]/50 border border-slate-200 dark:border-[#2d3139] text-slate-550 dark:text-slate-400 p-3 rounded-xl flex items-start gap-2 animate-fade-in">
+                  <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-500" />
+                  <div className="space-y-0.5">
+                    <p className="font-bold text-[10px] uppercase tracking-wider leading-none text-slate-700 dark:text-slate-300">SMTP / System Fallback Active</p>
+                    <p className="text-[10px] leading-normal">
+                      Connect your Google Account or configure a custom SMTP server under the <strong>SMTP Server Configuration</strong> tab to send invites directly from your own email.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-2 justify-end pt-2 border-t border-slate-100 dark:border-slate-850">
                 <button type="button" onClick={() => setSendInviteModalOpen(false)} className="btn-secondary py-2 px-4 rounded-xl text-xs font-bold">Cancel</button>

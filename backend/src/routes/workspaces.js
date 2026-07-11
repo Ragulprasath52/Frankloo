@@ -1092,7 +1092,8 @@ router.post('/:id/invitations', authenticate, checkWorkspaceRole(['OWNER', 'ADMI
         inviterName: req.user.name || req.user.username,
         customMessage,
         expiryDateStr: expiryDate.toLocaleDateString(),
-        invitationId: invitation.id
+        invitationId: invitation.id,
+        inviterId: req.user.id
       }).catch(err => console.error('Workspace email send error:', err));
 
       results.push({ email, status: 'SUCCESS', invitation });
@@ -1242,7 +1243,8 @@ router.post('/:id/invitations/:invitationId/resend', authenticate, checkWorkspac
       inviterName: req.user.name || req.user.username,
       customMessage: '',
       expiryDateStr: expiryDate.toLocaleDateString(),
-      invitationId: invitation.id
+      invitationId: invitation.id,
+      inviterId: req.user.id
     }).catch(err => console.error('Resend workspace email error:', err));
     
     // Broadcast socket update

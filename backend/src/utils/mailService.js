@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { prisma } from '../db.js';
 import { env } from '../config/env.js';
+import { sendEmail as sendGmailOAuthEmail } from './gmailService.js';
 
 /**
  * Replace variables in a template string
@@ -114,7 +115,8 @@ export async function sendWorkspaceEmail({
   inviterName,
   customMessage = '',
   expiryDateStr,
-  invitationId
+  invitationId,
+  inviterId
 }) {
   let settings = null;
   let workspace = null;
@@ -169,6 +171,80 @@ export async function sendWorkspaceEmail({
   const finalSubject = compileTemplate(templateSubject, variables);
   const finalHtml = compileTemplate(templateHtml, variables);
   const finalPlain = compileTemplate(templateText, variables);
+
+  // Try to send via Google OAuth first if the inviter has connected Google OAuth
+  if (inviterId) {
+    try {
+      const inviter = await prisma.user.findUnique({
+        where: { id: inviterId }
+      });
+      if (inviter && inviter.googleToken) {
+        try {
+          // Send email via Google OAuth
+          await sendGmailOAuthEmail({
+            userId: inviterId,
+            to: recipientEmail,
+            subject: finalSubject,
+            htmlText: finalHtml,
+            text: finalPlain
+          });
+
+          // Log success in Database
+          if (invitationId) {
+            await prisma.workspaceInvitation.update({
+              where: { id: invitationId },
+              data: {
+                deliveryStatus: 'DELIVERED',
+                deliveryError: null
+              }
+            });
+
+            await prisma.invitationAuditLog.create({
+              data: {
+                workspaceId,
+                invitationId,
+                email: recipientEmail,
+                action: 'DELIVERY_SUCCESS',
+                details: `Delivered via Google OAuth2 (Gmail: ${inviter.googleEmail})`
+              }
+            });
+          }
+          return; // Success, exit early!
+        } catch (oauthErr) {
+          console.error('[GMAIL OAUTH EMAIL] Send failed:', oauthErr);
+          
+          // Log failure in Database
+          if (invitationId) {
+            let errorMsg = oauthErr.message || 'Google OAuth delivery error';
+            if (errorMsg.includes('invalid_grant')) {
+              errorMsg = 'Google Account access has expired or been revoked. Please disconnect and reconnect your Google Account on the dashboard.';
+            }
+            
+            await prisma.workspaceInvitation.update({
+              where: { id: invitationId },
+              data: {
+                deliveryStatus: 'FAILED',
+                deliveryError: errorMsg
+              }
+            });
+
+            await prisma.invitationAuditLog.create({
+              data: {
+                workspaceId,
+                invitationId,
+                email: recipientEmail,
+                action: 'DELIVERY_FAILURE',
+                details: `Google OAuth error: ${errorMsg}`
+              }
+            });
+          }
+          return; // Stop here, do not fall back to mock sandbox delivery!
+        }
+      }
+    } catch (dbErr) {
+      console.error('Database lookup failed for inviter:', dbErr);
+    }
+  }
 
   // 4. Setup Transporter
   let transporter = null;
