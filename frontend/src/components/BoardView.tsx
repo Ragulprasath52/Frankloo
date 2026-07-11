@@ -2690,30 +2690,37 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
 
         {/* Workload View */}
         {activeTab === 'workload' && (
-          <div className="bg-white dark:bg-[#161a22] border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm max-w-4xl mx-auto space-y-6 animate-fade-in">
-            <h3 className="font-bold text-[#172b4d] dark:text-[#b6c2cf] text-sm">Team Workload Distribution</h3>
+          <div className="bg-white/90 dark:bg-[#161a22]/90 backdrop-blur-md border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 shadow-xl max-w-md mx-auto space-y-5 animate-fade-in">
+            <h3 className="font-bold text-slate-800 dark:text-[#f0f6fc] text-sm tracking-tight border-b border-slate-100 dark:border-slate-800 pb-3">
+              Team Workload Distribution
+            </h3>
             
-            <div className="space-y-4 divide-y divide-gray-200 dark:divide-gray-800">
+            <div className="space-y-4">
               {currentWorkspace?.members.map((m) => {
                 const memberCards = allCards.filter(c => c.assignees.some(a => a.userId === m.user.id));
+                const percentage = Math.min(100, (memberCards.length / 8) * 100);
                 return (
-                  <div key={m.id} className="pt-4 flex items-center justify-between gap-6">
-                    <div className="w-1/4 flex items-center gap-3">
+                  <div key={m.id} className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 shrink-0 min-w-[140px] sm:min-w-[160px]">
                       <img 
                         src={getAvatarUrl(m.user.avatarUrl, m.user.name || m.user.username)} 
                         alt="Avatar" 
-                        className="w-8 h-8 rounded-xl object-cover"
+                        className="w-8 h-8 rounded-xl object-cover ring-2 ring-slate-100 dark:ring-slate-800 shrink-0"
                       />
                       <div className="min-w-0">
-                        <h4 className="font-bold text-xs text-[#172b4d] dark:text-[#b6c2cf] truncate">{m.user.name || m.user.username}</h4>
-                        <span className="text-[10px] text-gray-500">{memberCards.length} assigned tasks</span>
+                        <h4 className="font-bold text-xs text-slate-700 dark:text-[#b6c2cf] truncate">
+                          {m.user.name || m.user.username}
+                        </h4>
+                        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                          {memberCards.length} {memberCards.length === 1 ? 'task' : 'tasks'} assigned
+                        </span>
                       </div>
                     </div>
 
-                    <div className="flex-1 bg-slate-100 dark:bg-slate-900 h-3 rounded-full overflow-hidden">
+                    <div className="flex-1 bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden relative">
                       <div 
-                        className="h-full rounded-full bg-indigo-600"
-                        style={{ width: `${Math.min(100, (memberCards.length / 8) * 100)}%` }}
+                        className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 transition-all duration-500 ease-out"
+                        style={{ width: `${percentage}%` }}
                       />
                     </div>
                   </div>
