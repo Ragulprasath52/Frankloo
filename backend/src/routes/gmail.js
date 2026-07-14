@@ -23,11 +23,23 @@ router.get('/profile', authenticate, async (req, res) => {
         gmailSandboxMode: true,
         dailySummaryEnabled: true,
         upcomingDeadlinesEnabled: true,
-        overdueAlertsEnabled: true
+        overdueAlertsEnabled: true,
+        googleToken: true
       }
     });
-    res.json(user);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({
+      googleEmail: user.googleEmail,
+      gmailSandboxMode: false,
+      dailySummaryEnabled: user.dailySummaryEnabled,
+      upcomingDeadlinesEnabled: user.upcomingDeadlinesEnabled,
+      overdueAlertsEnabled: user.overdueAlertsEnabled,
+      hasToken: user.googleToken !== null
+    });
   } catch (error) {
+    console.error('Fetch Gmail profile error:', error);
     res.status(500).json({ error: 'Server error fetching Gmail profile' });
   }
 });
@@ -35,24 +47,26 @@ router.get('/profile', authenticate, async (req, res) => {
 // POST Update Gmail Settings
 router.post('/settings', authenticate, async (req, res) => {
   try {
-    const { gmailSandboxMode, dailySummaryEnabled, upcomingDeadlinesEnabled, overdueAlertsEnabled } = req.body;
+    const { dailySummaryEnabled, upcomingDeadlinesEnabled, overdueAlertsEnabled } = req.body;
     const updated = await prisma.user.update({
       where: { id: req.user.id },
       data: {
-        gmailSandboxMode: gmailSandboxMode !== undefined ? gmailSandboxMode : undefined,
+        gmailSandboxMode: false,
         dailySummaryEnabled: dailySummaryEnabled !== undefined ? dailySummaryEnabled : undefined,
         upcomingDeadlinesEnabled: upcomingDeadlinesEnabled !== undefined ? upcomingDeadlinesEnabled : undefined,
         overdueAlertsEnabled: overdueAlertsEnabled !== undefined ? overdueAlertsEnabled : undefined
       },
       select: {
         googleEmail: true,
-        gmailSandboxMode: true,
         dailySummaryEnabled: true,
         upcomingDeadlinesEnabled: true,
         overdueAlertsEnabled: true
       }
     });
-    res.json(updated);
+    res.json({
+      ...updated,
+      gmailSandboxMode: false
+    });
   } catch (error) {
     res.status(500).json({ error: 'Server error updating Gmail settings' });
   }
@@ -61,21 +75,10 @@ router.post('/settings', authenticate, async (req, res) => {
 // GET OAuth URL
 router.get('/auth-url', authenticate, async (req, res) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-    
-    if (user?.gmailSandboxMode) {
-      // Sandbox OAuth Url directly hitting the callback route with sandbox code
-      const config = getOAuthConfig();
-      return res.json({ 
-        url: `${config.redirectUri}?code=sandbox_mock_code&state=${req.user.id}`,
-        isSandbox: true
-      });
-    }
-
     const oauth2Client = getOAuthClient();
     if (!oauth2Client) {
       return res.status(400).json({ 
-        error: 'Google OAuth is not configured on the server. Please use Sandbox Mode or set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET environment variables.' 
+        error: 'Google OAuth client is not configured on the server. Please set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET environment variables.' 
       });
     }
 

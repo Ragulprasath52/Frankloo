@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Users, Search, Trash2, Send, AlertCircle, RefreshCw, X, MoreVertical, Plus
+  Users, Search, Trash2, Send, AlertCircle, RefreshCw, X, MoreVertical, Plus, Copy
 } from 'lucide-react';
 import { useStore, getAvatarUrl } from '../store/useStore';
 
@@ -115,6 +115,12 @@ export default function MembersModule({ workspaceId, isEditor, onSelectBoard }: 
     } catch (err: any) {
       addToast('Error', err.message || 'Failed to revoke invitation', 'error');
     }
+  };
+
+  const handleCopyInviteLink = (token: string) => {
+    const acceptLink = `${window.location.origin}/accept-invite?token=${encodeURIComponent(token)}`;
+    navigator.clipboard.writeText(acceptLink);
+    addToast('Link Copied', 'Invitation link copied to clipboard.', 'success');
   };
 
   const handleRemove = async (memberId: string, memberName: string) => {
@@ -459,6 +465,13 @@ export default function MembersModule({ workspaceId, isEditor, onSelectBoard }: 
                           <td className="px-5 py-3 text-right">
                             {isEditor && (
                               <div className="flex items-center gap-1.5 justify-end">
+                                <button
+                                  onClick={() => handleCopyInviteLink(inv.token)}
+                                  className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors"
+                                  title="Copy invitation link"
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                </button>
                                 <button
                                   onClick={() => handleResend(inv.id)}
                                   className="p-1 rounded text-blue-500 hover:bg-blue-500/10 transition-colors"

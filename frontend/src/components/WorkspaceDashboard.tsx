@@ -962,16 +962,11 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
                 </div>
                 {/* Connection Status Badge */}
                 <div className="flex items-center gap-2 flex-wrap shrink-0">
-                  {gmailProfile?.googleEmail ? (
-                    <>
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20 max-w-[200px] truncate">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
-                        Connected: {gmailProfile.googleEmail}
-                      </span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${gmailProfile.gmailSandboxMode ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'}`}>
-                        {gmailProfile.gmailSandboxMode ? 'Sandbox' : 'Production'}
-                      </span>
-                    </>
+                  {gmailProfile?.googleEmail && gmailProfile?.hasToken ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20 max-w-[200px] truncate">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                      Connected: {gmailProfile.googleEmail}
+                    </span>
                   ) : (
                     <span className="text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2.5 py-1 rounded-md">
                       Disconnected
@@ -1000,24 +995,10 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
                 <div className="space-y-4 xl:col-span-1 xl:border-r border-[#dfe1e6] dark:border-[#a6c5e229] pr-0 xl:pr-6 pb-6 xl:pb-0 border-b xl:border-b-0">
                   <h4 className="font-bold text-xs text-slate-500 uppercase tracking-wider">Account Connection</h4>
                   
-                  {!gmailProfile?.googleEmail ? (
+                  {!gmailProfile?.googleEmail || !gmailProfile?.hasToken ? (
                     <div className="space-y-3 bg-slate-50 dark:bg-slate-900/20 p-4 rounded-lg border border-dashed border-slate-200 dark:border-slate-800 text-center">
                       <p className="text-xs text-[#44546f] dark:text-[#9fadbc]">
                         Connect your Gmail account to enable inbox sync and automated email alerts.
-                      </p>
-                      
-                      {/* Sandbox Toggle info */}
-                      <label className="flex items-center justify-between p-2 rounded bg-white dark:bg-[#1d2125] border border-[#dfe1e6] dark:border-[#a6c5e229] cursor-pointer text-[11px] text-[#172b4d] dark:text-[#b6c2cf] hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                        <span className="font-medium">Sandbox Mode (Mock API)</span>
-                        <input
-                          type="checkbox"
-                          checked={gmailProfile?.gmailSandboxMode ?? true}
-                          onChange={(e) => handleToggleSetting('gmailSandboxMode', e.target.checked)}
-                          className="rounded border-[#dfe1e6]"
-                        />
-                      </label>
-                      <p className="text-[10px] text-slate-400 mt-1">
-                        Sandbox mode handles OAuth and Sync instantly using mock credentials. Toggle off for real Google OAuth API.
                       </p>
                       
                       <button
@@ -1034,16 +1015,6 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
                         <span className="font-bold text-xs text-[#172b4d] dark:text-[#b6c2cf] block break-all">{gmailProfile.googleEmail}</span>
                       </div>
                       
-                      <label className="flex items-center justify-between p-2 rounded bg-white dark:bg-[#1d2125] border border-[#dfe1e6] dark:border-[#a6c5e229] cursor-pointer text-[11px] text-[#172b4d] dark:text-[#b6c2cf] hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                        <span className="font-medium">Sandbox Mode</span>
-                        <input
-                          type="checkbox"
-                          checked={gmailProfile.gmailSandboxMode}
-                          onChange={(e) => handleToggleSetting('gmailSandboxMode', e.target.checked)}
-                          className="rounded border-[#dfe1e6]"
-                        />
-                      </label>
-
                       <button
                         onClick={handleDisconnectGmail}
                         className="btn-secondary hover:text-red-500 hover:border-red-500/30 w-full py-2 flex items-center justify-center gap-1 text-xs"
@@ -1102,7 +1073,7 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
                     </p>
                     <button
                       onClick={handleSyncGmail}
-                      disabled={!gmailProfile?.googleEmail || gmailSyncing}
+                      disabled={!gmailProfile?.googleEmail || !gmailProfile?.hasToken || gmailSyncing}
                       className="btn-primary w-full py-2 flex items-center justify-center gap-1.5 font-semibold text-xs disabled:opacity-50"
                       style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}
                     >
@@ -1238,7 +1209,7 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
 
                     <button
                       type="submit"
-                      disabled={!gmailProfile?.googleEmail}
+                      disabled={!gmailProfile?.googleEmail || !gmailProfile?.hasToken}
                       className="btn-primary w-full justify-center py-2 text-xs font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Add Rule

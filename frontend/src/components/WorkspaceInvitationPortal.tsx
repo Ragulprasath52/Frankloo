@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Mail, Send, Activity, X, RefreshCw, AlertCircle,
+  Mail, Send, Activity, X, RefreshCw, AlertCircle, Copy,
   Eye, Moon, Sun, Laptop, Smartphone, Sparkles,
   Server, Plus, Lock, Search, Info, CheckCircle
 } from 'lucide-react';
@@ -260,6 +260,12 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
     } catch (err: any) {
       addToast('Error', err.message || 'Failed to revoke invitation.', 'error');
     }
+  };
+
+  const handleCopyInviteLink = (token: string) => {
+    const acceptLink = `${window.location.origin}/accept-invite?token=${encodeURIComponent(token)}`;
+    navigator.clipboard.writeText(acceptLink);
+    addToast('Link Copied', 'Invitation link copied to clipboard.', 'success');
   };
 
   // Compile Live Template Preview
@@ -596,6 +602,13 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
                               <td className="px-5 py-4 text-right">
                                 {inv.status === 'PENDING' && (
                                   <div className="flex justify-end gap-1.5">
+                                    <button
+                                      onClick={() => handleCopyInviteLink(inv.token)}
+                                      className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors"
+                                      title="Copy invitation link"
+                                    >
+                                      <Copy className="w-3.5 h-3.5" />
+                                    </button>
                                     <button
                                       onClick={() => handleResendInvite(inv.id)}
                                       className="p-1 rounded text-blue-500 hover:bg-blue-500/10 transition-colors"
@@ -971,7 +984,7 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
                 />
               </div>
 
-              {gmailProfile?.googleEmail ? (
+              {gmailProfile?.googleEmail && gmailProfile?.hasToken ? (
                 <div className="bg-emerald-500/10 dark:bg-emerald-500/5 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 p-3 rounded-xl flex items-start gap-2 animate-fade-in">
                   <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <div className="space-y-0.5">

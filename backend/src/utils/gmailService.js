@@ -94,7 +94,7 @@ Finance Team`,
 
 // Fetch recent emails (Real Gmail API or Sandbox Mock)
 export const fetchRecentEmails = async (user, count = 10) => {
-  if (user.gmailSandboxMode || !user.googleToken) {
+  if (!user.googleToken) {
     // Return Sandbox Mocks
     return MOCK_EMAILS;
   }
@@ -208,7 +208,7 @@ export const sendEmail = async ({ userId, to, subject, htmlText, text, threadId,
   });
 
   // 2. Sandbox simulation send
-  if (user.gmailSandboxMode || !user.googleToken) {
+  if (!user.googleToken) {
     console.log(`[GMAIL SANDBOX EMAIL]
 To: ${to}
 Subject: ${subject}
