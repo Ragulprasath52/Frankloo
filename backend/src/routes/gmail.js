@@ -8,7 +8,7 @@ import {
   fetchRecentEmails, 
   sendEmail 
 } from '../utils/gmailService.js';
-import { parseEmailBody } from '../utils/emailParser.js';
+import { parseEmailIntelligently, parseSender } from '../utils/emailParserService.js';
 import { notifyBoardUpdate } from '../socket.js';
 
 const router = Router();
@@ -168,6 +168,29 @@ router.get('/callback', async (req, res) => {
     // Get user email
     const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
     const userInfo = await oauth2.userinfo.get();
+
+    // Check if another Trel user has already connected this Google account
+    const existingConnection = await prisma.user.findFirst({
+      where: {
+        googleId: userInfo.data.id,
+        NOT: { id: user.id }
+      }
+    });
+
+    if (existingConnection) {
+      return res.status(400).send(`
+        <html>
+          <body style="font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #f4f5f7;">
+            <div style="background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; max-width: 450px;">
+              <h2 style="color: #de350b; margin-top: 0;">Connection Failed</h2>
+              <p>The Google account <strong>${userInfo.data.email}</strong> is already connected to another Trel user account.</p>
+              <p style="color: #6b778c; font-size: 13px; line-height: 1.5;">Each Google account can only be linked to one Trel user account at a time. Please disconnect it from the other account first or use a different Google account.</p>
+              <button onclick="window.close()" style="background: #0052cc; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 15px;">Close window</button>
+            </div>
+          </body>
+        </html>
+      `);
+    }
 
     await prisma.user.update({
       where: { id: user.id },
@@ -352,14 +375,15 @@ router.post('/sync', authenticate, async (req, res) => {
             listId = defaultList.id;
           }
 
-          const parsed = parseEmailBody(email.body, '');
+          const parsed = parseEmailIntelligently(email.subject, email.text || '', email.html || '');
 
           const card = await prisma.card.create({
             data: {
-              title: email.subject,
-              description: parsed.cleanDescription,
+              title: parsed.title,
+              description: parsed.description,
               position: 1000.0,
-              priority: email.subject.toLowerCase().includes('urgent') ? 'URGENT' : 'MEDIUM',
+              priority: parsed.priority || 'MEDIUM',
+              dueDate: parsed.dueDate ? new Date(parsed.dueDate) : null,
               listId
             }
           });
@@ -369,21 +393,22 @@ router.post('/sync', authenticate, async (req, res) => {
               cardId: card.id,
               sender: email.sender,
               subject: email.subject,
+              receivedTime: email.date ? new Date(email.date) : new Date(),
               messageId: email.id,
               threadId: email.threadId,
-              bodyHtml: email.body,
-              bodyText: parsed.cleanDescription,
+              bodyHtml: email.html || email.body || '',
+              bodyText: parsed.description,
               replyLink: `https://mail.google.com/mail/u/0/#inbox/${email.threadId || email.id}`,
               hasAttachments: email.attachments && email.attachments.length > 0
             }
           });
 
-          if (parsed.checklists && parsed.checklists.length > 0) {
-            for (let idx = 0; idx < parsed.checklists.length; idx++) {
+          if (parsed.checklist && parsed.checklist.length > 0) {
+            for (let idx = 0; idx < parsed.checklist.length; idx++) {
               await prisma.checklistItem.create({
                 data: {
                   cardId: card.id,
-                  content: parsed.checklists[idx],
+                  content: parsed.checklist[idx],
                   position: idx * 100.0
                 }
               });
@@ -419,24 +444,36 @@ router.post('/sync', authenticate, async (req, res) => {
           notifyBoardUpdate(matchedRule.targetBoardId, 'CARD_CREATE', card);
         }
       } else {
+        const parsed = parseEmailIntelligently(email.subject, email.text || '', email.html || '');
+        const senderInfo = parseSender(email.sender);
         // General sync to Inbox
         const detailsObj = {
           id: email.id,
           threadId: email.threadId,
           sender: email.sender,
+          senderName: senderInfo.name,
+          senderEmail: senderInfo.email,
           subject: email.subject,
+          recipients: email.recipients || '',
+          cc: email.cc || '',
+          receivedDate: email.date || new Date().toISOString(),
           link: `https://mail.google.com/mail/u/0/#inbox/${email.threadId || email.id}`,
-          attachments: email.attachments
+          attachments: email.attachments,
+          text: email.text || '',
+          html: email.html || '',
+          checklists: parsed.checklist || [],
+          labels: parsed.labels || []
         };
 
         await prisma.inboxItem.create({
           data: {
-            title: email.subject,
-            description: email.body,
+            title: parsed.title,
+            description: parsed.description,
             source: 'GMAIL',
             sourceDetails: JSON.stringify(detailsObj),
             status: 'NEW',
-            priority: email.subject.toLowerCase().includes('urgent') ? 'URGENT' : 'MEDIUM',
+            priority: parsed.priority || 'MEDIUM',
+            dueDate: parsed.dueDate ? new Date(parsed.dueDate) : null,
             workspaceId
           }
         });

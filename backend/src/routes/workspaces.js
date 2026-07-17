@@ -207,6 +207,35 @@ router.post('/user/accept-invitation', authenticate, async (req, res) => {
       });
     }
 
+    // Create board permissions based on invitation.boardAccess
+    try {
+      const defaultBoardRole = (invitation.role === 'OWNER' || invitation.role === 'ADMIN') ? 'ADMIN' : 'EDITOR';
+      if (invitation.boardAccess && invitation.boardAccess !== 'ALL') {
+        const customBoards = JSON.parse(invitation.boardAccess); // Array<{ boardId: string, role: string }>
+        for (const item of customBoards) {
+          await prisma.boardMember.upsert({
+            where: { boardId_userId: { boardId: item.boardId, userId: req.user.id } },
+            create: { boardId: item.boardId, userId: req.user.id, role: item.role || 'EDITOR' },
+            update: { role: item.role || 'EDITOR' }
+          });
+        }
+      } else {
+        // "ALL" or legacy/null default
+        const boards = await prisma.board.findMany({
+          where: { workspaceId: invitation.workspaceId }
+        });
+        for (const b of boards) {
+          await prisma.boardMember.upsert({
+            where: { boardId_userId: { boardId: b.id, userId: req.user.id } },
+            create: { boardId: b.id, userId: req.user.id, role: defaultBoardRole },
+            update: {}
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Failed to create board memberships upon accepting invitation:', err);
+    }
+
     // Update invitation status to ACCEPTED
     await prisma.workspaceInvitation.update({
       where: { id: invitation.id },
@@ -371,7 +400,16 @@ router.get('/:id', authenticate, checkWorkspaceRole([]), async (req, res) => {
       where: { id: req.params.id },
       include: {
         boards: {
-          where: { isArchived: false },
+          where: { 
+            isArchived: false,
+            ...(req.workspaceMember.role !== 'OWNER' && req.workspaceMember.role !== 'ADMIN' ? {
+              members: {
+                some: {
+                  userId: req.user.id
+                }
+              }
+            } : {})
+          },
           include: {
             lists: {
               include: {
@@ -444,10 +482,29 @@ router.get('/:id', authenticate, checkWorkspaceRole([]), async (req, res) => {
           }
         }
 
+        // Fetch member board access
+        const memberBoards = await prisma.boardMember.findMany({
+          where: {
+            userId: m.userId,
+            board: { workspaceId: workspace.id }
+          },
+          include: {
+            board: { select: { id: true, name: true } }
+          }
+        });
+
+        let boardsAccess = [];
+        if (m.role === 'OWNER' || m.role === 'ADMIN') {
+          boardsAccess = workspace.boards.map(b => ({ id: b.id, name: b.name, role: 'ADMIN' }));
+        } else {
+          boardsAccess = memberBoards.map(bm => ({ id: bm.board.id, name: bm.board.name, role: bm.role }));
+        }
+
         return {
           ...m,
           presence,
           lastActive,
+          boards: boardsAccess,
           activity: {
             cardsCreated: logsCount || (m.role === 'OWNER' ? 24 : 8),
             tasksCompleted: completedCount || (m.role === 'OWNER' ? 15 : 4),
@@ -472,9 +529,18 @@ router.get('/:id', authenticate, checkWorkspaceRole([]), async (req, res) => {
 router.get('/:id/activity', authenticate, checkWorkspaceRole([]), async (req, res) => {
   try {
     const workspaceId = req.params.id;
-    // Find all boards in the workspace
     const boards = await prisma.board.findMany({
-      where: { workspaceId, isArchived: false },
+      where: { 
+        workspaceId, 
+        isArchived: false,
+        ...(req.workspaceMember.role !== 'OWNER' && req.workspaceMember.role !== 'ADMIN' ? {
+          members: {
+            some: {
+              userId: req.user.id
+            }
+          }
+        } : {})
+      },
       select: { id: true }
     });
     const boardIds = boards.map(b => b.id);
@@ -542,7 +608,7 @@ router.delete('/:id', authenticate, checkWorkspaceRole(['OWNER']), async (req, r
 // POST Add / Invite Member
 router.post('/:id/members', authenticate, checkWorkspaceRole(['OWNER', 'ADMIN']), async (req, res) => {
   try {
-    const { usernameOrEmail, role } = req.body; // role: "ADMIN" or "MEMBER"
+    const { usernameOrEmail, role, boardAccess } = req.body; // role: "ADMIN" or "MEMBER"
 
     if (!usernameOrEmail) {
       return res.status(400).json({ error: 'Username or email is required' });
@@ -585,6 +651,35 @@ router.post('/:id/members', authenticate, checkWorkspaceRole(['OWNER', 'ADMIN'])
         }
       }
     });
+
+    // Create board permissions based on boardAccess
+    try {
+      const defaultBoardRole = (role === 'OWNER' || role === 'ADMIN') ? 'ADMIN' : 'EDITOR';
+      if (boardAccess && boardAccess !== 'ALL') {
+        const customBoards = Array.isArray(boardAccess) ? boardAccess : JSON.parse(boardAccess); // Array<{ boardId: string, role: string }>
+        for (const item of customBoards) {
+          await prisma.boardMember.upsert({
+            where: { boardId_userId: { boardId: item.boardId, userId: userToInvite.id } },
+            create: { boardId: item.boardId, userId: userToInvite.id, role: item.role || 'EDITOR' },
+            update: { role: item.role || 'EDITOR' }
+          });
+        }
+      } else {
+        // "ALL" or legacy/null default
+        const boards = await prisma.board.findMany({
+          where: { workspaceId: req.params.id }
+        });
+        for (const b of boards) {
+          await prisma.boardMember.upsert({
+            where: { boardId_userId: { boardId: b.id, userId: userToInvite.id } },
+            create: { boardId: b.id, userId: userToInvite.id, role: defaultBoardRole },
+            update: {}
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Failed to create board memberships upon direct add:', err);
+    }
 
     // Retrieve workspace name for email body
     const workspace = await prisma.workspace.findUnique({ where: { id: req.params.id } });
@@ -957,7 +1052,7 @@ router.delete('/:id/goals/:goalId', authenticate, checkWorkspaceRole(['OWNER', '
 // POST Create / Send workspace invitations (Supports multi-email, custom message)
 router.post('/:id/invitations', authenticate, checkWorkspaceRole(['OWNER', 'ADMIN']), async (req, res) => {
   try {
-    const { usernameOrEmail, role, customMessage } = req.body;
+    const { usernameOrEmail, role, customMessage, boardAccess } = req.body;
     const workspaceId = req.params.id;
 
     if (!usernameOrEmail) {
@@ -1024,6 +1119,8 @@ router.post('/:id/invitations', authenticate, checkWorkspaceRole(['OWNER', 'ADMI
       });
 
       let invitation = null;
+      const strBoardAccess = boardAccess ? (typeof boardAccess === 'string' ? boardAccess : JSON.stringify(boardAccess)) : null;
+
       if (existingInvite) {
         // Reuse and update invitation
         invitation = await prisma.workspaceInvitation.update({
@@ -1033,7 +1130,8 @@ router.post('/:id/invitations', authenticate, checkWorkspaceRole(['OWNER', 'ADMI
             expiresAt: expiryDate,
             createdAt: new Date(),
             resentCount: existingInvite.resentCount + 1,
-            lastResentAt: new Date()
+            lastResentAt: new Date(),
+            boardAccess: strBoardAccess
           }
         });
       } else {
@@ -1045,7 +1143,8 @@ router.post('/:id/invitations', authenticate, checkWorkspaceRole(['OWNER', 'ADMI
             role: role || 'MEMBER',
             token: crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex'), // Temp unique placeholder
             invitedById: req.user.id,
-            expiresAt: expiryDate
+            expiresAt: expiryDate,
+            boardAccess: strBoardAccess
           }
         });
       }
@@ -1093,7 +1192,8 @@ router.post('/:id/invitations', authenticate, checkWorkspaceRole(['OWNER', 'ADMI
         customMessage,
         expiryDateStr: expiryDate.toLocaleDateString(),
         invitationId: invitation.id,
-        inviterId: req.user.id
+        inviterId: req.user.id,
+        boardAccess: invitation.boardAccess
       }).catch(err => console.error('Workspace email send error:', err));
 
       results.push({ email, status: 'SUCCESS', invitation });
@@ -1461,6 +1561,81 @@ router.get('/:id/invitation-logs', authenticate, checkWorkspaceRole(['OWNER', 'A
   } catch (error) {
     console.error('Get invitation logs error:', error);
     res.status(500).json({ error: 'Server error fetching audit trail logs' });
+  }
+});
+
+// GET all board members and accessible boards in the workspace (for permissions panel)
+router.get('/:id/board-members', authenticate, checkWorkspaceRole(['OWNER', 'ADMIN']), async (req, res) => {
+  try {
+    const workspaceId = req.params.id;
+    const boardMembers = await prisma.boardMember.findMany({
+      where: {
+        board: {
+          workspaceId
+        }
+      },
+      include: {
+        user: {
+          select: { id: true, username: true, email: true, name: true, avatarUrl: true }
+        },
+        board: {
+          select: { id: true, name: true }
+        }
+      }
+    });
+    res.json(boardMembers);
+  } catch (error) {
+    console.error('Get workspace board members error:', error);
+    res.status(500).json({ error: 'Server error loading board members list' });
+  }
+});
+
+// POST Add or update board access for a member
+router.post('/:id/board-members', authenticate, checkWorkspaceRole(['OWNER', 'ADMIN']), async (req, res) => {
+  try {
+    const { userId, boardId, role } = req.body;
+    if (!userId || !boardId) {
+      return res.status(400).json({ error: 'userId and boardId are required' });
+    }
+
+    const boardMember = await prisma.boardMember.upsert({
+      where: {
+        boardId_userId: { boardId, userId }
+      },
+      create: {
+        boardId,
+        userId,
+        role: role || 'EDITOR'
+      },
+      update: {
+        role: role || 'EDITOR'
+      },
+      include: {
+        user: { select: { id: true, username: true, email: true, name: true, avatarUrl: true } },
+        board: { select: { id: true, name: true } }
+      }
+    });
+
+    res.status(201).json(boardMember);
+  } catch (error) {
+    console.error('Create/update board member error:', error);
+    res.status(500).json({ error: 'Server error updating board member role' });
+  }
+});
+
+// DELETE Revoke board access for a member
+router.delete('/:id/board-members/:boardId/:userId', authenticate, checkWorkspaceRole(['OWNER', 'ADMIN']), async (req, res) => {
+  try {
+    const { boardId, userId } = req.params;
+    await prisma.boardMember.delete({
+      where: {
+        boardId_userId: { boardId, userId }
+      }
+    });
+    res.json({ message: 'Board access revoked successfully' });
+  } catch (error) {
+    console.error('Delete board member error:', error);
+    res.status(500).json({ error: 'Server error revoking board access' });
   }
 });
 

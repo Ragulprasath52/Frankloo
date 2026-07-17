@@ -51,6 +51,11 @@ function getDefaultHtmlTemplate() {
                 <strong>{{workspace_owner}}</strong> has invited you to collaborate as a <strong>{{role}}</strong>.
               </p>
               
+              <!-- Board access details -->
+              <div style="margin: 0 0 20px 0;">
+                {{board_access_html}}
+              </div>
+              
               <!-- Custom message if present -->
               <div style="display: {{custom_message_display}}; margin: 0 0 24px 0; padding: 16px; background-color: #f6f8fa; border-left: 4px solid {{accent_color}}; border-radius: 0 6px 6px 0; font-style: italic; font-size: 14px; line-height: 22px; color: #57606a;">
                 "{{custom_message}}"
@@ -94,6 +99,8 @@ function getDefaultTextTemplate() {
 
 {{workspace_owner}} has invited you to collaborate as a {{role}}.
 
+{{board_access_text}}
+
 Click the link below to accept your invitation and start collaborating:
 {{invite_link}}
 
@@ -116,7 +123,8 @@ export async function sendWorkspaceEmail({
   customMessage = '',
   expiryDateStr,
   invitationId,
-  inviterId
+  inviterId,
+  boardAccess
 }) {
   let settings = null;
   let workspace = null;
@@ -146,6 +154,38 @@ export async function sendWorkspaceEmail({
   const logoUrl = `${env.backendBaseUrl}/uploads/logo.png`;
   const workspaceInitial = workspaceName[0]?.toUpperCase() || 'W';
 
+  let boardAccessHtml = '';
+  let boardAccessText = '';
+  try {
+    if (boardAccess && boardAccess !== 'ALL') {
+      const parsed = typeof boardAccess === 'string' ? JSON.parse(boardAccess) : boardAccess;
+      const boardIds = parsed.map(item => item.boardId);
+      const boards = await prisma.board.findMany({
+        where: { id: { in: boardIds } },
+        select: { id: true, name: true }
+      });
+      const items = parsed.map(item => {
+        const board = boards.find(b => b.id === item.boardId);
+        const boardName = board ? board.name : 'Unknown Board';
+        const roleLabel = (item.role || 'EDITOR').toLowerCase();
+        return { name: boardName, role: roleLabel };
+      });
+      
+      boardAccessText = `You currently have access to:\n` + items.map(item => `• ${item.name} (${item.role})`).join('\n');
+      boardAccessHtml = `<p style="margin: 0 0 12px 0; font-size: 15px; color: #24292f;">You currently have access to:</p>` +
+                        `<ul style="margin: 0 0 20px 0; padding-left: 20px; font-size: 14px; color: #24292f; line-height: 22px;">` +
+                        items.map(item => `<li><strong>${item.name}</strong> (${item.role})</li>`).join('') +
+                        `</ul>`;
+    } else {
+      boardAccessText = `You currently have access to all boards in this workspace.`;
+      boardAccessHtml = `<p style="margin: 0 0 16px 0; font-size: 15px; color: #24292f;">You currently have access to all boards in this workspace.</p>`;
+    }
+  } catch (err) {
+    console.error('Failed to parse boardAccess in mail service:', err);
+    boardAccessText = `You currently have access to all boards in this workspace.`;
+    boardAccessHtml = `<p style="margin: 0 0 16px 0; font-size: 15px; color: #24292f;">You currently have access to all boards in this workspace.</p>`;
+  }
+
   // 2. Prepare Variables Map
   const variables = {
     workspace_name: workspaceName,
@@ -160,7 +200,9 @@ export async function sendWorkspaceEmail({
     custom_message_display: customMessage ? 'block' : 'none',
     accent_color: accentColor,
     button_color: buttonColor,
-    footer: footerText
+    footer: footerText,
+    board_access_html: boardAccessHtml,
+    board_access_text: boardAccessText
   };
 
   // 3. Compile Templates

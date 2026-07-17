@@ -29,6 +29,7 @@ export interface User {
   username: string;
   name: string | null;
   avatarUrl: string | null;
+  googleEmail?: string | null;
 }
 
 export interface WorkspaceMember {
@@ -43,6 +44,7 @@ export interface WorkspaceMember {
     tasksCompleted: number;
     docsEdited: number;
   };
+  boards?: any[];
 }
 
 export interface Goal {
@@ -90,6 +92,8 @@ export interface Board {
   automations: AutomationRule[];
   milestones: Milestone[];
   savedFilters: SavedFilter[];
+  myRole?: string;
+  members?: any[];
   incomingEmailEnabled?: boolean | null;
   incomingEmailAddress?: string | null;
   incomingEmailListId?: string | null;
@@ -304,7 +308,9 @@ interface AppState {
   createWorkspace: (name: string, description?: string) => Promise<Workspace>;
   updateWorkspace: (id: string, name: string, description?: string) => Promise<void>;
   deleteWorkspace: (id: string) => Promise<void>;
-  inviteMember: (workspaceId: string, usernameOrEmail: string, role?: string, customMessage?: string) => Promise<any>;
+  inviteMember: (workspaceId: string, usernameOrEmail: string, role?: string, customMessage?: string, boardAccess?: any) => Promise<any>;
+  updateBoardMember: (workspaceId: string, userId: string, boardId: string, role: string) => Promise<any>;
+  revokeBoardMember: (workspaceId: string, boardId: string, userId: string) => Promise<void>;
   fetchWorkspaceInvitations: (workspaceId: string) => Promise<void>;
   revokeInvitation: (workspaceId: string, invitationId: string) => Promise<void>;
   resendInvitation: (workspaceId: string, invitationId: string) => Promise<void>;
@@ -670,11 +676,11 @@ export const useStore = create<AppState>((set, get) => ({
     await get().fetchWorkspaces();
   },
 
-  inviteMember: async (workspaceId, usernameOrEmail, role = 'MEMBER', customMessage = '') => {
+  inviteMember: async (workspaceId, usernameOrEmail, role = 'MEMBER', customMessage = '', boardAccess = null) => {
     const res = await fetch(`${API_URL}/workspaces/${workspaceId}/invitations`, {
       method: 'POST',
       headers: getHeaders(get().token),
-      body: JSON.stringify({ usernameOrEmail, role, customMessage })
+      body: JSON.stringify({ usernameOrEmail, role, customMessage, boardAccess })
     });
     if (!res.ok) {
       const err = await res.json();
@@ -683,6 +689,33 @@ export const useStore = create<AppState>((set, get) => ({
     const data = await res.json();
     await get().fetchWorkspaceInvitations(workspaceId);
     return data;
+  },
+
+  updateBoardMember: async (workspaceId, userId, boardId, role) => {
+    const res = await fetch(`${API_URL}/workspaces/${workspaceId}/board-members`, {
+      method: 'POST',
+      headers: getHeaders(get().token),
+      body: JSON.stringify({ userId, boardId, role })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to update board member role');
+    }
+    const data = await res.json();
+    await get().fetchWorkspaceDetails(workspaceId);
+    return data;
+  },
+
+  revokeBoardMember: async (workspaceId, boardId, userId) => {
+    const res = await fetch(`${API_URL}/workspaces/${workspaceId}/board-members/${boardId}/${userId}`, {
+      method: 'DELETE',
+      headers: getHeaders(get().token)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to revoke board member access');
+    }
+    await get().fetchWorkspaceDetails(workspaceId);
   },
 
   fetchWorkspaceInvitations: async (workspaceId) => {
@@ -1080,7 +1113,10 @@ export const useStore = create<AppState>((set, get) => ({
       headers: getHeaders(get().token),
       body: JSON.stringify(data)
     });
-    if (!res.ok) throw new Error('Error updating board');
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Error updating board');
+    }
     const updated = await res.json();
     if (get().currentBoard?.id === boardId) {
       set((state) => ({

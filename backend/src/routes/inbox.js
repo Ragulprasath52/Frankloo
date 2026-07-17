@@ -4,7 +4,7 @@ import { prisma } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
 import { notifyBoardUpdate } from '../socket.js';
 import { parseEmailBody } from '../utils/emailParser.js';
-import { parseEmailIntelligently, getDiceSimilarity } from '../utils/emailParserService.js';
+import { parseEmailIntelligently, getDiceSimilarity, parseSender } from '../utils/emailParserService.js';
 
 const router = Router();
 
@@ -141,12 +141,12 @@ router.post('/merge-card', authenticate, async (req, res) => {
 // POST inbound parsed email from SMTP/forward service
 router.post('/incoming-email', async (req, res) => {
   try {
-    const { to, from, subject, text, html, attachments, threadId, messageId } = req.body;
+    const { to, from, cc, subject, text, html, attachments, threadId, messageId, receivedDate } = req.body;
     if (!to || !from || !subject) {
       return res.status(400).json({ error: 'Missing required email fields (to, from, subject)' });
     }
 
-    const result = await processIncomingEmail({ to, from, subject, text, html, attachments, threadId, messageId });
+    const result = await processIncomingEmail({ to, from, cc, subject, text, html, attachments, threadId, messageId, receivedDate });
     res.json(result);
   } catch (error) {
     console.error('Incoming Email Parse Error:', error);
@@ -168,7 +168,7 @@ router.post('/cloudflare-email', express.text({ type: 'text/plain', limit: '25mb
       return res.status(401).json({ error: 'Invalid Cloudflare secret' });
     }
 
-    let to, from, subject, text, html, attachments, threadId, messageId;
+    let to, from, cc, subject, text, html, attachments, threadId, messageId, receivedDate;
 
     if (typeof req.body === 'string') {
       console.log('Parsing raw MIME body from string...');
@@ -177,11 +177,13 @@ router.post('/cloudflare-email', express.text({ type: 'text/plain', limit: '25mb
 
       to = req.headers['x-envelope-to'] || (parsedEmail.to && parsedEmail.to[0]?.address) || '';
       from = req.headers['x-envelope-from'] || parsedEmail.from?.address || '';
+      cc = (parsedEmail.cc || []).map(c => c.address || c.name || '').join(', ');
       subject = parsedEmail.subject || '(No Subject)';
       text = parsedEmail.text || '';
       html = parsedEmail.html || '';
       messageId = parsedEmail.messageId || null;
       threadId = null;
+      receivedDate = parsedEmail.date || new Date().toISOString();
       attachments = (parsedEmail.attachments || []).map(att => ({
         filename: att.filename,
         mimeType: att.mimeType,
@@ -190,7 +192,7 @@ router.post('/cloudflare-email', express.text({ type: 'text/plain', limit: '25mb
       }));
     } else {
       console.log('Body is JSON object...');
-      ({ to, from, subject, text, html, attachments, threadId, messageId } = req.body || {});
+      ({ to, from, cc, subject, text, html, attachments, threadId, messageId, receivedDate } = req.body || {});
     }
 
     console.log(`Email details parsed: from=${from}, to=${to}, subject=${subject}`);
@@ -203,12 +205,14 @@ router.post('/cloudflare-email', express.text({ type: 'text/plain', limit: '25mb
     const result = await processIncomingEmail({
       to,
       from,
+      cc,
       subject: subject || '(No Subject)',
       text: text || '',
       html: html || '',
       attachments: attachments || [],
       threadId,
-      messageId
+      messageId,
+      receivedDate
     });
     console.log('[CLOUDFLARE EMAIL PROCESSED SUCCESSFULLY]', result);
     res.json(result);
@@ -854,7 +858,7 @@ router.post('/:workspaceId/mock-incoming', authenticate, async (req, res) => {
 });
 
 // Helper function to process all incoming emails (from SMTP webhook or test simulator)
-export async function processIncomingEmail({ to, from, subject, text, html, attachments, threadId, messageId }) {
+export async function processIncomingEmail({ to, from, cc, subject, text, html, attachments, threadId, messageId, receivedDate }) {
   const cleanTo = to.match(/<([^>]+)>/)?.[1] || to.trim();
   console.log(`[PROCESS INCOMING EMAIL] cleanTo = ${cleanTo}`);
   const prefix = cleanTo.split('@')[0] || '';
@@ -1021,7 +1025,8 @@ export async function processIncomingEmail({ to, from, subject, text, html, atta
     }
   }
 
-  const parsed = parseEmailBody(text || '', html || '');
+  const parsed = parseEmailIntelligently(subject, text || '', html || '');
+  const senderInfo = parseSender(from);
 
   // 6. Automation Rules auto-routing matching logic
   let autoRouteMatch = false;
@@ -1076,12 +1081,22 @@ export async function processIncomingEmail({ to, from, subject, text, html, atta
       }
     }
 
+    // Add parsed auto labels
+    if (parsed.labels && parsed.labels.length > 0) {
+      for (const name of parsed.labels) {
+        if (!defaultLabels.some(l => l.name.toLowerCase() === name.toLowerCase())) {
+          defaultLabels.push({ name, color: '#0969da' });
+        }
+      }
+    }
+
     const card = await prisma.card.create({
       data: {
-        title: subject,
-        description: parsed.cleanDescription,
+        title: parsed.title,
+        description: parsed.description,
         position: 1000.0,
-        priority: board.incomingEmailDefaultPriority || 'MEDIUM',
+        priority: parsed.priority || board.incomingEmailDefaultPriority || 'MEDIUM',
+        dueDate: parsed.dueDate ? new Date(parsed.dueDate) : null,
         listId,
         customFields: JSON.stringify({ labels: defaultLabels, emoji: '' })
       }
@@ -1092,10 +1107,11 @@ export async function processIncomingEmail({ to, from, subject, text, html, atta
         cardId: card.id,
         sender: from,
         subject: subject,
+        receivedTime: receivedDate ? new Date(receivedDate) : new Date(),
         messageId: messageId || null,
         threadId: threadId || null,
         bodyHtml: html || text || '',
-        bodyText: parsed.cleanDescription,
+        bodyText: parsed.description,
         replyLink: null,
         hasAttachments: attachments && attachments.length > 0
       }
@@ -1135,12 +1151,12 @@ export async function processIncomingEmail({ to, from, subject, text, html, atta
     }
 
     // Checklists
-    if (parsed.checklists && parsed.checklists.length > 0) {
-      for (let idx = 0; idx < parsed.checklists.length; idx++) {
+    if (parsed.checklist && parsed.checklist.length > 0) {
+      for (let idx = 0; idx < parsed.checklist.length; idx++) {
         await prisma.checklistItem.create({
           data: {
             cardId: card.id,
-            content: parsed.checklists[idx],
+            content: parsed.checklist[idx],
             position: idx * 100.0
           }
         });
@@ -1164,24 +1180,30 @@ export async function processIncomingEmail({ to, from, subject, text, html, atta
   // Create workspace InboxItem
   const detailsJson = {
     sender: from,
+    senderName: senderInfo.name,
+    senderEmail: senderInfo.email,
     subject: subject,
     recipients: to,
+    cc: cc || '',
+    receivedDate: receivedDate || new Date().toISOString(),
     text: text || '',
     html: html || '',
     attachments: attachments || [],
     threadId: threadId || null,
     messageId: messageId || null,
-    checklists: parsed.checklists || []
+    checklists: parsed.checklist || [],
+    labels: parsed.labels || []
   };
 
   const item = await prisma.inboxItem.create({
     data: {
-      title: subject,
-      description: parsed.cleanDescription,
+      title: parsed.title,
+      description: parsed.description,
       source: 'EMAIL',
       sourceDetails: JSON.stringify(detailsJson),
       status: 'NEW',
-      priority: board.incomingEmailDefaultPriority || 'MEDIUM',
+      priority: parsed.priority || board.incomingEmailDefaultPriority || 'MEDIUM',
+      dueDate: parsed.dueDate ? new Date(parsed.dueDate) : null,
       workspaceId: board.workspaceId,
       boardId: board.id
     }

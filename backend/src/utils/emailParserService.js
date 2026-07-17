@@ -24,41 +24,203 @@ const ACTION_VERBS = [
   'create', 'design', 'build', 'implement', 'optimize', 'fix', 'improve', 
   'deploy', 'setup', 'configure', 'write', 'test', 'review', 'add', 
   'update', 'delete', 'migrate', 'integrate', 'publish', 'refactor',
-  'check', 'remove', 'add', 'make', 'change', 'send', 'get'
+  'check', 'remove', 'make', 'change', 'send', 'get', 'complete', 'upload', 'finish'
 ];
+
+/**
+ * Clean Subject Line of RE:, FW:, FWD:, etc.
+ */
+export function cleanSubject(subject = '') {
+  let cleaned = subject;
+  // Patterns matching RE:, FW:, FWD:, etc. and variations like Re[2]: or Fwd: fwd:
+  const prefixPattern = /^\s*(re|fw|fwd|aw|wg|reply|forward|回复|转发|答复)\s*(\[\d+\])?\s*:\s*/i;
+  while (prefixPattern.test(cleaned)) {
+    cleaned = cleaned.replace(prefixPattern, '');
+  }
+  return cleaned.replace(/\s+/g, ' ').trim() || 'No Subject';
+}
+
+/**
+ * Parses a sender address string to extract Name and Email
+ */
+export function parseSender(senderStr = '') {
+  let name = '';
+  let email = '';
+  const emailMatch = senderStr.match(/<([^>]+)>/);
+  if (emailMatch) {
+    email = emailMatch[1].trim();
+    name = senderStr.replace(/<[^>]+>/, '').replace(/['"]/g, '').trim();
+  } else {
+    email = senderStr.trim();
+    name = email.split('@')[0] || '';
+  }
+  return { name, email };
+}
+
+/**
+ * Decodes html entities and cleans html markup to plain text safely
+ */
+export function cleanHtmlBody(html = '') {
+  if (!html) return '';
+  
+  // 1. Remove style block contents (CSS)
+  let text = html.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, '');
+  
+  // 2. Remove script block contents (JS)
+  text = text.replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, '');
+  
+  // 3. Remove tracking pixels (1x1 images, transparent, spacer, etc.)
+  text = text.replace(/<img[^>]*width\s*=\s*["']?1["']?[^>]*>/gi, '');
+  text = text.replace(/<img[^>]*height\s*=\s*["']?1["']?[^>]*>/gi, '');
+  text = text.replace(/<img[^>]*src\s*=\s*["']?[^"']*(pixel|spacer|tracking|open|trck|t\.gif)[^"']*["']?[^>]*>/gi, '');
+
+  // 4. Format list items and structural blocks into newlines
+  text = text.replace(/<br\s*\/?>/gi, '\n');
+  text = text.replace(/<\/p>/gi, '\n\n');
+  text = text.replace(/<\/div>/gi, '\n');
+  text = text.replace(/<\/tr>/gi, '\n');
+  text = text.replace(/<\/li>/gi, '\n');
+  text = text.replace(/<li[^>]*>/gi, '• ');
+  
+  // 5. Strip all other tags
+  text = text.replace(/<[^>]+>/g, '');
+  
+  // 6. Decode entities
+  text = text
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&ldquo;/g, '"')
+    .replace(/&rdquo;/g, '"');
+    
+  return text.trim();
+}
+
+/**
+ * Parses email plain text body to strip signatures, chains, disclaimers, etc.
+ */
+export function cleanBodyText(bodyText = '') {
+  if (!bodyText) return '';
+  
+  let lines = bodyText.split(/\r?\n/);
+  let cleanLines = [];
+  
+  // Quoted email headers & history cutoff patterns
+  const quotePatterns = [
+    /^\s*On\s+.*\s+wrote:\s*$/i,
+    /^\s*-+\s*Original Message\s*-+\s*$/i,
+    /^\s*From:\s+.*$/i,
+    /^\s*>+.*$/ // lines starting with >
+  ];
+  
+  // Common company disclaimers
+  const disclaimerPatterns = [
+    /confidentiality\s+note/i,
+    /this\s+email\s+and\s+any\s+attachments\s+are\s+confidential/i,
+    /legally\s+privileged/i,
+    /intended\s+solely\s+for\s+the\s+addressee/i,
+    /do\s+not\s+disclose\s+this/i,
+    /sender\s+accepts\s+no\s+liability/i,
+    /disclaimer/i
+  ];
+  
+  // Unsubscribe footers
+  const unsubscribePatterns = [
+    /unsubscribe/i,
+    /opt-out/i,
+    /manage\s+preferences/i,
+    /click\s+here\s+to\s+unsubscribe/i
+  ];
+  
+  for (let line of lines) {
+    const trimmed = line.trim();
+    
+    // Stop processing if we hit quoted previous email chains
+    if (quotePatterns.some(pat => pat.test(line)) || trimmed.startsWith('>')) {
+      break;
+    }
+    
+    // Skip disclaimer & unsubscribe lines
+    if (disclaimerPatterns.some(pat => pat.test(trimmed)) || unsubscribePatterns.some(pat => pat.test(trimmed))) {
+      continue;
+    }
+    
+    // Skip raw MIME/base64 headers and boundaries
+    if (trimmed.startsWith('------=_NextPart') || trimmed.startsWith('Content-Type:') || trimmed.startsWith('Content-Transfer-Encoding:')) {
+      continue;
+    }
+    
+    cleanLines.push(line);
+  }
+  
+  let cleaned = cleanLines.join('\n').trim();
+  
+  // Strip standard email signatures
+  const signaturePatterns = [
+    /^--\s*$/m,               // Standard dash-dash-space
+    /^Best\s+regards/mi,
+    /^Warm\s+regards/mi,
+    /^Kind\s+regards/mi,
+    /^Regards/mi,
+    /^Sincerely/mi,
+    /^Thanks/mi,
+    /^Thank\s+you/mi,
+    /^Sent\s+from\s+my\s+iPhone/mi,
+    /^Sent\s+from\s+my\s+Android/mi,
+    /^Sent\s+from\s+Mail/mi
+  ];
+  
+  for (const pat of signaturePatterns) {
+    const match = cleaned.match(pat);
+    if (match && match.index !== undefined) {
+      cleaned = cleaned.substring(0, match.index).trim();
+    }
+  }
+
+  // Remove tracking parameters from links
+  cleaned = cleaned.replace(/(https?:\/\/[^\s]+)/g, (url) => {
+    try {
+      const parsed = new URL(url);
+      const params = parsed.searchParams;
+      let hasTracking = false;
+      for (const key of Array.from(params.keys())) {
+        if (key.startsWith('utm_') || key === 'clickid' || key === 'gclid' || key === 'fbclid') {
+          params.delete(key);
+          hasTracking = true;
+        }
+      }
+      return hasTracking ? parsed.toString() : url;
+    } catch (e) {
+      return url;
+    }
+  });
+  
+  // Remove lines containing pure base64 code that might leak from poorly formatted MIME sections
+  cleaned = cleaned.replace(/^[a-zA-Z0-9+/]{60,}\s*$/gm, '');
+
+  return cleaned.trim();
+}
 
 /**
  * Parses raw email content and extracts structured task fields with highlights.
  */
 export function parseEmailIntelligently(subject = '', text = '', html = '') {
-  let bodyText = text || stripHtml(html) || '';
-
-  // 1. Remove reply history/quotes and signatures first to extract only actionable text
-  const quotesRegex = /(On\s+.*\s+wrote:|-+\s*Original Message\s*-+|From:\s+.*|On\s+.*,\s+.*\s+wrote:|>+.*)/mi;
-  const signatureRegex = /(^--\s*$|^Best\s+regards|^Warm\s+regards|^Kind\s+regards|^Regards|^Sincerely|^Thanks|^Thank\s+you|^Sent\s+from\s+my)/mi;
-
-  let actionableText = bodyText;
+  // 1. Clean Subject
+  const extractedTitle = cleanSubject(subject);
   
-  const quoteMatch = bodyText.match(quotesRegex);
-  if (quoteMatch && quoteMatch.index !== undefined) {
-    actionableText = bodyText.substring(0, quoteMatch.index);
-  }
+  // 2. Safe html to text cleaning
+  const bodyText = text ? cleanBodyText(text) : cleanBodyText(cleanHtmlBody(html));
 
-  const sigMatch = actionableText.match(signatureRegex);
-  if (sigMatch && sigMatch.index !== undefined) {
-    actionableText = actionableText.substring(0, sigMatch.index);
-  }
-
-  actionableText = actionableText.trim();
-
-  // Split actionable text into sentences for sentence-level parsing
-  const sentences = actionableText
+  // Split text into sentences for sentence-level parsing
+  const sentences = bodyText
     .split(/[.!?\n]/)
     .map(s => s.trim())
     .filter(s => s.length > 5);
 
-  // Initialize extracted fields and highlights
-  let extractedTitle = subject.replace(/^(Fwd|Re|Fw|[FWD]):\s*/i, '').trim();
   let extractedDescription = '';
   let extractedPriority = 'MEDIUM';
   let extractedDueDate = null;
@@ -66,22 +228,16 @@ export function parseEmailIntelligently(subject = '', text = '', html = '') {
   const extractedChecklist = [];
 
   const highlights = {
-    title: { text: extractedTitle, match: extractedTitle },
+    title: { text: subject, match: extractedTitle },
     priority: null,
     dueDate: null,
     checklist: [],
     labels: {}
   };
 
-  // Ensure title highlight matches some text in subject/body if possible
-  const subjectMatch = subject.match(new RegExp(extractedTitle, 'i'));
-  if (subjectMatch) {
-    highlights.title = { text: subject, match: subjectMatch[0] };
-  }
-
   // --- Priority Extraction ---
   const priorityPatterns = {
-    URGENT: ['urgent', 'asap', 'immediate', 'emergency', 'highest priority', 'critical'],
+    URGENT: ['urgent', 'asap', 'immediate', 'emergency', 'highest priority', 'critical', 'immediately'],
     HIGH: ['high priority', 'important', 'crucial', 'must do', 'high'],
     MEDIUM: ['medium', 'normal', 'standard'],
     LOW: ['low', 'minor', 'trivial', 'whenever']
@@ -136,7 +292,7 @@ export function parseEmailIntelligently(subject = '', text = '', html = '') {
     }
     // 4. "end of month"
     else if (lowerSentence.includes('end of month') || lowerSentence.includes('end of the month')) {
-      calculatedDate = new Date(today.getFullYear(), today.getMonth() + 1, 0); // Last day of current month
+      calculatedDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       dateTextMatch = lowerSentence.includes('end of the month') ? 'end of the month' : 'end of month';
       dateSentence = sentence;
     }
@@ -183,13 +339,13 @@ export function parseEmailIntelligently(subject = '', text = '', html = '') {
     }
   }
 
-  // --- Checklist Extraction ---
-  for (const sentence of sentences) {
-    // 1. Detect standard checklist markers first
-    const listPattern = /^\s*[-*+]?\s*\[\s*\]\s+(.+)$/i;
-    const bulletPattern = /^\s*[-*+]\s+(.+)$/;
-    const numPattern = /^\d+\.\s+(.+)$/;
+  // --- Checklist / List Extraction ---
+  // Standard list patterns
+  const listPattern = /^\s*[-*+]?\s*\[\s*\]\s+(.+)$/i;
+  const bulletPattern = /^\s*[-*+•]\s+(.+)$/;
+  const numPattern = /^\d+\.\s+(.+)$/;
 
+  for (const sentence of sentences) {
     let parsedItem = '';
     let matchKw = '';
 
@@ -211,38 +367,56 @@ export function parseEmailIntelligently(subject = '', text = '', html = '') {
       }
     }
 
-    // 2. If no bullet points exist, check for action verbs at the start of sentences
+    // Natural action verb scanner if not explicitly in list format
     if (!parsedItem) {
-      const words = sentence.split(/\s+/);
+      const cleanSentence = sentence.replace(/^(please|can you|could you|make sure to|should|we need to)\s+/i, '');
+      const words = cleanSentence.split(/\s+/);
       if (words.length > 2) {
         const firstWord = words[0].toLowerCase().replace(/[^a-z]/g, '');
         if (ACTION_VERBS.includes(firstWord)) {
-          parsedItem = sentence;
+          parsedItem = cleanSentence;
           matchKw = words[0];
         }
       }
     }
 
-    if (parsedItem && parsedItem.length > 3 && parsedItem.length < 100) {
-      // Clean leading action structures if needed, capitalize first letter
-      const cleanItem = parsedItem.charAt(0).toUpperCase() + parsedItem.slice(1);
-      if (!extractedChecklist.includes(cleanItem)) {
-        extractedChecklist.push(cleanItem);
+    // Split sentence if it contains "and" connecting two action items
+    if (parsedItem) {
+      const dateSuffixPattern = /\s+(before|by|on)\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday|today|tomorrow)\b/i;
+      const lowerItem = parsedItem.toLowerCase();
+      if (lowerItem.includes(' and ')) {
+        const parts = parsedItem.split(/\s+and\s+/i);
+        for (const part of parts) {
+          const cleanPart = part.trim()
+            .replace(/^(please|can you|could you|make sure to)\s+/i, '')
+            .replace(dateSuffixPattern, '');
+          if (cleanPart.length > 3) {
+            const formattedPart = cleanPart.charAt(0).toUpperCase() + cleanPart.slice(1);
+            if (!extractedChecklist.includes(formattedPart)) {
+              extractedChecklist.push(formattedPart);
+            }
+          }
+        }
         highlights.checklist.push({ text: sentence, match: matchKw });
+      } else {
+        const cleanPart = parsedItem
+          .replace(/^(please|can you|could you|make sure to)\s+/i, '')
+          .replace(dateSuffixPattern, '');
+        const formattedPart = cleanPart.charAt(0).toUpperCase() + cleanPart.slice(1);
+        if (formattedPart.length > 3 && !extractedChecklist.includes(formattedPart)) {
+          extractedChecklist.push(formattedPart);
+          highlights.checklist.push({ text: sentence, match: matchKw });
+        }
       }
     }
   }
 
   // --- Description Synthesis ---
-  // Generate a clean summary paragraph from the actionable text
-  const descParagraphs = actionableText.split(/\n+/).map(p => p.trim()).filter(p => p.length > 20);
+  const descParagraphs = bodyText.split(/\n+/).map(p => p.trim()).filter(p => p.length > 10);
   if (descParagraphs.length > 0) {
-    extractedDescription = descParagraphs[0];
-    if (descParagraphs.length > 1) {
-      extractedDescription += '\n\n' + descParagraphs.slice(1, 3).join('\n\n');
-    }
+    extractedDescription = descParagraphs.join('\n\n');
   } else {
-    extractedDescription = actionableText;
+    extractedDescription = bodyText;
   }
 
   return {
@@ -257,8 +431,7 @@ export function parseEmailIntelligently(subject = '', text = '', html = '') {
 }
 
 /**
- * Compares two strings using Sørensen-Dice coefficient (n-grams matching).
- * Returns similarity score between 0 and 100.
+ * Compares two strings using Sørensen-Dice coefficient.
  */
 export function getDiceSimilarity(s1 = '', s2 = '') {
   const getBigrams = (str) => {

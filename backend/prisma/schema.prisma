@@ -33,6 +33,7 @@ model User {
   notifications Notification[]
   attachments  CardAttachment[]
   gmailAutoRules GmailAutoRule[]
+  boardMembers BoardMember[]
 }
 
 // ── Workspaces ───────────────────────────────────────────
@@ -122,6 +123,7 @@ model WorkspaceInvitation {
   deliveryError  String?
 
   workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  boardAccess    String?   @db.Text
 
   @@index([workspaceId, email])
 }
@@ -161,6 +163,7 @@ model Board {
   gmailAutoRules               GmailAutoRule[]
   inboxItems                   InboxItem[]
   emailLogs                    EmailLog[]
+  members                      BoardMember[]
 }
 
 // ── Lists / Columns ──────────────────────────────────────
@@ -523,5 +526,20 @@ model EmailLog {
   createdAt   DateTime @default(now())
 
   board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+}
+
+// ── Board Members ─────────────────────────────────────────────
+model BoardMember {
+  id        String   @id @default(uuid())
+  boardId   String
+  userId    String
+  role      String   @default("EDITOR") // "VIEWER", "COMMENTER", "EDITOR", "ADMIN"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, userId])
 }
 

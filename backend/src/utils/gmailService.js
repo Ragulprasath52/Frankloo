@@ -92,11 +92,39 @@ Finance Team`,
   }
 ];
 
+function getGmailBodyParts(payload) {
+  let text = '';
+  let html = '';
+  
+  function traverse(part) {
+    if (part.mimeType === 'text/plain' && part.body && part.body.data) {
+      text = Buffer.from(part.body.data, 'base64').toString('utf-8');
+    } else if (part.mimeType === 'text/html' && part.body && part.body.data) {
+      html = Buffer.from(part.body.data, 'base64').toString('utf-8');
+    }
+    if (part.parts) {
+      for (const p of part.parts) {
+        traverse(p);
+      }
+    }
+  }
+  
+  if (payload) {
+    traverse(payload);
+  }
+  
+  return { text, html };
+}
+
 // Fetch recent emails (Real Gmail API or Sandbox Mock)
 export const fetchRecentEmails = async (user, count = 10) => {
   if (!user.googleToken) {
     // Return Sandbox Mocks
-    return MOCK_EMAILS;
+    return MOCK_EMAILS.map(email => ({
+      ...email,
+      text: email.body,
+      html: email.body ? `<p>${email.body.replace(/\n/g, '<br />')}</p>` : ''
+    }));
   }
 
   const oauth2Client = getOAuthClient();
@@ -139,24 +167,32 @@ export const fetchRecentEmails = async (user, count = 10) => {
       const subjectHeader = headers.find(h => h.name.toLowerCase() === 'subject');
       const senderHeader = headers.find(h => h.name.toLowerCase() === 'from');
       const dateHeader = headers.find(h => h.name.toLowerCase() === 'date');
+      const toHeader = headers.find(h => h.name.toLowerCase() === 'to');
+      const ccHeader = headers.find(h => h.name.toLowerCase() === 'cc');
 
       const subject = subjectHeader ? subjectHeader.value : 'No Subject';
       const sender = senderHeader ? senderHeader.value : 'Unknown Sender';
       const date = dateHeader ? dateHeader.value : new Date().toISOString();
+      const recipients = toHeader ? toHeader.value : '';
+      const cc = ccHeader ? ccHeader.value : '';
 
-      // Extract body
-      let body = '';
-      if (details.data.payload.parts) {
-        const textPart = details.data.payload.parts.find(p => p.mimeType === 'text/plain');
-        if (textPart && textPart.body && textPart.body.data) {
-          body = Buffer.from(textPart.body.data, 'base64').toString('utf-8');
-        } else {
-          body = details.data.snippet || '';
+      // Extract body recursively
+      let { text, html } = getGmailBodyParts(details.data.payload);
+      
+      // Fallbacks
+      if (!text && !html) {
+        if (details.data.payload.body && details.data.payload.body.data) {
+          const rawBody = Buffer.from(details.data.payload.body.data, 'base64').toString('utf-8');
+          if (details.data.payload.mimeType === 'text/html') {
+            html = rawBody;
+          } else {
+            text = rawBody;
+          }
         }
-      } else if (details.data.payload.body && details.data.payload.body.data) {
-        body = Buffer.from(details.data.payload.body.data, 'base64').toString('utf-8');
-      } else {
-        body = details.data.snippet || '';
+      }
+      
+      if (!text) {
+        text = details.data.snippet || '';
       }
 
       // Check for attachments
@@ -180,8 +216,12 @@ export const fetchRecentEmails = async (user, count = 10) => {
         sender,
         subject,
         snippet: details.data.snippet || '',
-        body,
+        body: text || html || '',
+        text,
+        html,
         date,
+        recipients,
+        cc,
         attachments,
         labelIds: details.data.labelIds || []
       });

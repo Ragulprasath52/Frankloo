@@ -162,7 +162,8 @@ router.post('/register', async (req, res) => {
         email: user.email,
         username: user.username,
         name: user.name,
-        avatarUrl: user.avatarUrl
+        avatarUrl: user.avatarUrl,
+        googleEmail: user.googleEmail
       },
       autoJoinedWorkspaceId
     });
@@ -221,7 +222,8 @@ router.post('/login', async (req, res) => {
         email: user.email,
         username: user.username,
         name: user.name,
-        avatarUrl: user.avatarUrl
+        avatarUrl: user.avatarUrl,
+        googleEmail: user.googleEmail
       }
     });
   } catch (error) {
@@ -237,7 +239,8 @@ router.get('/me', authenticate, async (req, res) => {
     email: req.user.email,
     username: req.user.username,
     name: req.user.name,
-    avatarUrl: req.user.avatarUrl
+    avatarUrl: req.user.avatarUrl,
+    googleEmail: req.user.googleEmail
   });
 });
 
@@ -285,7 +288,8 @@ router.put('/me', authenticate, async (req, res) => {
       email: updatedUser.email,
       username: updatedUser.username,
       name: updatedUser.name,
-      avatarUrl: updatedUser.avatarUrl
+      avatarUrl: updatedUser.avatarUrl,
+      googleEmail: updatedUser.googleEmail
     });
   } catch (error) {
     console.error('Update profile error:', error);

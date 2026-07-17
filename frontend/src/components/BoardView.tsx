@@ -8,7 +8,7 @@ import {
   BarChart3, UserCheck, Play, ArrowLeft, Plus, X, Trash2, MoreHorizontal,
   CalendarCheck, CheckCircle, PlusCircle, Copy, Check, Info, Lock, Paintbrush,
   AlertCircle, Sparkles, ChevronRight, Upload, HelpCircle, Users,
-  Pencil, Inbox, Mail, RotateCw, GripVertical,
+  Pencil, Inbox, Mail, RotateCw, GripVertical, Share2,
   Pin, Eye, Trash, Paperclip, Search, Archive
 } from 'lucide-react';
 import { 
@@ -265,6 +265,11 @@ interface KanbanColumnProps {
   hasCustomBg: boolean;
   keyboardGrabbedCardId: string | null;
   handleCardKeyDown: (e: React.KeyboardEvent, card: Card, listId: string) => void;
+  width?: number;
+  onResizeEnd: (width: number) => void;
+  onResetWidth: () => void;
+  onAnnounceWidth: (width: number) => void;
+  isBoardEditor: boolean;
 }
 
 const KanbanColumn = React.memo(({
@@ -297,7 +302,12 @@ const KanbanColumn = React.memo(({
   handleCardPointerDown,
   hasCustomBg,
   keyboardGrabbedCardId,
-  handleCardKeyDown
+  handleCardKeyDown,
+  width,
+  onResizeEnd,
+  onResetWidth,
+  onAnnounceWidth,
+  isBoardEditor
 }: KanbanColumnProps) => {
   const [isAddingCard, setIsAddingCard] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
@@ -307,6 +317,117 @@ const KanbanColumn = React.memo(({
   const menuRef = React.useRef<HTMLDivElement>(null);
   
   const { deleteList, updateList, updateCard, createCard, token } = useStore();
+
+  const colRef = React.useRef<HTMLDivElement>(null);
+
+  const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (window.innerWidth < 768) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const columnEl = colRef.current;
+    if (!columnEl) return;
+
+    const handleEl = e.currentTarget;
+    try {
+      handleEl.setPointerCapture(e.pointerId);
+    } catch (err) {}
+
+    const startX = e.clientX;
+    const startWidth = columnEl.offsetWidth;
+
+    columnEl.classList.add('is-resizing');
+    document.body.classList.add('is-resizing-column');
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = Math.max(280, Math.min(700, startWidth + deltaX));
+      
+      requestAnimationFrame(() => {
+        columnEl.style.setProperty('--col-width', `${newWidth}px`);
+      });
+    };
+
+    const handlePointerUp = (upEvent: PointerEvent) => {
+      try {
+        handleEl.releasePointerCapture(upEvent.pointerId);
+      } catch (err) {}
+      
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+
+      columnEl.classList.remove('is-resizing');
+      document.body.classList.remove('is-resizing-column');
+
+      const currentVal = columnEl.style.getPropertyValue('--col-width') || `${startWidth}`;
+      const finalWidth = parseInt(currentVal, 10);
+      
+      onResizeEnd(finalWidth);
+      onAnnounceWidth(finalWidth);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onResetWidth();
+    onAnnounceWidth(280);
+  };
+
+  const handleResizeKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const currentWidth = width || 280;
+      const newWidth = Math.max(280, currentWidth - 10);
+      onResizeEnd(newWidth);
+      onAnnounceWidth(newWidth);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      const currentWidth = width || 280;
+      const newWidth = Math.min(700, currentWidth + 10);
+      onResizeEnd(newWidth);
+      onAnnounceWidth(newWidth);
+    }
+  };
+
+  const handleAutoFitToContent = () => {
+    const columnEl = colRef.current;
+    if (!columnEl) return;
+    const cards = Array.from(columnEl.querySelectorAll('.kb-card')) as HTMLElement[];
+    if (cards.length === 0) {
+      onResizeEnd(280);
+      onAnnounceWidth(280);
+      return;
+    }
+    
+    let maxContentWidth = 280;
+    cards.forEach(card => {
+      const titleEl = card.querySelector('h4, .line-clamp-2') as HTMLElement;
+      if (titleEl) {
+        const tempSpan = document.createElement('span');
+        tempSpan.style.font = window.getComputedStyle(titleEl).font;
+        tempSpan.style.visibility = 'hidden';
+        tempSpan.style.position = 'absolute';
+        tempSpan.style.whiteSpace = 'nowrap';
+        tempSpan.innerText = titleEl.innerText;
+        document.body.appendChild(tempSpan);
+        
+        const contentWidth = tempSpan.offsetWidth + 40;
+        document.body.removeChild(tempSpan);
+        
+        if (contentWidth > maxContentWidth) {
+          maxContentWidth = contentWidth;
+        }
+      }
+    });
+
+    const finalWidth = Math.max(280, Math.min(700, maxContentWidth));
+    onResizeEnd(finalWidth);
+    onAnnounceWidth(finalWidth);
+  };
 
   React.useEffect(() => {
     if (!menuOpen) return;
@@ -517,6 +638,28 @@ const KanbanColumn = React.memo(({
         <div className="border-t border-slate-150 dark:border-slate-850 my-1" />
 
         <button
+          onClick={() => {
+            onResetWidth();
+            onAnnounceWidth(280);
+            setMenuOpen(false);
+          }}
+          className="w-full text-left px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded font-semibold text-slate-750 dark:text-slate-250"
+        >
+          Reset Column Width
+        </button>
+        <button
+          onClick={() => {
+            handleAutoFitToContent();
+            setMenuOpen(false);
+          }}
+          className="w-full text-left px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded font-semibold text-slate-750 dark:text-slate-250"
+        >
+          Auto Fit to Content
+        </button>
+
+        <div className="border-t border-slate-150 dark:border-slate-850 my-1" />
+
+        <button
           onClick={async () => {
             setMenuOpen(false);
             const confirmed = await showConfirm(
@@ -565,7 +708,11 @@ const KanbanColumn = React.memo(({
   const isGlow = !!draggedEmail;
   return (
     <div
+      ref={colRef}
       data-list-id={list.id}
+      style={{
+        '--col-width': width ? `${width}px` : '280px'
+      } as React.CSSProperties}
       draggable={isColumnDraggable && editingListId !== list.id}
       onDragStart={(e) => handleListDragStart(e, list.id)}
       onDragEnd={() => {
@@ -580,6 +727,20 @@ const KanbanColumn = React.memo(({
           : ''
       } transition-all duration-200`}
     >
+      {/* Draggable column resize handle */}
+      <div 
+        role="separator"
+        aria-label={`Resize column ${list.name}`}
+        aria-valuenow={width || 280}
+        aria-valuemin={280}
+        aria-valuemax={700}
+        tabIndex={0}
+        onPointerDown={startResize}
+        onDoubleClick={handleDoubleClick}
+        onKeyDown={handleResizeKeyDown}
+        className="col-resize-handle"
+      />
+
       {/* Column Header */}
       <div className="flex items-center justify-between px-3 py-1.5 shrink-0 border-b border-gray-200/50 dark:border-gray-800/40 cursor-default bg-slate-50/20 dark:bg-black/5">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -598,26 +759,27 @@ const KanbanColumn = React.memo(({
           ) : (
             <span 
               onClick={(e) => {
+                if (!isBoardEditor) return;
                 e.stopPropagation();
                 setEditingListId(list.id);
                 setEditingListName(list.name);
               }}
-              className="text-xs font-bold uppercase tracking-wider text-[#172b4d] dark:text-[#cbd5e1] truncate cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50 px-1 py-0.5 rounded flex items-center gap-1 min-w-0"
-              title="Rename column"
+              className={`text-xs font-bold uppercase tracking-wider text-[#172b4d] dark:text-[#cbd5e1] truncate ${isBoardEditor ? 'cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50' : ''} px-1 py-0.5 rounded flex items-center gap-1 min-w-0`}
+              title={isBoardEditor ? "Rename column" : undefined}
             >
               <span className="truncate max-w-[8rem]">{list.name}</span>
-              <Pencil className="w-2.5 h-2.5 opacity-0 group-hover/list:opacity-60 transition-opacity text-slate-550 shrink-0" />
+              {isBoardEditor && <Pencil className="w-2.5 h-2.5 opacity-0 group-hover/list:opacity-60 transition-opacity text-slate-550 shrink-0" />}
             </span>
           )}
 
           {/* Dedicated Drag Handle for Columns */}
-          {editingListId !== list.id && (
+          {editingListId !== list.id && isBoardEditor && (
             <div
               onMouseDown={() => setIsColumnDraggable(true)}
               onMouseUp={() => setIsColumnDraggable(false)}
               onTouchStart={() => setIsColumnDraggable(true)}
               onTouchEnd={() => setIsColumnDraggable(false)}
-              className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded cursor-grab active:cursor-grabbing text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors shrink-0"
+              className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded cursor-grab active:cursor-grabbing text-slate-400 dark:text-slate-550 hover:text-slate-700 dark:hover:text-slate-300 transition-colors shrink-0"
               title="Drag column"
             >
               <GripVertical className="w-3.5 h-3.5" />
@@ -636,17 +798,19 @@ const KanbanColumn = React.memo(({
           </span>
         </div>
         <div className="relative">
-          <button
-            onClick={() => {
-              setMenuOpen(!menuOpen);
-              setMoveMode(false);
-              setSortMode(false);
-            }}
-            className="w-5 h-5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors text-slate-400 shrink-0 cursor-pointer"
-            title="List actions"
-          >
-            <MoreHorizontal className="w-3.5 h-3.5" />
-          </button>
+          {isBoardEditor && (
+            <button
+              onClick={() => {
+                setMenuOpen(!menuOpen);
+                setMoveMode(false);
+                setSortMode(false);
+              }}
+              className="w-5 h-5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors text-slate-400 shrink-0 cursor-pointer"
+              title="List actions"
+            >
+              <MoreHorizontal className="w-3.5 h-3.5" />
+            </button>
+          )}
 
           {/* Floating Dropdown for Desktop */}
           {menuOpen && (
@@ -715,54 +879,56 @@ const KanbanColumn = React.memo(({
       </div>
 
       {/* Add Card input block */}
-      <div className="px-2 pb-2 shrink-0 border-t border-gray-100/50 dark:border-gray-800/40 pt-1.5">
-        {!isAddingCard ? (
-          <button
-            onClick={() => setIsAddingCard(true)}
-            className="w-full text-left text-xs font-semibold py-1 px-2 rounded-md text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100/50 dark:hover:bg-slate-800/40 transition-colors flex items-center gap-1 cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5 text-slate-450" /> Add a card
-          </button>
-        ) : (
-          <div className="space-y-1.5 animate-scale-in">
-            <textarea
-              placeholder="Enter card title…"
-              value={cardTitles[list.id] || ''}
-              onChange={e => setCardTitles({ ...cardTitles, [list.id]: e.target.value })}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleCreateCardSubmit(list.id);
-                  setIsAddingCard(false);
-                } else if (e.key === 'Escape') {
-                  setIsAddingCard(false);
-                }
-              }}
-              className="w-full text-xs p-1.5 bg-white dark:bg-slate-900 border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-slate-100 resize-none font-semibold leading-normal"
-              style={{ borderColor: 'var(--border)' }}
-              rows={2}
-              autoFocus
-            />
-            <div className="flex gap-1 justify-end">
-              <button
-                onClick={() => setIsAddingCard(false)}
-                className="px-2 py-0.5 text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-350 rounded hover:bg-slate-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  handleCreateCardSubmit(list.id);
-                  setIsAddingCard(false);
+      {isBoardEditor && (
+        <div className="px-2 pb-2 shrink-0 border-t border-gray-100/50 dark:border-gray-800/40 pt-1.5">
+          {!isAddingCard ? (
+            <button
+              onClick={() => setIsAddingCard(true)}
+              className="w-full text-left text-xs font-semibold py-1 px-2 rounded-md text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100/50 dark:hover:bg-slate-800/40 transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 text-slate-450" /> Add a card
+            </button>
+          ) : (
+            <div className="space-y-1.5 animate-scale-in">
+              <textarea
+                placeholder="Enter card title…"
+                value={cardTitles[list.id] || ''}
+                onChange={e => setCardTitles({ ...cardTitles, [list.id]: e.target.value })}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleCreateCardSubmit(list.id);
+                    setIsAddingCard(false);
+                  } else if (e.key === 'Escape') {
+                    setIsAddingCard(false);
+                  }
                 }}
-                className="px-2.5 py-0.5 text-[9px] bg-indigo-600 text-white rounded font-bold hover:bg-indigo-750"
-              >
-                Add Card
-              </button>
+                className="w-full text-xs p-1.5 bg-white dark:bg-slate-900 border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-slate-100 resize-none font-semibold leading-normal"
+                style={{ borderColor: 'var(--border)' }}
+                rows={2}
+                autoFocus
+              />
+              <div className="flex gap-1 justify-end">
+                <button
+                  onClick={() => setIsAddingCard(false)}
+                  className="px-2 py-0.5 text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-350 rounded hover:bg-slate-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    handleCreateCardSubmit(list.id);
+                    setIsAddingCard(false);
+                  }}
+                  className="px-2.5 py-0.5 text-[9px] bg-indigo-600 text-white rounded font-bold hover:bg-indigo-750"
+                >
+                  Add Card
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }, (prevProps, nextProps) => {
@@ -788,8 +954,8 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
     user, currentBoard, fetchBoardDetails, deleteBoard,
     createList, archiveList, createCard, updateCard, updateBoard,
     createAutomationRule, deleteAutomationRule, currentWorkspace, convertInboxItem, token,
-    addToast, showConfirm, fetchArchivedItems, updateList,
-    inboxItems, fetchInboxItems, updateInboxItem, deleteInboxItem, syncGmailInbox, draggedEmail, setDraggedEmail, batchConvertInboxItems
+    addToast, showConfirm, fetchArchivedItems, updateList, updateBoardMember, revokeBoardMember,
+    inboxItems, fetchInboxItems, updateInboxItem, deleteInboxItem, draggedEmail, setDraggedEmail, batchConvertInboxItems, inviteMember
   } = useStore();
 
   const themeStore = useThemeStore();
@@ -797,6 +963,9 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
 
   const currentMember = currentWorkspace?.members.find(m => m.user.id === user?.id);
   const isOwnerOrAdmin = currentMember?.role === 'OWNER' || currentMember?.role === 'ADMIN';
+
+  const isBoardAdmin = currentBoard?.myRole === 'ADMIN' || isOwnerOrAdmin;
+  const isBoardEditor = isBoardAdmin || currentBoard?.myRole === 'EDITOR';
 
   const [activeTab, setActiveTab] = useState<TabType>('kanban');
   const [newListOpen, setNewListOpen] = useState(false);
@@ -806,6 +975,11 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
   const [copied, setCopied] = useState(false);
   const [showAllMembersModal, setShowAllMembersModal] = useState(false);
   const [isColumnDragging, setIsColumnDragging] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [shareUserRole, setShareUserRole] = useState('EDITOR');
+  const [shareEmail, setShareEmail] = useState('');
+  const [shareMessage, setShareMessage] = useState('');
+  const [sharingSubmitting, setSharingSubmitting] = useState(false);
   const [keyboardGrabbedCardId, setKeyboardGrabbedCardId] = useState<string | null>(null);
   
   // Board & Card Renaming states
@@ -827,6 +1001,47 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
       return [];
     }
   });
+
+  // Load column widths for this board
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem(`trel-column-widths-${boardId}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const [ariaAnnouncement, setAriaAnnouncement] = useState('');
+
+  const saveColumnWidth = (listId: string, width: number) => {
+    setColumnWidths(prev => {
+      const updated = { ...prev, [listId]: width };
+      try {
+        localStorage.setItem(`trel-column-widths-${boardId}`, JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
+      return updated;
+    });
+  };
+
+  const resetColumnWidth = (listId: string) => {
+    setColumnWidths(prev => {
+      const updated = { ...prev };
+      delete updated[listId];
+      try {
+        localStorage.setItem(`trel-column-widths-${boardId}`, JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
+      return updated;
+    });
+  };
+
+  const announceWidthChange = (columnName: string, width: number) => {
+    setAriaAnnouncement(`Column ${columnName} width set to ${width} pixels.`);
+  };
   const togglePinInboxItem = (itemId: string) => {
     setPinnedInboxItemIds(prev => {
       const next = prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId];
@@ -1160,6 +1375,61 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
   const [actType, setActType] = useState('SET_PRIORITY');
   const [actVal, setActVal] = useState('HIGH');
 
+  const handleAddWorkspaceMember = async (userId: string) => {
+    if (!currentWorkspace) return;
+    try {
+      await updateBoardMember(currentWorkspace.id, userId, boardId, shareUserRole);
+      addToast('Member Added', 'Workspace member added to board successfully.', 'success');
+      fetchBoardDetails(boardId);
+    } catch (err: any) {
+      addToast('Error', err.message || 'Failed to add member', 'error');
+    }
+  };
+
+  const handleInviteNewUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentWorkspace || !shareEmail.trim()) return;
+    setSharingSubmitting(true);
+    try {
+      const boardAccess = [{ boardId, role: shareUserRole }];
+      await inviteMember(currentWorkspace.id, shareEmail.trim(), 'MEMBER', shareMessage, boardAccess);
+      addToast('Invitation Sent', 'User invited to board successfully.', 'success');
+      setShareEmail('');
+      setShareMessage('');
+    } catch (err: any) {
+      addToast('Error', err.message || 'Failed to invite user', 'error');
+    } finally {
+      setSharingSubmitting(false);
+    }
+  };
+
+  const handleUpdateBoardMemberRole = async (userId: string, newRole: string) => {
+    if (!currentWorkspace) return;
+    try {
+      await updateBoardMember(currentWorkspace.id, userId, boardId, newRole);
+      addToast('Role Updated', 'Board member role updated successfully.', 'success');
+      fetchBoardDetails(boardId);
+    } catch (err: any) {
+      addToast('Error', err.message || 'Failed to update role', 'error');
+    }
+  };
+
+  const handleRevokeBoardMember = async (userId: string) => {
+    if (!currentWorkspace) return;
+    const confirmed = await showConfirm(
+      'Revoke Access',
+      'Are you sure you want to remove this user from the board?'
+    );
+    if (!confirmed) return;
+    try {
+      await revokeBoardMember(currentWorkspace.id, boardId, userId);
+      addToast('Access Revoked', 'User removed from board successfully.', 'success');
+      fetchBoardDetails(boardId);
+    } catch (err: any) {
+      addToast('Error', err.message || 'Failed to revoke access', 'error');
+    }
+  };
+
   useEffect(() => {
     fetchBoardDetails(boardId);
   }, [boardId]);
@@ -1228,7 +1498,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
   };
 
   const handleCardPointerDown = (e: React.PointerEvent<HTMLDivElement>, card: Card, listId: string) => {
-    if (isColumnDragging || e.button !== 0) return;
+    if (isColumnDragging || e.button !== 0 || document.body.classList.contains('is-resizing-column')) return;
     
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.closest('textarea') || target.closest('input') || target.closest('a')) {
@@ -1969,6 +2239,33 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
               )}
             </button>
 
+            {/* Share Board Button */}
+            {isBoardAdmin && (
+              <button
+                onClick={() => setIsShareModalOpen(true)}
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all shadow-sm hover:scale-105 active:scale-95"
+                style={{ 
+                  background: 'var(--bg-surface)', 
+                  borderColor: 'var(--border)',
+                  color: 'var(--text-primary)'
+                }}
+              >
+                <Share2 className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Share</span>
+              </button>
+            )}
+
+            {/* Mobile Share Board Button (icon only) */}
+            {isBoardAdmin && (
+              <button
+                onClick={() => setIsShareModalOpen(true)}
+                className="md:hidden btn-icon rounded-lg relative mr-1"
+                title="Share Board"
+              >
+                <Share2 className="w-4 h-4 text-indigo-500" />
+              </button>
+            )}
+
             <button
               onClick={() => setCustomizerOpen(true)}
               className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all shadow-sm hover:scale-105 active:scale-95"
@@ -2123,50 +2420,58 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                   hasCustomBg={hasCustomBg}
                   keyboardGrabbedCardId={keyboardGrabbedCardId}
                   handleCardKeyDown={handleCardKeyDown}
+                  width={columnWidths[list.id]}
+                  onResizeEnd={(w) => saveColumnWidth(list.id, w)}
+                  onResetWidth={() => resetColumnWidth(list.id)}
+                  onAnnounceWidth={(w) => announceWidthChange(list.name, w)}
+                  isBoardEditor={isBoardEditor}
                 />
               ))}
 
           {/* Add Column button */}
-          {newListOpen ? (
-            <form 
-              onSubmit={handleCreateListSubmit} 
-              className="w-[18rem] bg-white dark:bg-[#161a22] border rounded-2xl p-3 shrink-0 space-y-2.5 shadow-xl"
-              style={{ borderColor: 'var(--border)' }}
-            >
-              <input
-                type="text" 
-                value={newListName}
-                onChange={e => setNewListName(e.target.value)}
-                placeholder="Enter column title…"
-                className="tf-input w-full text-xs py-2 px-3 rounded-xl" 
-                required 
-                autoFocus
-              />
-              <div className="flex gap-2">
-                <button type="submit" className="btn-primary py-2 px-4 text-xs flex-1 justify-center rounded-xl">Add column</button>
-                <button 
-                  type="button" 
-                  onClick={() => setNewListOpen(false)} 
-                  className="btn-icon rounded-xl"
+          {isBoardEditor && (
+            newListOpen ? (
+              <form 
+                onSubmit={handleCreateListSubmit} 
+                className="w-[18rem] bg-white dark:bg-[#161a22] border rounded-2xl p-3 shrink-0 space-y-2.5 shadow-xl"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <input 
+                  type="text" 
+                  value={newListName}
+                  onChange={e => setNewListName(e.target.value)}
+                  placeholder="Enter column title…"
+                  className="tf-input w-full text-xs py-2 px-3 rounded-xl" 
+                  required 
+                  autoFocus
                 >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </form>
-          ) : (
-            <button
-              onClick={() => setNewListOpen(true)}
-              className="h-12 flex items-center gap-2 px-4 text-xs font-semibold rounded-2xl shrink-0 transition-all border border-dashed hover:border-solid hover:scale-102 hover:shadow-md cursor-pointer"
-              style={{
-                width: '18rem',
-                background: 'var(--bg-surface)',
-                borderColor: 'var(--border)',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              <PlusCircle className="w-4 h-4 text-indigo-500" />
-              <span>Create Column</span>
-            </button>
+                </input>
+                <div className="flex gap-2">
+                  <button type="submit" className="btn-primary py-2 px-4 text-xs flex-1 justify-center rounded-xl">Add column</button>
+                  <button 
+                    type="button" 
+                    onClick={() => setNewListOpen(false)} 
+                    className="btn-icon rounded-xl"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                onClick={() => setNewListOpen(true)}
+                className="h-12 flex items-center gap-2 px-4 text-xs font-semibold rounded-2xl shrink-0 transition-all border border-dashed hover:border-solid hover:scale-102 hover:shadow-md cursor-pointer"
+                style={{
+                  width: '18rem',
+                  background: 'var(--bg-surface)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                <PlusCircle className="w-4 h-4 text-indigo-500" />
+                <span>Create Column</span>
+              </button>
+            )
           )}
         </div>
 
@@ -2234,18 +2539,17 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                     <button
                       onClick={async () => {
                         if (currentWorkspace) {
-                          addToast('Syncing', 'Fetching latest Gmail messages...', 'info');
+                          addToast('Refreshing', 'Refreshing inbox items...', 'info');
                           try {
-                            await syncGmailInbox(currentWorkspace.id);
                             await fetchInboxItems(currentWorkspace.id);
-                            addToast('Synced', 'Inbox updated successfully.', 'success');
+                            addToast('Refreshed', 'Inbox updated successfully.', 'success');
                           } catch (err: any) {
-                            addToast('Sync Failed', err.message || 'Error updating inbox.', 'error');
+                            addToast('Refresh Failed', err.message || 'Error updating inbox.', 'error');
                           }
                         }
                       }}
                       className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0"
-                      title="Refresh & Sync Gmail"
+                      title="Refresh Inbox"
                     >
                       <RotateCw className="w-3.5 h-3.5" />
                     </button>
@@ -3561,6 +3865,150 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
         </div>
       )}
 
+      {/* ── Share Board Modal ── */}
+      {isShareModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setIsShareModalOpen(false)}>
+          <div className="bg-white dark:bg-[#161b22] border border-slate-250 dark:border-[#30363d] rounded-2xl p-5 w-full max-w-lg shadow-2xl animate-scale-in text-xs max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-205">Share Board: {currentBoard.name}</h3>
+                <p className="text-[10px] text-slate-450 dark:text-slate-500">Configure board access & permission roles</p>
+              </div>
+              <button onClick={() => setIsShareModalOpen(false)} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/5 text-slate-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-6 pt-4 text-left">
+              {/* Section 1: Add Existing Workspace Members */}
+              <div className="space-y-2">
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">Add Workspace Member</h4>
+                <div className="flex gap-2">
+                  <select
+                    className="flex-1 px-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl text-xs font-semibold cursor-pointer"
+                    onChange={e => {
+                      if (e.target.value) {
+                        handleAddWorkspaceMember(e.target.value);
+                        e.target.value = '';
+                      }
+                    }}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Select workspace member to add...</option>
+                    {currentWorkspace?.members
+                      .filter(wm => !(currentBoard?.members || []).some((bm: any) => bm.userId === wm.user.id))
+                      .map(wm => (
+                        <option key={wm.user.id} value={wm.user.id}>
+                          {wm.user.name || wm.user.username} (@{wm.user.username})
+                        </option>
+                      ))}
+                  </select>
+
+                  <select
+                    value={shareUserRole}
+                    onChange={e => setShareUserRole(e.target.value)}
+                    className="px-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl text-xs font-semibold cursor-pointer"
+                  >
+                    <option value="VIEWER">Viewer</option>
+                    <option value="COMMENTER">Commenter</option>
+                    <option value="EDITOR">Editor</option>
+                    <option value="ADMIN">Board Admin</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Section 2: Invite New User Directly */}
+              <form onSubmit={handleInviteNewUser} className="space-y-3 border-t border-slate-100 dark:border-slate-800 pt-4">
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">Invite User to Board</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    placeholder="Email or Username"
+                    value={shareEmail}
+                    onChange={e => setShareEmail(e.target.value)}
+                    className="px-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl text-xs font-semibold"
+                    required
+                  />
+                  <input
+                    type="text"
+                    placeholder="Custom Invite Message (optional)"
+                    value={shareMessage}
+                    onChange={e => setShareMessage(e.target.value)}
+                    className="px-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl text-xs font-semibold"
+                  />
+                </div>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-[10px] text-slate-400">User will receive a workspace invite linked to this board.</span>
+                  <button type="submit" disabled={sharingSubmitting} className="btn-primary py-1.5 px-4 rounded-xl text-xs font-bold shrink-0">
+                    {sharingSubmitting ? 'Inviting...' : 'Send Invite'}
+                  </button>
+                </div>
+              </form>
+
+              {/* Section 3: Current Board Members List */}
+              <div className="border-t border-slate-100 dark:border-slate-800 pt-4 space-y-2">
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">Current Members ({currentBoard?.members?.length || 0})</h4>
+                <div className="max-h-48 overflow-y-auto space-y-2 pr-1 divide-y divide-slate-100 dark:divide-slate-850">
+                  {currentBoard?.members?.map((bm: any) => {
+                    const wsMember = currentWorkspace?.members.find(wm => wm.user.id === bm.userId);
+                    const isOwner = wsMember?.role === 'OWNER';
+                    return (
+                      <div key={bm.id} className="flex items-center justify-between pt-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <img
+                            src={getAvatarUrl(bm.user.avatarUrl, bm.user.name || bm.user.username)}
+                            alt="Avatar"
+                            className="w-6 h-6 rounded-full object-cover shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-850 dark:text-slate-200 truncate">{bm.user.name || bm.user.username}</p>
+                            <p className="text-[9px] text-slate-400">@{bm.user.username}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {isOwner ? (
+                            <span className="text-[10px] font-bold text-amber-500 uppercase px-2">Owner</span>
+                          ) : (
+                            <>
+                              <select
+                                value={bm.role}
+                                onChange={e => handleUpdateBoardMemberRole(bm.userId, e.target.value)}
+                                className="px-2 py-1 bg-white dark:bg-[#161b22] border border-slate-250 dark:border-[#2d3139] rounded text-[10px] cursor-pointer"
+                              >
+                                <option value="VIEWER">Viewer</option>
+                                <option value="COMMENTER">Commenter</option>
+                                <option value="EDITOR">Editor</option>
+                                <option value="ADMIN">Board Admin</option>
+                              </select>
+                              <button
+                                onClick={() => handleRevokeBoardMember(bm.userId)}
+                                className="text-red-500 hover:text-red-600 font-bold px-1 hover:bg-red-50 dark:hover:bg-red-950/20 rounded"
+                              >
+                                Remove
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button type="button" onClick={() => setIsShareModalOpen(false)} className="btn-secondary py-2 px-4 rounded-xl text-xs font-bold">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {ariaAnnouncement && (
+        <div className="sr-only" aria-live="assertive" aria-atomic="true">
+          {ariaAnnouncement}
+        </div>
+      )}
     </div>
   );
 }

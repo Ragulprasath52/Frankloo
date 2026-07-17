@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Mail, Send, Activity, X, RefreshCw, AlertCircle, Copy,
   Eye, Moon, Sun, Laptop, Smartphone, Sparkles,
-  Server, Plus, Lock, Search, Info, CheckCircle
+  Server, Plus, Lock, Search, CheckCircle
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 
@@ -995,12 +995,12 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
                   </div>
                 </div>
               ) : (
-                <div className="bg-slate-50 dark:bg-[#0d0d0f]/50 border border-slate-200 dark:border-[#2d3139] text-slate-550 dark:text-slate-400 p-3 rounded-xl flex items-start gap-2 animate-fade-in">
-                  <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-500" />
+                <div className="bg-amber-500/10 border border-amber-500/30 text-[#b07b1d] dark:text-amber-450 p-3 rounded-xl flex items-start gap-2 animate-fade-in">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <div className="space-y-0.5">
-                    <p className="font-bold text-[10px] uppercase tracking-wider leading-none text-slate-700 dark:text-slate-300">SMTP / System Fallback Active</p>
-                    <p className="text-[10px] leading-normal">
-                      Connect your Google Account or configure a custom SMTP server under the <strong>SMTP Server Configuration</strong> tab to send invites directly from your own email.
+                    <p className="font-bold text-[10px] uppercase tracking-wider leading-none">Google Account Disconnected</p>
+                    <p className="text-[10px] leading-relaxed">
+                      Connect your Google Account under Integrations or configure a custom SMTP server under the <strong>SMTP Server Configuration</strong> tab to send invites directly from your own email.
                     </p>
                   </div>
                 </div>

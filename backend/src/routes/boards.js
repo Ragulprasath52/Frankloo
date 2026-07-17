@@ -33,8 +33,49 @@ const checkBoardAccess = async (req, res, next) => {
       return res.status(403).json({ error: 'You do not have access to this board' });
     }
 
+    let boardRole = null;
+    if (membership.role === 'OWNER' || membership.role === 'ADMIN') {
+      boardRole = 'ADMIN';
+    } else {
+      const boardMember = await prisma.boardMember.findUnique({
+        where: {
+          boardId_userId: {
+            boardId,
+            userId
+          }
+        }
+      });
+      if (!boardMember) {
+        return res.status(403).json({ error: 'You do not have access to this board' });
+      }
+      boardRole = boardMember.role;
+    }
+
+    // Centrally enforce granular permissions on write/mutate operations
+    if (req.method !== 'GET') {
+      // 1. Comments require COMMENTER or EDITOR or ADMIN
+      if (req.path.includes('/comments')) {
+        if (boardRole !== 'COMMENTER' && boardRole !== 'EDITOR' && boardRole !== 'ADMIN') {
+          return res.status(403).json({ error: 'You do not have permission to comment on this board' });
+        }
+      }
+      // 2. Updating Board details (PUT boards/:id) requires Board ADMIN
+      else if (req.method === 'PUT' && req.params.id === boardId && !req.path.includes('/lists') && !req.path.includes('/cards') && !req.path.includes('/milestones')) {
+        if (boardRole !== 'ADMIN') {
+          return res.status(403).json({ error: 'Only board administrators can update board settings' });
+        }
+      }
+      // 3. All other modifications (lists, cards, checklists, dependencies, automations, milestones) require EDITOR or ADMIN
+      else {
+        if (boardRole !== 'EDITOR' && boardRole !== 'ADMIN') {
+          return res.status(403).json({ error: 'You do not have permission to modify this board' });
+        }
+      }
+    }
+
     req.board = board;
     req.workspaceRole = membership.role;
+    req.boardRole = boardRole;
     next();
   } catch (error) {
     console.error('Check board access error:', error);
@@ -57,7 +98,17 @@ router.get('/workspace/:workspaceId', authenticate, async (req, res) => {
     }
 
     const boards = await prisma.board.findMany({
-      where: { workspaceId, isArchived: false },
+      where: {
+        workspaceId,
+        isArchived: false,
+        ...(membership.role !== 'OWNER' && membership.role !== 'ADMIN' ? {
+          members: {
+            some: {
+              userId: req.user.id
+            }
+          }
+        } : {})
+      },
       include: {
         lists: {
           include: {
@@ -110,6 +161,15 @@ router.post('/workspace/:workspaceId', authenticate, async (req, res) => {
         { name: 'Doing', position: 2000, boardId: board.id },
         { name: 'Done', position: 3000, boardId: board.id }
       ]
+    });
+
+    // Add creator as Board Admin
+    await prisma.boardMember.create({
+      data: {
+        boardId: board.id,
+        userId: req.user.id,
+        role: 'ADMIN'
+      }
     });
 
     // Log activity
@@ -180,11 +240,19 @@ router.get('/:id', authenticate, checkBoardAccess, async (req, res) => {
         },
         automations: true,
         milestones: true,
-        savedFilters: true
+        savedFilters: true,
+        members: {
+          include: {
+            user: { select: { id: true, username: true, name: true, avatarUrl: true } }
+          }
+        }
       }
     });
 
-    res.json(board);
+    res.json({
+      ...board,
+      myRole: req.boardRole
+    });
   } catch (error) {
     console.error('Get board error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -194,6 +262,10 @@ router.get('/:id', authenticate, checkBoardAccess, async (req, res) => {
 // PUT update board
 router.put('/:id', authenticate, checkBoardAccess, async (req, res) => {
   try {
+    if (req.boardRole !== 'ADMIN') {
+      return res.status(403).json({ error: 'Only board administrators can update board settings' });
+    }
+
     const { 
       name, description, background, isArchived,
       incomingEmailAddress, incomingEmailEnabled, incomingEmailListId,
@@ -236,6 +308,9 @@ router.put('/:id', authenticate, checkBoardAccess, async (req, res) => {
     res.json(updated);
   } catch (error) {
     console.error('Update board error:', error);
+    if (error.code === 'P2002') {
+      return res.status(400).json({ error: 'This incoming email address is already in use by another board. Please choose a different, unique email address.' });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -283,6 +358,15 @@ router.post('/:id/duplicate', authenticate, checkBoardAccess, async (req, res) =
         description: board.description,
         background: board.background,
         workspaceId: board.workspaceId
+      }
+    });
+
+    // Add creator as Board Admin
+    await prisma.boardMember.create({
+      data: {
+        boardId: newBoard.id,
+        userId: req.user.id,
+        role: 'ADMIN'
       }
     });
 

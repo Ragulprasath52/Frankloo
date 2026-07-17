@@ -1404,12 +1404,28 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
               <div className="grid grid-cols-1 gap-1 text-gray-500 dark:text-[#8d96a0] font-sans">
                 <div>
                   <span className="font-semibold inline-block w-14">From:</span>
-                  <span className="text-slate-800 dark:text-slate-200">{JSON.parse(selectedEmail.sourceDetails || '{}').sender}</span>
+                  <span className="text-slate-800 dark:text-slate-200">
+                    {JSON.parse(selectedEmail.sourceDetails || '{}').senderName || ''} {` <${JSON.parse(selectedEmail.sourceDetails || '{}').senderEmail || JSON.parse(selectedEmail.sourceDetails || '{}').sender}>`}
+                  </span>
                 </div>
                 <div>
                   <span className="font-semibold inline-block w-14">To:</span>
                   <span className="text-slate-800 dark:text-slate-200 break-all">{JSON.parse(selectedEmail.sourceDetails || '{}').recipients}</span>
                 </div>
+                {JSON.parse(selectedEmail.sourceDetails || '{}').cc && (
+                  <div>
+                    <span className="font-semibold inline-block w-14">Cc:</span>
+                    <span className="text-slate-800 dark:text-slate-200 break-all">{JSON.parse(selectedEmail.sourceDetails || '{}').cc}</span>
+                  </div>
+                )}
+                {JSON.parse(selectedEmail.sourceDetails || '{}').receivedDate && (
+                  <div>
+                    <span className="font-semibold inline-block w-14">Received:</span>
+                    <span className="text-slate-800 dark:text-slate-200">
+                      {new Date(JSON.parse(selectedEmail.sourceDetails || '{}').receivedDate).toLocaleString()}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Attachments Section */}
@@ -1552,9 +1568,9 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                         <button
                           type="button"
                           onClick={() => handleMergeSubmit(dup.id)}
-                          className="btn-primary py-1.5 px-3 text-[10px] rounded-lg bg-amber-600 hover:bg-amber-700 flex-1 sm:flex-initial"
+                          className="btn-primary py-1.5 px-3 text-[10px] rounded-lg bg-amber-600 hover:bg-amber-700 flex-1 sm:flex-initial font-bold"
                         >
-                          Merge
+                          Update Existing Task
                         </button>
                       </div>
                     </div>
@@ -1567,14 +1583,14 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                     onClick={() => setDuplicateWarningOpen(false)}
                     className="btn-secondary py-2 px-4 rounded-xl font-bold text-indigo-655 dark:text-indigo-400 border border-indigo-500/10 bg-indigo-500/5 hover:bg-indigo-500/10"
                   >
-                    Create Anyway
+                    Create New Task
                   </button>
                   <button
                     type="button"
                     onClick={() => setConvertModalOpen(false)}
-                    className="btn-secondary py-2 px-4 rounded-xl"
+                    className="btn-secondary py-2 px-4 rounded-xl font-bold"
                   >
-                    Cancel
+                    Ignore
                   </button>
                 </div>
               </div>
