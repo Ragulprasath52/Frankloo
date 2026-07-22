@@ -24,7 +24,7 @@ function DashboardLayout() {
     token, user, workspaces, currentWorkspace, 
     fetchWorkspaces, fetchWorkspaceDetails, 
     currentBoard, initSocketConnection, showConfirm,
-    setSidebarOpen, fetchMe
+    setSidebarOpen, fetchMe, setSidebarCollapsed
   } = useStore();
 
   const themeStore = useThemeStore();
@@ -130,6 +130,15 @@ function DashboardLayout() {
     }
   }, [currentBoard]);
 
+  // Collapse sidebar when activeBoardId is set to give a full-screen board view
+  useEffect(() => {
+    if (activeBoardId) {
+      setSidebarCollapsed(true);
+    } else {
+      setSidebarCollapsed(false);
+    }
+  }, [activeBoardId]);
+
   const handleUpdateWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentWorkspace || !wsName.trim()) return;
@@ -174,6 +183,8 @@ function DashboardLayout() {
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={(tab) => { setActiveTab(tab); setActiveBoardId(null); }} 
+        activeBoardId={activeBoardId}
+        setActiveBoardId={setActiveBoardId}
         onOpenWorkspaceSettings={() => setWsSettingsOpen(true)}
         onOpenGuide={() => setGuideOpen(true)}
       />

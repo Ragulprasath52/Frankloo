@@ -5,6 +5,9 @@ import { notifyBoardUpdate, notifyUser } from '../socket.js';
 import { runAutomations } from '../utils/automations.js';
 import { sendSlackNotification, sendDiscordNotification } from './integrations.js';
 import { sendEmail } from '../utils/gmailService.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const router = Router();
 
@@ -233,7 +236,8 @@ router.get('/:id', authenticate, checkBoardAccess, async (req, res) => {
                     user: { select: { id: true, username: true, name: true, avatarUrl: true } }
                   }
                 },
-                emailDetails: true
+                emailDetails: true,
+                attachments: true
               }
             }
           }
@@ -1128,6 +1132,85 @@ router.get('/:boardId/archived-items', authenticate, checkBoardAccess, async (re
   } catch (error) {
     console.error('Get archived items error:', error);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST upload card attachment (base64)
+router.post('/:boardId/cards/:cardId/attachments', authenticate, checkBoardAccess, async (req, res) => {
+  try {
+    const { boardId, cardId } = req.params;
+    const { filename, mimeType, size, base64Data } = req.body;
+
+    if (!filename || !base64Data) {
+      return res.status(400).json({ error: 'Missing filename or base64Data' });
+    }
+
+    const buffer = Buffer.from(base64Data, 'base64');
+    const uniqueFilename = `${Date.now()}-${filename}`;
+    
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const uploadDir = path.join(__dirname, '../../../uploads');
+    const uploadPath = path.join(uploadDir, uniqueFilename);
+
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    fs.writeFileSync(uploadPath, buffer);
+    const storagePath = `uploads/${uniqueFilename}`;
+
+    const attachment = await prisma.cardAttachment.create({
+      data: {
+        cardId,
+        uploadedBy: req.user.id,
+        filename,
+        storagePath,
+        mimeType: mimeType || 'application/octet-stream',
+        size: size || buffer.length
+      }
+    });
+
+    notifyBoardUpdate(boardId, 'ATTACHMENT_CREATE', { cardId, attachment });
+    res.status(201).json(attachment);
+  } catch (error) {
+    console.error('Upload card attachment error:', error);
+    res.status(500).json({ error: 'Server error uploading attachment' });
+  }
+});
+
+// DELETE delete card attachment
+router.delete('/:boardId/cards/:cardId/attachments/:attachmentId', authenticate, checkBoardAccess, async (req, res) => {
+  try {
+    const { boardId, cardId, attachmentId } = req.params;
+
+    const attachment = await prisma.cardAttachment.findUnique({
+      where: { id: attachmentId }
+    });
+
+    if (!attachment) {
+      return res.status(404).json({ error: 'Attachment not found' });
+    }
+
+    // Try deleting file from disk
+    try {
+      const __dirname = path.dirname(fileURLToPath(import.meta.url));
+      const filePath = path.join(__dirname, '../../../', attachment.storagePath);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (e) {
+      console.warn('Could not delete attachment file from disk:', e);
+    }
+
+    await prisma.cardAttachment.delete({
+      where: { id: attachmentId }
+    });
+
+    notifyBoardUpdate(boardId, 'ATTACHMENT_DELETE', { cardId, attachmentId });
+    res.json({ message: 'Attachment deleted successfully' });
+  } catch (error) {
+    console.error('Delete card attachment error:', error);
+    res.status(500).json({ error: 'Server error deleting attachment' });
   }
 });
 

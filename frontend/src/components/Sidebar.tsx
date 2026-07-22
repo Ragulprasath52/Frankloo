@@ -2,22 +2,24 @@ import { useState, useEffect } from 'react';
 import { useStore, getAvatarUrl } from '../store/useStore';
 import { useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, Target, BarChart2, Bell,
+  Users, Target, BarChart2, Bell,
   Sun, Moon, LogOut, Plus, Settings, ChevronDown,
   Check, X, AlertCircle, CheckCircle2, BookOpen, Link2,
   Inbox, Palette, ChevronLeft, ChevronRight, HelpCircle, Mail,
-  Upload
+  Upload, Home
 } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  activeBoardId?: string | null;
+  setActiveBoardId?: (boardId: string | null) => void;
   onOpenWorkspaceSettings: () => void;
   onOpenGuide: () => void;
 }
 
-export default function Sidebar({ activeTab, setActiveTab, onOpenWorkspaceSettings, onOpenGuide }: SidebarProps) {
+export default function Sidebar({ activeTab, setActiveTab, activeBoardId, setActiveBoardId, onOpenWorkspaceSettings, onOpenGuide }: SidebarProps) {
   const navigate = useNavigate();
   const {
     user, logout, theme, setTheme, workspaces, currentWorkspace,
@@ -142,17 +144,7 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenWorkspaceSettin
 
   const isOwnerOrAdmin = currentWorkspace?.myRole === 'OWNER' || currentWorkspace?.myRole === 'ADMIN';
 
-  const navItems = [
-    { id: 'boards',       label: 'Boards',             icon: LayoutDashboard },
-    { id: 'board-inbox',  label: 'Board Inbox',         icon: Inbox },
-    { id: 'members',      label: 'Members',             icon: Users },
-    { id: 'goals',        label: 'Goals',               icon: Target },
-    { id: 'documents',    label: 'Wiki & Docs',          icon: BookOpen },
-    { id: 'insights',     label: 'Insights',             icon: BarChart2 },
-    { id: 'integrations', label: 'Integrations',         icon: Link2 },
-    ...(isOwnerOrAdmin ? [{ id: 'invitations', label: 'Invitations Portal', icon: Mail }] : []),
-    { id: 'appearance',   label: 'Appearance & Themes',  icon: Palette },
-  ];
+
 
   const wsInitial = currentWorkspace?.name?.[0]?.toUpperCase() || 'W';
 
@@ -185,190 +177,546 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenWorkspaceSettin
           ${isSidebarCollapsed ? 'w-[4.5rem]' : 'w-[17rem]'}
         `}
       >
-        {/* Brand */}
-        <div className="px-4 py-4 flex items-center justify-between gap-3 border-b border-slate-200 dark:border-white/5">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-transparent">
-              <img src={logoImg} alt="logo" className="w-32 h-32 max-w-none shrink-0 dark:invert-0 invert" />
-            </div>
-            {!isSidebarCollapsed && (
-              <div className="min-w-0 animate-fade-in">
-                <p className="font-bold text-sm leading-tight text-slate-800 dark:text-[#f0f6fc] font-display">Frankloo</p>
-                <p className="text-[0.6875rem] leading-tight mt-0.5 text-slate-455 dark:text-[#6e7681]">Self-hosted workspace</p>
-              </div>
-            )}
-          </div>
-          {/* Collapse/Expand Toggle Button (visible on Tablet/Desktop) */}
-          <button
-            onClick={() => setSidebarCollapsed(!isSidebarCollapsed)}
-            className="hidden lg:flex btn-icon p-1 rounded hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-white"
-            title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-          >
-            {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-          </button>
-          
-          {/* Mobile Close Button inside Sidebar */}
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden btn-icon p-1 rounded hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-800 dark:text-[#8d96a0]"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+        {isSidebarCollapsed ? (
+          /* ── COLLAPSED SIDEBAR (Strict Grid Alignment) ── */
+          <div className="flex flex-col h-full items-center py-4 justify-between relative w-full">
+            
+            <button
+              onClick={() => setSidebarCollapsed(false)}
+              className="absolute -right-3 top-5 bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] shadow-md z-50 p-1 rounded-full text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10"
+              title="Expand Sidebar"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
 
-        {/* Workspace Selector */}
-        <div className="px-3 py-3 relative border-b border-slate-200 dark:border-white/5">
-          {!isSidebarCollapsed && (
-            <p className="text-[0.625rem] font-semibold uppercase tracking-widest px-1 mb-1.5 animate-fade-in text-slate-500 dark:text-[#6e7681]">Workspace</p>
-          )}
-          <button
-            onClick={() => setWsDropdownOpen(!wsDropdownOpen)}
-            className="w-full flex items-center justify-between gap-2 px-2 py-2 rounded-lg text-sm font-medium transition-colors bg-slate-200/50 dark:bg-white/10 text-slate-850 dark:text-[#e6edf3] border border-slate-250 dark:border-white/5 hover:bg-slate-200 dark:hover:bg-white/15"
-          >
-            <div className="flex items-center gap-2 min-w-0 mx-auto lg:mx-0">
-              <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 text-[0.625rem] font-bold text-white"
-                style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)' }}>
+            <div className="w-11 h-11 flex items-center justify-center mb-1 shrink-0">
+              <button
+                onClick={() => setWsDropdownOpen(!wsDropdownOpen)}
+                className="w-8 h-8 rounded flex items-center justify-center text-[10px] font-bold text-white shadow-sm hover:scale-105 transition-transform"
+                style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)' }}
+                title={currentWorkspace?.name || "Workspace"}
+              >
                 {wsInitial}
-              </div>
-              {!isSidebarCollapsed && <span className="truncate animate-fade-in">{currentWorkspace?.name || 'Select workspace…'}</span>}
+              </button>
             </div>
-            {!isSidebarCollapsed && (
-              <ChevronDown className="w-3.5 h-3.5 shrink-0 transition-transform duration-200 text-slate-500 dark:text-[#6e7681]" />
-            )}
-          </button>
 
-          {wsDropdownOpen && !isSidebarCollapsed && (
-            <div className="absolute left-3 right-3 top-full mt-1 rounded-xl shadow-2xl z-50 py-1.5 overflow-hidden animate-fade-in bg-white dark:bg-[#21262d] border border-slate-200 dark:border-[#30363d]">
-              <p className="text-[0.625rem] font-semibold uppercase tracking-wider px-3 py-1.5 text-slate-500 dark:text-[#6e7681]">Your workspaces</p>
-              {workspaces.map((ws) => (
-                <button
-                  key={ws.id}
-                  onClick={() => { handleSelectWorkspace(ws.id); setSidebarOpen(false); }}
-                  className="w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2 transition-colors text-slate-700 dark:text-[#c9d1d9] hover:bg-slate-100 dark:hover:bg-white/5"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-4 h-4 rounded text-[0.5rem] font-bold text-white flex items-center justify-center shrink-0"
-                      style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)' }}>
-                      {ws.name[0]?.toUpperCase()}
-                    </div>
-                    <span className="truncate">{ws.name}</span>
-                  </div>
-                  {currentWorkspace?.id === ws.id && <Check className="w-3.5 h-3.5 shrink-0 text-indigo-600 dark:text-[#58a6ff]" />}
-                </button>
-              ))}
-              <div className="border-t border-slate-150 dark:border-white/8 mt-1 pt-1">
-                <button
-                  onClick={() => { setWsDropdownOpen(false); setNewWsModalOpen(true); }}
-                  className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors text-indigo-600 dark:text-[#58a6ff] hover:bg-slate-100 dark:hover:bg-white/5"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Create workspace
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+            <hr className="w-8 border-t border-slate-200 dark:border-white/5 mb-3 shrink-0" />
 
-        {/* Navigation */}
-        <nav className="flex-1 px-2 py-3 space-y-1 overflow-y-auto">
-          {!isSidebarCollapsed && (
-            <p className="text-[0.625rem] font-semibold uppercase tracking-widest px-2 mb-2 animate-fade-in text-slate-500 dark:text-[#6e7681]">
-              {currentWorkspace?.name || 'Workspace'}
-            </p>
-          )}
-          {navItems.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => handleTabChange(id)}
-              className={`sidebar-item flex items-center gap-3 w-full px-3 py-2 rounded-md transition-colors ${activeTab === id ? 'active bg-white/10' : ''}`}
-              title={isSidebarCollapsed ? label : undefined}
-            >
-              <Icon className={`w-4 h-4 shrink-0 ${isSidebarCollapsed ? 'mx-auto' : ''}`} />
-              {!isSidebarCollapsed && <span className="animate-fade-in">{label}</span>}
-            </button>
-          ))}
-          {(currentWorkspace?.myRole === 'OWNER' || currentWorkspace?.myRole === 'ADMIN') && (
-            <button 
-              onClick={handleSettingsClick} 
-              className="sidebar-item flex items-center gap-3 w-full px-3 py-2 rounded-md transition-colors mt-1"
-              title={isSidebarCollapsed ? "Settings" : undefined}
-            >
-              <Settings className={`w-4 h-4 shrink-0 ${isSidebarCollapsed ? 'mx-auto' : ''}`} />
-              {!isSidebarCollapsed && <span className="animate-fade-in">Settings</span>}
-            </button>
-          )}
-        </nav>
+            <div className="flex-grow w-full flex flex-col items-center space-y-2 overflow-y-auto scrollbar-none">
+              <button
+                onClick={() => { handleTabChange('boards'); setActiveBoardId && setActiveBoardId(null); }}
+                className={`w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-150 ${
+                  activeTab === 'boards' && !activeBoardId
+                    ? 'bg-slate-200 dark:bg-white/10 text-slate-900 dark:text-white'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                }`}
+                title="Home"
+              >
+                <div className="w-6 h-6 flex items-center justify-center">
+                  <Home className="w-4 h-4 shrink-0" />
+                </div>
+              </button>
 
-        {/* Footer */}
-        <div className="px-2 py-3 space-y-2 border-t border-slate-200 dark:border-white/5">
-          {/* Controls */}
-          <div className={`flex items-center gap-1 px-1 ${isSidebarCollapsed ? 'flex-col space-y-1' : ''}`}>
-            <button
-              onClick={() => setInboxOpen(!isInboxOpen)}
-              className={`btn-icon flex-1 justify-center p-2 rounded hover:bg-slate-200 dark:hover:bg-white/10 ${isInboxOpen ? 'text-slate-800 dark:text-white bg-slate-200/50 dark:bg-white/10' : ''}`}
-              title="Workspace Inbox"
-            >
-              <div className="relative flex items-center justify-center">
-                <Inbox className="w-4 h-4 text-slate-500 dark:text-[#8d96a0]" />
+              <button
+                onClick={() => { handleTabChange('board-inbox'); }}
+                className={`w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-150 relative ${
+                  activeTab === 'board-inbox'
+                    ? 'bg-slate-200 dark:bg-white/10 text-slate-900 dark:text-white'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                }`}
+                title="Inbox"
+              >
+                <div className="w-6 h-6 flex items-center justify-center">
+                  <Inbox className="w-4 h-4 shrink-0" />
+                </div>
                 {inboxUnreadCount > 0 && (
-                  <span className="notif-dot absolute -top-1.5 -right-1.5 bg-indigo-600 dark:bg-[#6366f1]" style={{ minWidth: '14px', height: '14px', fontSize: '0.5rem', padding: '0 3px' }}>
+                  <span className="absolute top-1 right-1 bg-indigo-600 dark:bg-indigo-500 text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow-sm">
                     {inboxUnreadCount}
                   </span>
                 )}
-              </div>
-            </button>
-            <button
-              onClick={() => setNotifPanelOpen(true)}
-              className="btn-icon flex-1 justify-center p-2 rounded hover:bg-slate-200 dark:hover:bg-white/10"
-              title="Notifications"
-            >
-              <div className="relative flex items-center justify-center">
-                <Bell className="w-4 h-4 text-slate-500 dark:text-[#8d96a0]" />
+              </button>
+
+              <hr className="w-8 border-t border-slate-200 dark:border-white/5 my-1.5 shrink-0" />
+
+              <button
+                onClick={() => handleTabChange('members')}
+                className={`w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-150 ${
+                  activeTab === 'members'
+                    ? 'bg-slate-200 dark:bg-white/10 text-slate-900 dark:text-white'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                }`}
+                title="Members"
+              >
+                <div className="w-6 h-6 flex items-center justify-center">
+                  <Users className="w-4 h-4 shrink-0" />
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleTabChange('documents')}
+                className={`w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-150 ${
+                  activeTab === 'documents'
+                    ? 'bg-slate-200 dark:bg-white/10 text-slate-900 dark:text-white'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                }`}
+                title="Wiki & Docs"
+              >
+                <div className="w-6 h-6 flex items-center justify-center">
+                  <BookOpen className="w-4 h-4 shrink-0" />
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleTabChange('goals')}
+                className={`w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-150 ${
+                  activeTab === 'goals'
+                    ? 'bg-slate-200 dark:bg-white/10 text-slate-900 dark:text-white'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                }`}
+                title="Goals"
+              >
+                <div className="w-6 h-6 flex items-center justify-center">
+                  <Target className="w-4 h-4 shrink-0" />
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleTabChange('insights')}
+                className={`w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-150 ${
+                  activeTab === 'insights'
+                    ? 'bg-slate-200 dark:bg-white/10 text-slate-900 dark:text-white'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                }`}
+                title="Insights"
+              >
+                <div className="w-6 h-6 flex items-center justify-center">
+                  <BarChart2 className="w-4 h-4 shrink-0" />
+                </div>
+              </button>
+
+              <hr className="w-8 border-t border-slate-200 dark:border-white/5 my-1.5 shrink-0" />
+
+              <button
+                onClick={() => handleTabChange('integrations')}
+                className={`w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-150 ${
+                  activeTab === 'integrations'
+                    ? 'bg-slate-200 dark:bg-white/10 text-slate-900 dark:text-white'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                }`}
+                title="Integrations"
+              >
+                <div className="w-6 h-6 flex items-center justify-center">
+                  <Link2 className="w-4 h-4 shrink-0" />
+                </div>
+              </button>
+
+              {isOwnerOrAdmin && (
+                <button
+                  onClick={() => handleTabChange('invitations')}
+                  className={`w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-150 ${
+                    activeTab === 'invitations'
+                      ? 'bg-slate-200 dark:bg-white/10 text-slate-900 dark:text-white'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                  }`}
+                  title="Invitations Portal"
+                >
+                  <div className="w-6 h-6 flex items-center justify-center">
+                    <Mail className="w-4 h-4 shrink-0" />
+                  </div>
+                </button>
+              )}
+
+              <button
+                onClick={() => handleTabChange('appearance')}
+                className={`w-11 h-11 flex items-center justify-center rounded-lg transition-all duration-150 ${
+                  activeTab === 'appearance'
+                    ? 'bg-slate-200/60 dark:bg-white/10 text-slate-900 dark:text-white'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                }`}
+                title="Appearance & Themes"
+              >
+                <div className="w-6 h-6 flex items-center justify-center">
+                  <Palette className="w-4 h-4 shrink-0" />
+                </div>
+              </button>
+
+              {isOwnerOrAdmin && (
+                <button
+                  onClick={handleSettingsClick}
+                  className="w-11 h-11 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5 transition-all duration-150"
+                  title="Workspace Settings"
+                >
+                  <div className="w-6 h-6 flex items-center justify-center">
+                    <Settings className="w-4 h-4 shrink-0" />
+                  </div>
+                </button>
+              )}
+            </div>
+
+            <div className="w-full flex flex-col items-center space-y-2 pt-2 border-t border-slate-200 dark:border-white/5 shrink-0">
+              <button
+                onClick={onOpenGuide}
+                className="w-11 h-11 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-850 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5 transition-all duration-150"
+                title="Application Guide"
+              >
+                <div className="w-6 h-6 flex items-center justify-center">
+                  <HelpCircle className="w-4 h-4 shrink-0" />
+                </div>
+              </button>
+
+              <button
+                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                className="w-11 h-11 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-850 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5 transition-all duration-150"
+                title={theme === 'light' ? "Switch to Dark Mode" : "Switch to Light Mode"}
+              >
+                <div className="w-6 h-6 flex items-center justify-center">
+                  {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                </div>
+              </button>
+
+              <button
+                onClick={() => setNotifPanelOpen(true)}
+                className="w-11 h-11 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-850 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5 transition-all duration-150 relative"
+                title="Notifications"
+              >
+                <div className="w-6 h-6 flex items-center justify-center">
+                  <Bell className="w-4 h-4" />
+                </div>
                 {unreadCount > 0 && (
-                  <span className="notif-dot absolute -top-1.5 -right-1.5" style={{ minWidth: '14px', height: '14px', fontSize: '0.5rem', padding: '0 3px' }}>
+                  <span className="absolute top-1 right-1 bg-indigo-650 dark:bg-indigo-500 text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow-sm">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
-              </div>
-            </button>
-            <button
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="btn-icon flex-1 justify-center p-2 rounded hover:bg-slate-200 dark:hover:bg-white/10"
-              title="Toggle theme"
-            >
-              {theme === 'dark'
-                ? <Sun className="w-4 h-4 text-slate-500 dark:text-[#8d96a0]" />
-                : <Moon className="w-4 h-4 text-slate-500 dark:text-[#8d96a0]" />}
-            </button>
-            <button
-              onClick={onOpenGuide}
-              className="btn-icon flex-1 justify-center p-2 rounded hover:bg-slate-200 dark:hover:bg-white/10 text-indigo-600 dark:text-indigo-400 hover:text-indigo-750 dark:hover:text-indigo-300"
-              title="Application Guide"
-            >
-              <HelpCircle className="w-4 h-4" />
-            </button>
-            <button onClick={logout} className="btn-icon flex-1 justify-center p-2 rounded hover:bg-slate-200 dark:hover:bg-white/10" title="Log out">
-              <LogOut className="w-4 h-4 text-slate-500 dark:text-[#8d96a0]" />
-            </button>
-          </div>
+              </button>
 
-          {/* User */}
-          <button
-            onClick={() => setProfileModalOpen(true)}
-            className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-left transition-colors ${isSidebarCollapsed ? 'justify-center' : 'justify-start'} text-slate-700 dark:text-[#e6edf3]`}
-          >
-            <img
-              src={getAvatarUrl(user?.avatarUrl, user?.name || user?.username)}
-              alt="avatar"
-              className="w-7 h-7 rounded-full shrink-0 ring-2 ring-slate-200 dark:ring-white/10"
-            />
-            {!isSidebarCollapsed && (
-              <div className="min-w-0 flex-1 animate-fade-in">
-                <p className="text-sm font-semibold truncate leading-tight text-slate-850 dark:text-[#f0f6fc]">{user?.name || user?.username}</p>
-                <p className="text-[0.6875rem] truncate leading-tight text-slate-500 dark:text-[#6e7681]">@{user?.username}</p>
+              <div className="w-11 h-11 flex items-center justify-center pt-1 shrink-0">
+                <button
+                  onClick={() => setProfileModalOpen(true)}
+                  className="w-7 h-7 rounded-full overflow-hidden border border-slate-200 dark:border-white/10 hover:scale-105 transition-all"
+                  title="Your Profile"
+                >
+                  <img
+                    src={getAvatarUrl(user?.avatarUrl, user?.name || user?.username || 'U')}
+                    alt="profile"
+                    className="w-full h-full object-cover"
+                  />
+                </button>
               </div>
-            )}
-          </button>
-        </div>
+            </div>
+          </div>
+        ) : (
+          /* ── EXPANDED SIDEBAR (Standard List Navigator) ── */
+          <>
+            <div className="px-4 py-4 flex items-center justify-between gap-3 border-b border-slate-200 dark:border-white/5">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-transparent">
+                  <img src={logoImg} alt="logo" className="w-32 h-32 max-w-none shrink-0 dark:invert-0 invert" />
+                </div>
+                <div className="min-w-0 animate-fade-in">
+                  <p className="font-bold text-sm leading-tight text-slate-800 dark:text-[#f0f6fc] font-display">Frankloo</p>
+                  <p className="text-[0.6875rem] leading-tight mt-0.5 text-slate-455 dark:text-[#6e7681]">Self-hosted workspace</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSidebarCollapsed(!isSidebarCollapsed)}
+                className="hidden lg:flex btn-icon p-1 rounded hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-white"
+                title="Collapse Sidebar"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="lg:hidden btn-icon p-1 rounded hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-800 dark:text-[#8d96a0]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-3 py-3 relative border-b border-slate-200 dark:border-white/5">
+              <p className="text-[0.625rem] font-semibold uppercase tracking-widest px-1 mb-1.5 animate-fade-in text-slate-500 dark:text-[#6e7681]">Workspace</p>
+              <button
+                onClick={() => setWsDropdownOpen(!wsDropdownOpen)}
+                className="w-full flex items-center justify-between gap-2 px-2 py-2 rounded-lg text-sm font-medium transition-colors bg-slate-200/50 dark:bg-white/10 text-slate-855 dark:text-[#e6edf3] border border-slate-250 dark:border-white/5 hover:bg-slate-200 dark:hover:bg-white/15"
+              >
+                <div className="flex items-center gap-2 min-w-0 mx-auto lg:mx-0">
+                  <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 text-[0.625rem] font-bold text-white"
+                    style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)' }}>
+                    {wsInitial}
+                  </div>
+                  <span className="truncate animate-fade-in">{currentWorkspace?.name || 'Select workspace…'}</span>
+                </div>
+                <ChevronDown className="w-3.5 h-3.5 shrink-0 transition-transform duration-200 text-slate-500 dark:text-[#6e7681]" />
+              </button>
+
+              {wsDropdownOpen && (
+                <div className="absolute left-3 right-3 top-full mt-1 rounded-xl shadow-2xl z-50 py-1.5 overflow-hidden animate-fade-in bg-white dark:bg-[#21262d] border border-slate-200 dark:border-[#30363d]">
+                  <p className="text-[0.625rem] font-semibold uppercase tracking-wider px-3 py-1.5 text-slate-500 dark:text-[#6e7681]">Your workspaces</p>
+                  {workspaces.map((ws) => (
+                    <button
+                      key={ws.id}
+                      onClick={() => { handleSelectWorkspace(ws.id); setSidebarOpen(false); }}
+                      className="w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2 transition-colors text-slate-700 dark:text-[#c9d1d9] hover:bg-slate-100 dark:hover:bg-white/5"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-4 h-4 rounded text-[0.5rem] font-bold text-white flex items-center justify-center shrink-0"
+                          style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)' }}>
+                          {ws.name[0]?.toUpperCase()}
+                        </div>
+                        <span className="truncate">{ws.name}</span>
+                      </div>
+                      {currentWorkspace?.id === ws.id && <Check className="w-3.5 h-3.5 shrink-0 text-indigo-600 dark:text-[#58a6ff]" />}
+                    </button>
+                  ))}
+                  <div className="border-t border-slate-150 dark:border-white/8 mt-1 pt-1">
+                    <button
+                      onClick={() => { setWsDropdownOpen(false); setNewWsModalOpen(true); }}
+                      className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors text-indigo-600 dark:text-[#58a6ff] hover:bg-slate-100 dark:hover:bg-white/5"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Create workspace
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto scrollbar-thin text-left">
+              <div className="space-y-0.5">
+                <button
+                  onClick={() => { handleTabChange('boards'); setActiveBoardId && setActiveBoardId(null); }}
+                  className={`w-full flex items-center py-1.5 rounded-lg text-xs font-semibold transition-colors justify-start px-2.5 gap-2.5 ${
+                    activeTab === 'boards' && !activeBoardId
+                      ? 'bg-slate-200/60 dark:bg-white/10 text-slate-900 dark:text-white'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                  }`}
+                >
+                  <Home className="w-3.5 h-3.5 shrink-0" />
+                  <span>Home</span>
+                </button>
+
+                <button
+                  onClick={() => { handleTabChange('board-inbox'); }}
+                  className={`w-full flex items-center justify-between py-1.5 rounded-lg text-xs font-semibold transition-colors justify-start px-2.5 gap-2.5 ${
+                    activeTab === 'board-inbox'
+                      ? 'bg-slate-200/60 dark:bg-white/10 text-slate-900 dark:text-white'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Inbox className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Inbox</span>
+                  </div>
+                  {inboxUnreadCount > 0 && (
+                    <span className="bg-indigo-600 dark:bg-indigo-500/20 text-white dark:text-indigo-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1">
+                      {inboxUnreadCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between px-2.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-550">Boards</p>
+                </div>
+                
+                <div className="pl-1 space-y-0.5 max-h-40 overflow-y-auto scrollbar-thin">
+                  {(currentWorkspace?.boards || []).length === 0 ? (
+                    <p className="text-[10px] text-slate-400 dark:text-slate-650 px-2 py-1 italic">No boards yet</p>
+                  ) : (
+                    (currentWorkspace?.boards || []).map((b: any) => {
+                      const isSelected = activeBoardId === b.id;
+                      return (
+                        <button
+                          key={b.id}
+                          onClick={() => { handleTabChange('boards'); setActiveBoardId && setActiveBoardId(b.id); }}
+                          className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                            isSelected
+                              ? 'bg-slate-200/40 dark:bg-white/5 text-slate-900 dark:text-white font-semibold'
+                              : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                          }`}
+                        >
+                          <span className="text-slate-400 dark:text-[#58a6ff] font-bold text-xs shrink-0">•</span>
+                          <span className="truncate">{b.name}</span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-550 px-2.5 mb-1.5">Collaboration</p>
+                
+                <button
+                  onClick={() => handleTabChange('members')}
+                  className={`w-full flex items-center py-1.5 rounded-lg text-xs font-semibold transition-colors justify-start px-2.5 gap-2.5 ${
+                    activeTab === 'members'
+                      ? 'bg-slate-200/60 dark:bg-white/10 text-slate-900 dark:text-white'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5 shrink-0" />
+                  <span>Members</span>
+                </button>
+
+                <button
+                  onClick={() => handleTabChange('documents')}
+                  className={`w-full flex items-center py-1.5 rounded-lg text-xs font-semibold transition-colors justify-start px-2.5 gap-2.5 ${
+                    activeTab === 'documents'
+                      ? 'bg-slate-200/60 dark:bg-white/10 text-slate-900 dark:text-white'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                  }`}
+                >
+                  <BookOpen className="w-3.5 h-3.5 shrink-0" />
+                  <span>Wiki & Docs</span>
+                </button>
+
+                <button
+                  onClick={() => handleTabChange('goals')}
+                  className={`w-full flex items-center py-1.5 rounded-lg text-xs font-semibold transition-colors justify-start px-2.5 gap-2.5 ${
+                    activeTab === 'goals'
+                      ? 'bg-slate-200/60 dark:bg-white/10 text-slate-900 dark:text-white'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                  }`}
+                >
+                  <Target className="w-3.5 h-3.5 shrink-0" />
+                  <span>Goals</span>
+                </button>
+
+                <button
+                  onClick={() => handleTabChange('insights')}
+                  className={`w-full flex items-center py-1.5 rounded-lg text-xs font-semibold transition-colors justify-start px-2.5 gap-2.5 ${
+                    activeTab === 'insights'
+                      ? 'bg-slate-200/60 dark:bg-white/10 text-slate-900 dark:text-white'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                  }`}
+                >
+                  <BarChart2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>Insights</span>
+                </button>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-550 px-2.5 mb-1.5">Settings & Tools</p>
+
+                <button
+                  onClick={() => handleTabChange('integrations')}
+                  className={`w-full flex items-center py-1.5 rounded-lg text-xs font-semibold transition-colors justify-start px-2.5 gap-2.5 ${
+                    activeTab === 'integrations'
+                      ? 'bg-slate-200/60 dark:bg-white/10 text-slate-900 dark:text-white'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                  }`}
+                >
+                  <Link2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>Integrations</span>
+                </button>
+
+                {isOwnerOrAdmin && (
+                  <button
+                    onClick={() => handleTabChange('invitations')}
+                    className={`w-full flex items-center py-1.5 rounded-lg text-xs font-semibold transition-colors justify-start px-2.5 gap-2.5 ${
+                      activeTab === 'invitations'
+                        ? 'bg-slate-200/60 dark:bg-white/10 text-slate-900 dark:text-white'
+                        : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                    }`}
+                  >
+                    <Mail className="w-3.5 h-3.5 shrink-0" />
+                    <span>Invitations Portal</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => handleTabChange('appearance')}
+                  className={`w-full flex items-center py-1.5 rounded-lg text-xs font-semibold transition-colors justify-start px-2.5 gap-2.5 ${
+                    activeTab === 'appearance'
+                      ? 'bg-slate-200/60 dark:bg-white/10 text-slate-900 dark:text-white'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5'
+                  }`}
+                >
+                  <Palette className="w-3.5 h-3.5 shrink-0" />
+                  <span>Appearance & Themes</span>
+                </button>
+
+                {isOwnerOrAdmin && (
+                  <button 
+                    onClick={handleSettingsClick} 
+                    className="w-full flex items-center py-1.5 rounded-lg text-xs font-semibold transition-colors text-slate-500 hover:text-slate-800 dark:text-[#8d96a0] dark:hover:text-[#f0f6fc] hover:bg-slate-100 dark:hover:bg-white/5 justify-start px-2.5 gap-2.5"
+                  >
+                    <Settings className="w-3.5 h-3.5 shrink-0" />
+                    <span>Workspace Settings</span>
+                  </button>
+                )}
+              </div>
+            </nav>
+
+            <div className="px-2 py-3 space-y-2 border-t border-slate-200 dark:border-white/5">
+              <div className="flex items-center gap-1 px-1">
+                <button
+                  onClick={() => setInboxOpen(!isInboxOpen)}
+                  className={`btn-icon flex-1 justify-center p-2 rounded hover:bg-slate-200 dark:hover:bg-white/10 ${isInboxOpen ? 'text-slate-800 dark:text-white bg-slate-200/50 dark:bg-white/10' : ''}`}
+                  title="Workspace Inbox"
+                >
+                  <div className="relative flex items-center justify-center">
+                    <Inbox className="w-4 h-4 text-slate-500 dark:text-[#8d96a0]" />
+                    {inboxUnreadCount > 0 && (
+                      <span className="notif-dot absolute -top-1.5 -right-1.5 bg-indigo-600 dark:bg-[#6366f1]" style={{ minWidth: '14px', height: '14px', fontSize: '0.5rem', padding: '0 3px' }}>
+                        {inboxUnreadCount}
+                      </span>
+                    )}
+                  </div>
+                </button>
+                <button
+                  onClick={() => setNotifPanelOpen(true)}
+                  className="btn-icon flex-1 justify-center p-2 rounded hover:bg-slate-200 dark:hover:bg-white/10"
+                  title="Notifications"
+                >
+                  <div className="relative flex items-center justify-center">
+                    <Bell className="w-4 h-4 text-slate-500 dark:text-[#8d96a0]" />
+                    {unreadCount > 0 && (
+                      <span className="notif-dot absolute -top-1.5 -right-1.5" style={{ minWidth: '14px', height: '14px', fontSize: '0.5rem', padding: '0 3px' }}>
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </div>
+                </button>
+                <button
+                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                  className="btn-icon flex-1 justify-center p-2 rounded hover:bg-slate-200 dark:hover:bg-white/10"
+                  title="Toggle theme"
+                >
+                  {theme === 'dark'
+                    ? <Sun className="w-4 h-4 text-slate-500 dark:text-[#8d96a0]" />
+                    : <Moon className="w-4 h-4 text-slate-500 dark:text-[#8d96a0]" />}
+                </button>
+                <button
+                  onClick={onOpenGuide}
+                  className="btn-icon flex-1 justify-center p-2 rounded hover:bg-slate-200 dark:hover:bg-white/10 text-indigo-600 dark:text-indigo-400 hover:text-indigo-750 dark:hover:text-indigo-300"
+                  title="Application Guide"
+                >
+                  <HelpCircle className="w-4 h-4" />
+                </button>
+                <button onClick={logout} className="btn-icon flex-1 justify-center p-2 rounded hover:bg-slate-200 dark:hover:bg-white/10" title="Log out">
+                  <LogOut className="w-4 h-4 text-slate-500 dark:text-[#8d96a0]" />
+                </button>
+              </div>
+
+              <button
+                onClick={() => setProfileModalOpen(true)}
+                className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-left transition-colors text-slate-700 dark:text-[#e6edf3]"
+              >
+                <img
+                  src={getAvatarUrl(user?.avatarUrl, user?.name || user?.username)}
+                  alt="avatar"
+                  className="w-7 h-7 rounded-full shrink-0 ring-2 ring-slate-200 dark:ring-white/10"
+                />
+                <div className="min-w-0 flex-1 animate-fade-in">
+                  <p className="text-sm font-semibold truncate leading-tight text-slate-850 dark:text-[#f0f6fc]">{user?.name || user?.username}</p>
+                  <p className="text-[0.6875rem] truncate leading-tight text-slate-500 dark:text-[#6e7681]">@{user?.username}</p>
+                </div>
+              </button>
+            </div>
+          </>
+        )}
       </aside>
 
       {/* Notifications Panel */}

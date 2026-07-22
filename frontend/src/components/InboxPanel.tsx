@@ -173,8 +173,11 @@ export default function InboxPanel() {
 
   // Filter and Search processing
   const filteredItems = inboxItems.filter(item => {
-    const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          item.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const sourceDetailsObj = JSON.parse(item.sourceDetails || '{}');
+    const attachmentsText = (sourceDetailsObj.attachments || []).map((a: any) => a.filename || '').join(' ');
+    const checklistsText = (sourceDetailsObj.checklists || []).join(' ');
+    const searchString = `${item.title} ${item.description} ${sourceDetailsObj.sender || ''} ${sourceDetailsObj.senderName || ''} ${sourceDetailsObj.senderEmail || ''} ${sourceDetailsObj.recipients || ''} ${sourceDetailsObj.cc || ''} ${sourceDetailsObj.bcc || ''} ${attachmentsText} ${checklistsText}`.toLowerCase();
+    const matchesSearch = searchString.includes(searchTerm.toLowerCase());
     
     const matchesSource = filterSource === 'ALL' || item.source === filterSource;
 
@@ -189,7 +192,6 @@ export default function InboxPanel() {
 
     const matchesPriority = filterPriority === 'ALL' || item.priority === filterPriority;
 
-    const sourceDetailsObj = JSON.parse(item.sourceDetails || '{}');
     const hasAtt = sourceDetailsObj.attachments && sourceDetailsObj.attachments.length > 0;
     const matchesAttachments = !filterHasAttachments || hasAtt;
 

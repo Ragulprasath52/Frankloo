@@ -5,6 +5,9 @@ import { authenticate } from '../middleware/auth.js';
 import { notifyBoardUpdate } from '../socket.js';
 import { parseEmailBody } from '../utils/emailParser.js';
 import { parseEmailIntelligently, getDiceSimilarity, parseSender } from '../utils/emailParserService.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const router = Router();
 
@@ -23,35 +26,71 @@ router.post('/parse-email', async (req, res) => {
 // POST check for duplicate tasks
 router.post('/check-duplicates', authenticate, async (req, res) => {
   try {
-    const { boardId, title } = req.body;
-    if (!boardId || !title) {
-      return res.status(400).json({ error: 'Missing boardId or title' });
+    const { boardId, title, messageId, threadId } = req.body;
+    if (!boardId) {
+      return res.status(400).json({ error: 'Missing boardId' });
     }
 
-    const cards = await prisma.card.findMany({
-      where: {
-        list: { boardId },
-        isArchived: false
-      },
-      include: {
-        list: { select: { name: true } }
-      }
-    });
-
     const duplicates = [];
-    for (const card of cards) {
-      const similarity = getDiceSimilarity(title, card.title);
-      if (similarity >= 60) {
+
+    // 1. Check messageId and threadId first
+    if (messageId || threadId) {
+      const emailMatches = await prisma.card.findMany({
+        where: {
+          list: { boardId },
+          isArchived: false,
+          emailDetails: {
+            OR: [
+              ...(messageId ? [{ messageId }] : []),
+              ...(threadId ? [{ threadId }] : [])
+            ]
+          }
+        },
+        include: {
+          list: { select: { name: true } },
+          emailDetails: true
+        }
+      });
+
+      for (const card of emailMatches) {
         duplicates.push({
           id: card.id,
           title: card.title,
           listName: card.list.name,
-          similarity
+          similarity: 100,
+          reason: card.emailDetails?.messageId === messageId ? 'Message-ID Match' : 'Thread-ID Match'
         });
       }
     }
 
-    duplicates.sort((a, b) => b.similarity - a.similarity);
+    // 2. Perform text similarity checks if title is provided
+    if (title) {
+      const cards = await prisma.card.findMany({
+        where: {
+          list: { boardId },
+          isArchived: false
+        },
+        include: {
+          list: { select: { name: true } }
+        }
+      });
+
+      for (const card of cards) {
+        if (duplicates.some(d => d.id === card.id)) continue;
+        const similarity = getDiceSimilarity(title, card.title);
+        if (similarity >= 60) {
+          duplicates.push({
+            id: card.id,
+            title: card.title,
+            listName: card.list.name,
+            similarity,
+            reason: 'Title Similarity'
+          });
+        }
+      }
+    }
+
+    duplicates.sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
 
     res.json({
       hasDuplicates: duplicates.length > 0,
@@ -340,6 +379,7 @@ export async function convertSingleItemInternal({
   checklist,
   title,
   description,
+  attachments,
   userId
 }) {
   const item = await prisma.inboxItem.findUnique({
@@ -415,6 +455,12 @@ export async function convertSingleItemInternal({
 
   // Create CardEmailDetails if GMAIL or EMAIL source
   if (item.source === 'GMAIL' || item.source === 'EMAIL') {
+    const metadataJson = JSON.stringify({
+      cc: detailsObj.cc || '',
+      bcc: detailsObj.bcc || '',
+      recipients: detailsObj.recipients || '',
+      replyLink: detailsObj.link || null
+    });
     await prisma.cardEmailDetails.create({
       data: {
         cardId: card.id,
@@ -424,7 +470,7 @@ export async function convertSingleItemInternal({
         threadId: detailsObj.threadId || null,
         bodyHtml: detailsObj.html || item.description,
         bodyText: detailsObj.text || item.description,
-        replyLink: detailsObj.link || null,
+        replyLink: metadataJson,
         hasAttachments: detailsObj.attachments && detailsObj.attachments.length > 0
       }
     });
@@ -443,14 +489,32 @@ export async function convertSingleItemInternal({
   }
 
   // Handle attachments if present
-  if (detailsObj.attachments && detailsObj.attachments.length > 0) {
-    for (const att of detailsObj.attachments) {
+  const finalAttachments = attachments || detailsObj.attachments || [];
+  if (finalAttachments.length > 0) {
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const uploadDir = path.join(__dirname, '../../../uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    for (const att of finalAttachments) {
+      let storagePath = att.storagePath || 'uploads/gmail-dummy';
+      if (att.base64Data) {
+        try {
+          const buffer = Buffer.from(att.base64Data, 'base64');
+          const uniqueFilename = `${Date.now()}-${att.filename}`;
+          fs.writeFileSync(path.join(uploadDir, uniqueFilename), buffer);
+          storagePath = `uploads/${uniqueFilename}`;
+        } catch (err) {
+          console.error('Error saving base64 attachment:', err);
+        }
+      }
       await prisma.cardAttachment.create({
         data: {
           cardId: card.id,
           uploadedBy: userId,
           filename: att.filename,
-          storagePath: att.storagePath || 'uploads/gmail-dummy',
+          storagePath,
           mimeType: att.mimeType || 'application/octet-stream',
           size: att.size || 0
         }
@@ -508,7 +572,8 @@ export async function convertSingleItemInternal({
       comments: {
         orderBy: { createdAt: 'desc' },
         include: { user: { select: { id: true, username: true, name: true, avatarUrl: true } } }
-      }
+      },
+      emailDetails: true
     }
   });
 
@@ -519,7 +584,7 @@ export async function convertSingleItemInternal({
 router.post('/:workspaceId/:itemId/convert', authenticate, async (req, res) => {
   try {
     const { workspaceId, itemId } = req.params;
-    const { boardId, listId, assigneeIds, labels, priority, dueDate, checklist, title, description } = req.body;
+    const { boardId, listId, assigneeIds, labels, priority, dueDate, checklist, title, description, attachments } = req.body;
 
     if (!boardId || !listId) return res.status(400).json({ error: 'Board ID and List ID are required' });
 
@@ -540,6 +605,7 @@ router.post('/:workspaceId/:itemId/convert', authenticate, async (req, res) => {
       checklist,
       title,
       description,
+      attachments,
       userId: req.user.id
     });
 
@@ -1102,6 +1168,12 @@ export async function processIncomingEmail({ to, from, cc, subject, text, html, 
       }
     });
 
+    const metadataJson = JSON.stringify({
+      cc: cc || '',
+      bcc: bcc || '',
+      recipients: to || '',
+      replyLink: null
+    });
     await prisma.cardEmailDetails.create({
       data: {
         cardId: card.id,
@@ -1112,7 +1184,7 @@ export async function processIncomingEmail({ to, from, cc, subject, text, html, 
         threadId: threadId || null,
         bodyHtml: html || text || '',
         bodyText: parsed.description,
-        replyLink: null,
+        replyLink: metadataJson,
         hasAttachments: attachments && attachments.length > 0
       }
     });

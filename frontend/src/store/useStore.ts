@@ -169,6 +169,8 @@ export interface Card {
   checklists: ChecklistItem[];
   dependencies: TaskDependency[];
   comments: Comment[];
+  emailDetails?: any;
+  attachments?: any[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -427,8 +429,10 @@ interface AppState {
   fetchEmailLogs: (workspaceId: string, boardId: string) => Promise<any[]>;
   sendTestEmail: (workspaceId: string, boardId: string) => Promise<void>;
   parseEmailIntelligently: (title: string, text: string, html: string) => Promise<any>;
-  checkDuplicates: (boardId: string, title: string) => Promise<any>;
+  checkDuplicates: (boardId: string, title: string, messageId?: string | null, threadId?: string | null) => Promise<any>;
   mergeCard: (data: { cardId: string; inboxItemId: string; description?: string; checklist?: string[]; labels?: string[] }) => Promise<any>;
+  uploadAttachment: (boardId: string, cardId: string, file: { filename: string; mimeType: string; size: number; base64Data: string }) => Promise<any>;
+  deleteAttachment: (boardId: string, cardId: string, attachmentId: string) => Promise<void>;
 
   // Gmail Integration Actions
   fetchGmailProfile: () => Promise<void>;
@@ -1811,11 +1815,11 @@ export const useStore = create<AppState>((set, get) => ({
     return await res.json();
   },
 
-  checkDuplicates: async (boardId, title) => {
+  checkDuplicates: async (boardId, title, messageId = null, threadId = null) => {
     const res = await fetch(`${API_URL}/inbox/check-duplicates`, {
       method: 'POST',
       headers: getHeaders(get().token),
-      body: JSON.stringify({ boardId, title })
+      body: JSON.stringify({ boardId, title, messageId, threadId })
     });
     if (!res.ok) throw new Error('Failed to check duplicates');
     return await res.json();
@@ -1835,8 +1839,42 @@ export const useStore = create<AppState>((set, get) => ({
     if (currentWorkspace) {
       await get().fetchWorkspaceDetails(currentWorkspace.id);
     }
-    
+    const currentBoard = get().currentBoard;
+    if (currentBoard) {
+      await get().fetchBoardDetails(currentBoard.id);
+    }
     return result;
+  },
+
+  uploadAttachment: async (boardId, cardId, file) => {
+    const res = await fetch(`${API_URL}/boards/${boardId}/cards/${cardId}/attachments`, {
+      method: 'POST',
+      headers: getHeaders(get().token),
+      body: JSON.stringify(file)
+    });
+    if (!res.ok) throw new Error('Failed to upload attachment');
+    const attachment = await res.json();
+    
+    // Refresh board details
+    const currentBoard = get().currentBoard;
+    if (currentBoard) {
+      await get().fetchBoardDetails(currentBoard.id);
+    }
+    return attachment;
+  },
+
+  deleteAttachment: async (boardId, cardId, attachmentId) => {
+    const res = await fetch(`${API_URL}/boards/${boardId}/cards/${cardId}/attachments/${attachmentId}`, {
+      method: 'DELETE',
+      headers: getHeaders(get().token)
+    });
+    if (!res.ok) throw new Error('Failed to delete attachment');
+    
+    // Refresh board details
+    const currentBoard = get().currentBoard;
+    if (currentBoard) {
+      await get().fetchBoardDetails(currentBoard.id);
+    }
   },
 
   fetchEmailLogs: async (workspaceId, boardId) => {

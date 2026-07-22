@@ -49,6 +49,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
   const [convertedCardId, setConvertedCardId] = useState<string | null>(null);
   const [converting, setConverting] = useState(false);
   const [saveAsDefaultPreferences, setSaveAsDefaultPreferences] = useState(false);
+  const [convertAttachments, setConvertAttachments] = useState<any[]>([]);
 
   // Advanced Parser & Duplicate Check states
   const [convertItemTitle, setConvertItemTitle] = useState('');
@@ -267,6 +268,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
     setHoveredField(null);
     setDuplicateList([]);
     setDuplicateWarningOpen(false);
+    setConvertAttachments(details.attachments || []);
 
     const bId = item.boardId || selectedBoardId || currentWorkspace?.boards?.[0]?.id || '';
     setConvertBoardId(bId);
@@ -299,7 +301,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
       setHighlights(parsedData.highlights || null);
 
       if (bId) {
-        const dupResult = await checkDuplicates(bId, parsedData.title || item.title);
+        const dupResult = await checkDuplicates(bId, parsedData.title || item.title, details.messageId, details.threadId);
         if (dupResult.hasDuplicates) {
           setDuplicateList(dupResult.duplicates);
           setDuplicateWarningOpen(true);
@@ -382,6 +384,28 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
     setConvertChecklist(convertChecklist.filter((_, idx) => idx !== index));
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      filesArray.forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64Data = (reader.result as string).split(',')[1];
+          setConvertAttachments(prev => [
+            ...prev,
+            {
+              filename: file.name,
+              mimeType: file.type,
+              size: file.size,
+              base64Data
+            }
+          ]);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
   const handleConvertSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!convertItem || !convertBoardId || !convertListId) {
@@ -404,7 +428,8 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
         dueDate: convertDueDate ? new Date(convertDueDate).toISOString() : null,
         checklist: convertChecklist,
         title: convertItemTitle,
-        description: convertItemDescription
+        description: convertItemDescription,
+        attachments: convertAttachments
       };
 
       // Save defaults if toggled
@@ -1832,6 +1857,73 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                         >
                           Add
                         </button>
+                      </div>
+                    </div>
+
+                    {/* Attachments Management block */}
+                    <div>
+                      <label className="tf-label font-bold mb-1 block">Attachments ({convertAttachments.length})</label>
+                      <div className="space-y-1.5 max-h-28 overflow-y-auto mb-2 border border-gray-200 dark:border-gray-800 p-2.5 rounded-xl bg-slate-50 dark:bg-white/5">
+                        {convertAttachments.map((att, idx) => {
+                          const isImage = att.mimeType?.startsWith('image/');
+                          const isPDF = att.mimeType === 'application/pdf';
+                          const canPreview = isImage || isPDF;
+                          return (
+                            <div 
+                              key={idx} 
+                              className="flex items-center justify-between gap-2 p-1.5 px-3 bg-white dark:bg-[#1d2125] border border-gray-150 dark:border-gray-800 rounded-lg text-[11px]"
+                            >
+                              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                <span className="font-bold truncate text-slate-805 dark:text-slate-205" title={att.filename}>{att.filename}</span>
+                                <span className="text-gray-400 shrink-0">({(att.size / 1024).toFixed(0)} KB)</span>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {canPreview && att.storagePath && (
+                                  <a
+                                    href={`/uploads/${att.storagePath.replace('uploads/', '')}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="px-1.5 py-0.5 text-[9px] font-bold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 rounded"
+                                  >
+                                    Preview
+                                  </a>
+                                )}
+                                {att.storagePath && (
+                                  <a
+                                    href={`/uploads/${att.storagePath.replace('uploads/', '')}`}
+                                    download={att.filename}
+                                    className="p-1 text-indigo-500 hover:bg-black/5 dark:hover:bg-white/5 rounded"
+                                    title="Download"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                  </a>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setConvertAttachments(convertAttachments.filter((_, i) => i !== idx));
+                                  }}
+                                  className="p-1 text-red-500 hover:bg-black/5 dark:hover:bg-white/5 rounded font-bold"
+                                  title="Delete"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {convertAttachments.length === 0 && (
+                          <span className="text-[10px] text-gray-400 block text-center py-2">No attachments</span>
+                        )}
+                      </div>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="file"
+                          multiple
+                          onChange={handleFileChange}
+                          className="text-[10px] w-full text-gray-500 file:mr-3 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                        />
                       </div>
                     </div>
 

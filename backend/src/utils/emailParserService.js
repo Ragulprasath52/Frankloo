@@ -1,3 +1,5 @@
+import sanitizeHtml from 'sanitize-html';
+import { convert } from 'html-to-text';
 import { stripHtml } from './emailParser.js';
 
 // Predefined set of labels and their associated keywords for matching
@@ -58,50 +60,60 @@ export function parseSender(senderStr = '') {
 }
 
 /**
- * Decodes html entities and cleans html markup to plain text safely
+ * Cleans raw html email using sanitize-html and html-to-text.
  */
 export function cleanHtmlBody(html = '') {
   if (!html) return '';
   
-  // 1. Remove style block contents (CSS)
-  let text = html.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, '');
-  
-  // 2. Remove script block contents (JS)
-  text = text.replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, '');
-  
-  // 3. Remove tracking pixels (1x1 images, transparent, spacer, etc.)
-  text = text.replace(/<img[^>]*width\s*=\s*["']?1["']?[^>]*>/gi, '');
-  text = text.replace(/<img[^>]*height\s*=\s*["']?1["']?[^>]*>/gi, '');
-  text = text.replace(/<img[^>]*src\s*=\s*["']?[^"']*(pixel|spacer|tracking|open|trck|t\.gif)[^"']*["']?[^>]*>/gi, '');
+  // 1. Sanitize using sanitize-html to remove scripts, styles, hidden elements, tracking pixels
+  const sanitized = sanitizeHtml(html, {
+    nonTextTags: ['style', 'script', 'textarea', 'noscript', 'head', 'title', 'meta'],
+    allowedTags: [
+      'p', 'br', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
+      'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'b', 'i', 'strong', 'em', 'span', 'div'
+    ],
+    allowedAttributes: {
+      'a': ['href', 'title'],
+      'img': ['src', 'alt', 'width', 'height'],
+      'span': ['style'],
+      'div': ['style'],
+      'p': ['style']
+    },
+    exclusiveFilter: function(frame) {
+      // Remove hidden elements (e.g. display:none or visibility:hidden)
+      const style = frame.attribs.style || '';
+      if (/display:\s*none/i.test(style) || /visibility:\s*hidden/i.test(style)) {
+        return true;
+      }
+      
+      // Remove tracking pixels
+      if (frame.tag === 'img') {
+        const width = frame.attribs.width;
+        const height = frame.attribs.height;
+        const src = frame.attribs.src || '';
+        if (width === '1' || height === '1' || /pixel|spacer|tracking|open|trck|t\.gif/i.test(src)) {
+          return true;
+        }
+      }
+      return false;
+    }
+  });
 
-  // 4. Format list items and structural blocks into newlines
-  text = text.replace(/<br\s*\/?>/gi, '\n');
-  text = text.replace(/<\/p>/gi, '\n\n');
-  text = text.replace(/<\/div>/gi, '\n');
-  text = text.replace(/<\/tr>/gi, '\n');
-  text = text.replace(/<\/li>/gi, '\n');
-  text = text.replace(/<li[^>]*>/gi, '• ');
-  
-  // 5. Strip all other tags
-  text = text.replace(/<[^>]+>/g, '');
-  
-  // 6. Decode entities
-  text = text
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&ldquo;/g, '"')
-    .replace(/&rdquo;/g, '"');
-    
+  // 2. Convert to formatted plain text, preserving structure
+  const text = convert(sanitized, {
+    wordwrap: false,
+    selectors: [
+      { selector: 'a', options: { hideLinkHrefIfSameAsText: true } },
+      { selector: 'img', format: 'skip' },
+      { selector: 'table', options: { uppercaseHeader: false } }
+    ]
+  });
+
   return text.trim();
 }
 
 /**
- * Parses email plain text body to strip signatures, chains, disclaimers, etc.
+ * Parses email plain text body to strip signatures, chains, disclaimers, unsubscribe footers, etc.
  */
 export function cleanBodyText(bodyText = '') {
   if (!bodyText) return '';
@@ -125,7 +137,8 @@ export function cleanBodyText(bodyText = '') {
     /intended\s+solely\s+for\s+the\s+addressee/i,
     /do\s+not\s+disclose\s+this/i,
     /sender\s+accepts\s+no\s+liability/i,
-    /disclaimer/i
+    /disclaimer/i,
+    /privileged\/confidential/i
   ];
   
   // Unsubscribe footers
@@ -206,14 +219,53 @@ export function cleanBodyText(bodyText = '') {
 }
 
 /**
+ * Segment email plain text into latest message and previous conversation
+ */
+export function segmentEmailText(bodyText = '') {
+  if (!bodyText) return { latest: '', previous: '' };
+
+  const lines = bodyText.split(/\r?\n/);
+  const latestLines = [];
+  const previousLines = [];
+  let isPrevious = false;
+
+  const quotePatterns = [
+    /^\s*On\s+.*\s+wrote:\s*$/i,
+    /^\s*-+\s*Original Message\s*-+\s*$/i,
+    /^\s*From:\s+.*$/i,
+    /^\s*>+.*$/
+  ];
+
+  for (const line of lines) {
+    if (!isPrevious) {
+      if (quotePatterns.some(pat => pat.test(line)) || line.trim().startsWith('>')) {
+        isPrevious = true;
+        previousLines.push(line);
+        continue;
+      }
+      latestLines.push(line);
+    } else {
+      previousLines.push(line);
+    }
+  }
+
+  return {
+    latest: cleanBodyText(latestLines.join('\n')),
+    previous: previousLines.join('\n').trim()
+  };
+}
+
+/**
  * Parses raw email content and extracts structured task fields with highlights.
  */
 export function parseEmailIntelligently(subject = '', text = '', html = '') {
   // 1. Clean Subject
   const extractedTitle = cleanSubject(subject);
   
-  // 2. Safe html to text cleaning
-  const bodyText = text ? cleanBodyText(text) : cleanBodyText(cleanHtmlBody(html));
+  // 2. Prefer cleanHtmlBody for rich email content when html is available, else text
+  const rawBodyText = html ? cleanHtmlBody(html) : (text || '');
+  const { latest, previous } = segmentEmailText(rawBodyText);
+  const bodyText = latest || cleanBodyText(text || html || '');
 
   // Split text into sentences for sentence-level parsing
   const sentences = bodyText
@@ -426,7 +478,9 @@ export function parseEmailIntelligently(subject = '', text = '', html = '') {
     dueDate: extractedDueDate,
     labels: extractedLabels,
     checklist: extractedChecklist,
-    highlights
+    highlights,
+    latestMessage: latest,
+    previousConversation: previous
   };
 }
 

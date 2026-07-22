@@ -4,7 +4,8 @@ import type { Card } from '../store/useStore';
 import {
   X, AlignLeft, CheckSquare, Link2, MessageSquare,
   Trash2, Plus, Clock, Archive, Pencil,
-  Paperclip, MoreHorizontal, Check
+  Paperclip, MoreHorizontal, Check, Download,
+  ChevronDown, ChevronUp, Users, Tag, Info, Mail
 } from 'lucide-react';
 
 interface CardModalProps { card: Card; onClose: () => void; }
@@ -34,7 +35,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
     currentBoard, currentWorkspace, updateCard, assignUserToCard,
     unassignUserFromCard, createChecklistItem, updateChecklistItem,
     deleteChecklistItem, createComment, createDependency, deleteDependency,
-    addToast, user
+    addToast, user, uploadAttachment, deleteAttachment
   } = useStore();
 
   const [title, setTitle] = useState(card.title);
@@ -56,6 +57,19 @@ export default function CardModal({ card, onClose }: CardModalProps) {
   const [moreSettingsOpen, setMoreSettingsOpen] = useState(false);
   const [isEditingDesc, setIsEditingDesc] = useState(false);
   const [replyTargetId, setReplyTargetId] = useState<string | null>(null);
+  const [prevExpanded, setPrevExpanded] = useState(false);
+  const [sectionsExpanded, setSectionsExpanded] = useState<Record<string, boolean>>({
+    details: true,
+    assignees: true,
+    labels: true,
+    attachments: true,
+    checklists: true,
+    timeTracking: true,
+    email: true
+  });
+  const toggleSection = (key: string) => {
+    setSectionsExpanded(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   // Custom visual label & emoji states
   const [labels, setLabels] = useState<{ name: string; color: string }[]>([]);
@@ -467,7 +481,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
             </div>
 
             {/* Description Document-style block */}
-            <div className="space-y-2">
+            <div className="space-y-2 mb-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider flex items-center gap-2">
                   <AlignLeft className="w-4 h-4 text-indigo-500" /> Description
@@ -475,7 +489,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                 {!isEditingDesc && (
                   <button
                     onClick={() => setIsEditingDesc(true)}
-                    className="text-xs text-indigo-500 dark:text-indigo-400 font-bold hover:underline"
+                    className="text-xs text-indigo-550 dark:text-indigo-400 font-bold hover:underline"
                   >
                     Edit
                   </button>
@@ -512,376 +526,608 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                 </div>
               ) : (
                 <div 
-                  className="p-4 bg-slate-50/50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800/40 rounded-xl text-xs leading-relaxed text-slate-700 dark:text-slate-330 font-normal whitespace-pre-wrap doc-content hover:bg-slate-50 dark:hover:bg-slate-850/20 transition-colors cursor-pointer"
+                  className="p-4 bg-slate-50/50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800/40 rounded-xl text-xs leading-relaxed text-slate-700 dark:text-slate-200 font-normal whitespace-pre-wrap doc-content hover:bg-slate-50 dark:hover:bg-slate-850/20 transition-colors cursor-pointer"
                   onClick={() => setIsEditingDesc(true)}
                 >
-                  {description ? description : <span className="text-slate-450 italic">No description details. Click here to document guidelines…</span>}
+                  {description ? description : <span className="text-slate-400 italic">No description details. Click here to document guidelines…</span>}
                 </div>
               )}
             </div>
 
-            {/* Checklist workspace panel */}
-            <div className="space-y-4 pt-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider flex items-center gap-2">
-                  <CheckSquare className="w-4 h-4 text-indigo-500" /> Checklist
-                </h3>
-                <span className="text-xs font-bold text-slate-450 dark:text-slate-400">{doneChecklist}/{totalChecklist}</span>
-              </div>
+            {/* Collapsible Metadata Sections */}
+            <div className="space-y-4">
               
-              {totalChecklist > 0 && (
-                <div className="flex items-center gap-3 text-xs font-mono font-bold text-indigo-500 dark:text-indigo-400 bg-indigo-500/5 dark:bg-indigo-500/10 px-3 py-2 rounded-xl border border-indigo-500/10">
-                  <span>Progress</span>
-                  <span className="tracking-widest hidden sm:inline">{getProgressBlocks(progress)}</span>
-                  <span className="ml-auto">{progress}%</span>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                {card.checklists?.map((item) => (
-                  <div key={item.id} className="flex items-center gap-3 group py-1 px-2 hover:bg-slate-50/50 dark:hover:bg-slate-950/30 rounded-lg transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={item.isCompleted}
-                      onChange={() => currentBoard && updateChecklistItem(currentBoard.id, item.id, { isCompleted: !item.isCompleted })}
-                      className="w-4 h-4 rounded border-slate-350 dark:border-slate-700 text-indigo-650 focus:ring-indigo-500 cursor-pointer"
-                    />
-                    <span className={`text-xs transition-colors ${item.isCompleted ? 'line-through text-slate-400 dark:text-slate-555' : 'text-slate-800 dark:text-slate-200'}`}>
-                      {item.content}
-                    </span>
-                    <button
-                      onClick={() => currentBoard && deleteChecklistItem(currentBoard.id, item.id)}
-                      className="opacity-0 group-hover:opacity-100 ml-auto btn-icon p-1 hover:bg-rose-500/10 hover:text-rose-500 rounded transition-all"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <form onSubmit={handleAddChecklist} className="flex gap-2">
-                <input
-                  type="text"
-                  value={newChecklistVal}
-                  onChange={e => setNewChecklistVal(e.target.value)}
-                  placeholder="Add checklist item…"
-                  className="tf-input flex-1 text-xs px-3 py-2 rounded-xl"
-                  style={{ borderColor: 'var(--border)' }}
-                />
-                <button type="submit" className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all">
-                  <Plus className="w-4 h-4" />
+              {/* 1. Details Section */}
+              <div className="border-t border-slate-100 dark:border-slate-800/40 pt-4">
+                <button
+                  type="button"
+                  onClick={() => toggleSection('details')}
+                  className="w-full flex items-center justify-between text-xs font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider py-1 hover:text-indigo-500 transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <Info className="w-3.5 h-3.5 text-indigo-500" /> Details
+                  </span>
+                  {sectionsExpanded.details ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                 </button>
-              </form>
-            </div>
-
-            {/* Attachments Section */}
-            {card.coverImage && !coverImage.startsWith('#') && !coverImage.startsWith('linear-') && (
-              <div className="space-y-3 pt-2">
-                <h3 className="text-xs font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider flex items-center gap-2">
-                  <Paperclip className="w-4 h-4 text-indigo-500" /> Card Attachments
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="flex gap-3 p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800/40 rounded-xl relative group">
-                    <div className="w-14 h-14 bg-slate-200 dark:bg-slate-900 rounded-lg overflow-hidden shrink-0">
-                      <img src={coverImage} alt="cover thumb" className="w-full h-full object-cover" />
+                {sectionsExpanded.details && (
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50/50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800/40 rounded-xl p-4 text-xs">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-slate-400 dark:text-slate-500 font-semibold">Status</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200">
+                        {currentBoard?.lists?.find(l => l.id === card.listId)?.name || 'Inbox'}
+                      </span>
                     </div>
-                    <div className="flex-1 min-w-0 flex flex-col justify-center text-xs">
-                      <span className="font-bold text-slate-800 dark:text-slate-200 truncate">card_cover_image.png</span>
-                      <span className="text-[10px] text-slate-400 mt-1">Image Attachment</span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-slate-400 dark:text-slate-500 font-semibold">Priority</span>
+                      <div>
+                        <select
+                          value={priority}
+                          onChange={e => { setPriority(e.target.value as any); save({ priority: e.target.value }); }}
+                          className="bg-transparent border border-slate-200 dark:border-slate-800 rounded px-2 py-1 font-bold text-slate-800 dark:text-slate-200 cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        >
+                          <option value="LOW">Low</option>
+                          <option value="MEDIUM">Medium</option>
+                          <option value="HIGH">High</option>
+                          <option value="URGENT">Urgent</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-slate-400 dark:text-slate-550 font-semibold">Due Date</span>
+                      <div>
+                        <input
+                          type="date"
+                          value={dueDate}
+                          onChange={e => { setDueDate(e.target.value); save({ dueDate: e.target.value ? new Date(e.target.value).toISOString() : null }); }}
+                          className="bg-transparent border border-slate-200 dark:border-slate-800 rounded px-2 py-1 font-bold text-slate-800 dark:text-slate-200 cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-slate-400 dark:text-slate-500 font-semibold">Created By</span>
+                      <span className="font-bold text-slate-805 dark:text-slate-205">
+                        {card.emailDetails?.sender || 'Workspace Member'}
+                      </span>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
-            )}
 
-            {/* Dependencies */}
-            {(card.dependencies?.length > 0 || availablePrereqs.length > 0) && (
-              <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800/40">
-                <h3 className="text-xs font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider flex items-center gap-2">
-                  <Link2 className="w-4 h-4 text-indigo-500" /> Dependencies
-                </h3>
-                <div className="space-y-2">
-                  {card.dependencies?.map(d => (
-                    <div key={d.id} className="flex items-center justify-between p-2.5 bg-slate-50/50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800/40 rounded-xl text-xs">
-                      <span className="text-slate-650 dark:text-slate-400 font-medium">
-                        Blocked by: <span className="text-slate-800 dark:text-slate-200 font-bold ml-1">{d.dependsOnCard?.title}</span>
-                      </span>
-                      <button onClick={() => currentBoard && deleteDependency(currentBoard.id, card.id, d.id)} className="btn-icon p-1 hover:bg-rose-500/10 hover:text-rose-500 rounded transition-colors">
-                        <X className="w-3.5 h-3.5" />
+              {/* 2. Assignees Section */}
+              <div className="border-t border-slate-100 dark:border-slate-800/40 pt-4">
+                <button
+                  type="button"
+                  onClick={() => toggleSection('assignees')}
+                  className="w-full flex items-center justify-between text-xs font-bold text-slate-400 dark:text-slate-555 uppercase tracking-wider py-1 hover:text-indigo-500 transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <Users className="w-3.5 h-3.5 text-indigo-500" /> Assignees ({card.assignees?.length || 0})
+                  </span>
+                  {sectionsExpanded.assignees ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+                {sectionsExpanded.assignees && (
+                  <div className="mt-3 relative">
+                    <div className="flex flex-wrap gap-1.5 items-center px-1">
+                      {card.assignees?.map(a => (
+                        <img
+                          key={a.id}
+                          src={getAvatarUrl(a.user.avatarUrl, a.user.name || a.user.username)}
+                          alt={a.user.name || ''}
+                          title={a.user.name || a.user.username}
+                          className="w-6 h-6 rounded-full object-cover border border-white dark:border-slate-850 cursor-pointer hover:scale-105 transition-transform"
+                        />
+                      ))}
+                      <button 
+                        type="button"
+                        onClick={() => setAssigneeSelectOpen(!assigneeSelectOpen)}
+                        className="w-6 h-6 rounded-full border border-dashed border-slate-450 dark:border-slate-655 flex items-center justify-center text-slate-450 hover:text-indigo-500 hover:border-indigo-500 transition-all font-bold text-xs"
+                      >
+                        +
                       </button>
                     </div>
-                  ))}
-                </div>
-                {availablePrereqs.length > 0 && (
-                  <form onSubmit={handleAddDependency} className="flex gap-2">
-                    <select value={newDepVal} onChange={e => setNewDepVal(e.target.value)} className="tf-input flex-1 text-xs px-3 py-2 rounded-xl" required>
-                      <option value="">Select prerequisite card…</option>
-                      {availablePrereqs.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-                    </select>
-                    <button type="submit" className="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all">Add</button>
-                  </form>
+
+                    {/* Assignee select dropdown overlay */}
+                    {assigneeSelectOpen && (
+                      <div className="absolute left-0 mt-2 z-50 w-52 bg-white dark:bg-[#161a22] border border-slate-205 dark:border-slate-800 rounded-xl shadow-xl p-2 animate-scale-in">
+                        <div className="text-[10px] font-bold text-slate-450 dark:text-slate-500 uppercase tracking-wider px-2 py-1 border-b border-slate-100 dark:border-slate-800 mb-1">
+                          Toggle Assignees
+                        </div>
+                        <div className="max-h-40 overflow-y-auto space-y-0.5 scrollbar-thin text-left">
+                          {currentWorkspace?.members.map(m => {
+                            const assigned = card.assignees?.some(a => a.userId === m.user.id);
+                            return (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => {
+                                  if (assigned) {
+                                    currentBoard && unassignUserFromCard(currentBoard.id, card.id, m.user.id);
+                                  } else {
+                                    currentBoard && assignUserToCard(currentBoard.id, card.id, m.user.id);
+                                  }
+                                }}
+                                className={`w-full flex items-center gap-2 px-2 py-1 rounded-lg text-xs hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left ${
+                                  assigned ? 'text-indigo-500 dark:text-indigo-400 font-semibold' : 'text-slate-600 dark:text-slate-400'
+                                }`}
+                              >
+                                <img
+                                  src={getAvatarUrl(m.user.avatarUrl, m.user.name || m.user.username)}
+                                  alt="avatar" className="w-4 h-4 rounded-full shrink-0"
+                                />
+                                <span className="truncate flex-1">{m.user.name || m.user.username}</span>
+                                {assigned && <Check className="w-3.5 h-3.5 ml-auto text-indigo-500" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
 
-          </div>
-
-          {/* Right sidebar (30%): fixed details, time tracking and activity hub */}
-          <div className="w-full md:w-[22rem] shrink-0 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 flex flex-col h-full bg-slate-50/30 dark:bg-[#0e121a] overflow-y-auto p-5 space-y-5 scrollbar-thin">
-            
-            {/* Details Section */}
-            <div className="space-y-4">
-              <h4 className="text-xs font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider pb-1.5 border-b border-slate-100 dark:border-slate-800/40">
-                Task Attributes
-              </h4>
-              
-              <div className="grid grid-cols-2 gap-y-3.5 text-xs">
-                <span className="text-slate-400 dark:text-slate-500 font-semibold flex items-center">Priority</span>
-                <div>
-                  <select
-                    value={priority}
-                    onChange={e => { setPriority(e.target.value as any); save({ priority: e.target.value }); }}
-                    className="bg-transparent border border-transparent hover:border-slate-200 dark:hover:border-slate-800 rounded px-1.5 py-0.5 font-bold text-slate-800 dark:text-slate-200 cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    <option value="LOW">Low</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="HIGH">High</option>
-                    <option value="URGENT">Urgent</option>
-                  </select>
-                </div>
-
-                <span className="text-slate-400 dark:text-slate-500 font-semibold flex items-center">Due Date</span>
-                <div>
-                  <input
-                    type="date"
-                    value={dueDate}
-                    onChange={e => { setDueDate(e.target.value); save({ dueDate: e.target.value ? new Date(e.target.value).toISOString() : null }); }}
-                    className="bg-transparent border border-transparent hover:border-slate-200 dark:hover:border-slate-800 rounded px-1.5 py-0.5 font-bold text-slate-800 dark:text-slate-200 cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-
-                <span className="text-slate-400 dark:text-slate-550 font-semibold flex items-center">Estimate (min)</span>
-                <div>
-                  <input
-                    type="number"
-                    value={estTime || ''}
-                    onChange={e => setEstTime(Number(e.target.value))}
-                    onBlur={() => save({ estimatedTime: Number(estTime) })}
-                    placeholder="None"
-                    className="w-16 bg-transparent border border-transparent hover:border-slate-200 dark:hover:border-slate-800 rounded px-1.5 py-0.5 font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-
-                <span className="text-slate-400 dark:text-slate-550 font-semibold flex items-center">Logged</span>
-                <span className="font-bold px-1.5 py-0.5 text-slate-800 dark:text-slate-200">{formatTime(card.loggedTime || 0)}</span>
-
-                <span className="text-slate-400 dark:text-slate-550 font-semibold flex items-center">Assignees</span>
-                <div className="relative">
-                  <div className="flex flex-wrap gap-1 items-center px-1.5">
-                    {card.assignees?.map(a => (
-                      <img
-                        key={a.id}
-                        src={getAvatarUrl(a.user.avatarUrl, a.user.name || a.user.username)}
-                        alt={a.user.name || ''}
-                        title={a.user.name || a.user.username}
-                        className="w-5 h-5 rounded-full object-cover border border-white dark:border-slate-850 cursor-pointer hover:scale-105 transition-transform"
-                      />
-                    ))}
-                    <button 
-                      onClick={() => setAssigneeSelectOpen(!assigneeSelectOpen)}
-                      className="w-5 h-5 rounded-full border border-dashed border-slate-400 dark:border-slate-650 flex items-center justify-center text-slate-450 hover:text-indigo-500 hover:border-indigo-500 transition-all font-bold text-xs"
-                    >
-                      +
-                    </button>
-                  </div>
-
-                  {/* Assignee select dropdown overlay */}
-                  {assigneeSelectOpen && (
-                    <div className="absolute right-0 mt-1 z-50 w-52 bg-white dark:bg-[#161a22] border border-slate-205 dark:border-slate-800 rounded-xl shadow-xl p-2 animate-scale-in">
-                      <div className="text-[10px] font-bold text-slate-450 dark:text-slate-500 uppercase tracking-wider px-2 py-1 border-b border-slate-100 dark:border-slate-800 mb-1">
-                        Toggle Assignees
-                      </div>
-                      <div className="max-h-40 overflow-y-auto space-y-0.5 scrollbar-thin text-left">
-                        {currentWorkspace?.members.map(m => {
-                          const assigned = card.assignees?.some(a => a.userId === m.user.id);
-                          return (
-                            <button
-                              key={m.id}
-                              onClick={() => {
-                                if (assigned) {
-                                  currentBoard && unassignUserFromCard(currentBoard.id, card.id, m.user.id);
-                                } else {
-                                  currentBoard && assignUserToCard(currentBoard.id, card.id, m.user.id);
-                                }
-                              }}
-                              className={`w-full flex items-center gap-2 px-2 py-1 rounded-lg text-xs hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left ${
-                                assigned ? 'text-indigo-500 dark:text-indigo-400 font-semibold' : 'text-slate-600 dark:text-slate-400'
-                              }`}
-                            >
-                              <img
-                                src={getAvatarUrl(m.user.avatarUrl, m.user.name || m.user.username)}
-                                alt="avatar" className="w-4 h-4 rounded-full shrink-0"
-                              />
-                              <span className="truncate flex-1">{m.user.name || m.user.username}</span>
-                              {assigned && <Check className="w-3.5 h-3.5 ml-auto text-indigo-500" />}
-                            </button>
-                          );
-                        })}
-                      </div>
+              {/* 3. Labels Section */}
+              <div className="border-t border-slate-100 dark:border-slate-800/40 pt-4">
+                <button
+                  type="button"
+                  onClick={() => toggleSection('labels')}
+                  className="w-full flex items-center justify-between text-xs font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider py-1 hover:text-indigo-500 transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <Tag className="w-3.5 h-3.5 text-indigo-500" /> Labels ({labels.length})
+                  </span>
+                  {sectionsExpanded.labels ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+                {sectionsExpanded.labels && (
+                  <div className="mt-3 relative">
+                    <div className="flex flex-wrap gap-1.5 px-1 items-center">
+                      {labels.map((lbl, idx) => (
+                        <span
+                          key={idx}
+                          className="text-[9px] px-2.5 py-0.5 rounded font-extrabold text-white uppercase tracking-wider flex items-center gap-1 shadow-sm"
+                          style={{ backgroundColor: lbl.color }}
+                        >
+                          {lbl.name}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveLabel(idx)}
+                            className="hover:text-red-200 focus:outline-none font-bold"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setLabelManagerOpen(!labelManagerOpen)}
+                        className="text-[9px] px-2 py-0.5 rounded border border-dashed border-slate-455 text-slate-455 hover:text-indigo-500 hover:border-indigo-500 transition-all font-bold"
+                      >
+                        + Add
+                      </button>
                     </div>
-                  )}
-                </div>
 
-                <span className="text-slate-400 dark:text-slate-550 font-semibold flex items-center">Labels</span>
-                <div className="relative">
-                  <div className="flex flex-wrap gap-1 px-1.5">
-                    <button
-                      onClick={() => setLabelManagerOpen(!labelManagerOpen)}
-                      className="text-[9px] px-1.5 py-0.5 rounded border border-dashed border-slate-400 text-slate-450 hover:text-indigo-500 hover:border-indigo-500 transition-all font-bold"
-                    >
-                      + Add
-                    </button>
-                  </div>
-
-                  {/* Label management dropdown overlay */}
-                  {labelManagerOpen && (
-                    <div className="absolute right-0 mt-1 z-50 w-56 bg-white dark:bg-[#161a22] border border-slate-205 dark:border-slate-800 rounded-xl shadow-xl p-3 animate-scale-in space-y-3">
-                      <div className="text-[10px] font-bold text-slate-450 dark:text-slate-550 uppercase tracking-wider pb-1.5 border-b border-slate-100 dark:border-slate-800 mb-1 flex justify-between items-center">
-                        <span>Labels</span>
-                        <button onClick={() => setLabelManagerOpen(false)} className="text-slate-400 hover:text-white">✕</button>
-                      </div>
-                      
-                      <div className="space-y-1 max-h-24 overflow-y-auto scrollbar-thin">
-                        {labels.map((lbl, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-1 rounded hover:bg-slate-50 dark:hover:bg-slate-900/30">
-                            <span className="text-[10px] px-2 py-0.5 rounded text-white font-bold" style={{ backgroundColor: lbl.color }}>
-                              {lbl.name}
-                            </span>
-                            <button onClick={() => handleRemoveLabel(idx)} className="text-slate-400 hover:text-rose-500">
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-
-                      <form onSubmit={handleAddLabel} className="space-y-2 border-t border-slate-100 dark:border-slate-800/40 pt-2">
-                        <div className="flex gap-1 justify-center">
-                          {['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'].map((c) => (
-                            <button
-                              key={c}
-                              type="button"
-                              onClick={() => setNewLabelColor(c)}
-                              className={`w-4 h-4 rounded-full border ${
-                                newLabelColor === c ? 'ring-2 ring-offset-1 ring-indigo-500 border-transparent' : 'border-slate-200 dark:border-slate-800'
-                              }`}
-                              style={{ backgroundColor: c }}
-                            />
+                    {/* Label management dropdown overlay */}
+                    {labelManagerOpen && (
+                      <div className="absolute left-0 mt-2 z-50 w-56 bg-white dark:bg-[#161a22] border border-slate-205 dark:border-slate-800 rounded-xl shadow-xl p-3 animate-scale-in space-y-3">
+                        <div className="text-[10px] font-bold text-slate-450 dark:text-slate-550 uppercase tracking-wider pb-1.5 border-b border-slate-100 dark:border-slate-800 mb-1 flex justify-between items-center">
+                          <span>Labels</span>
+                          <button type="button" onClick={() => setLabelManagerOpen(false)} className="text-slate-400 hover:text-white">✕</button>
+                        </div>
+                        
+                        <div className="space-y-1 max-h-24 overflow-y-auto scrollbar-thin">
+                          {labels.map((lbl, idx) => (
+                            <div key={idx} className="flex items-center justify-between p-1 rounded hover:bg-slate-50 dark:hover:bg-slate-900/30">
+                              <span className="text-[10px] px-2 py-0.5 rounded text-white font-bold" style={{ backgroundColor: lbl.color }}>
+                                {lbl.name}
+                              </span>
+                              <button type="button" onClick={() => handleRemoveLabel(idx)} className="text-slate-400 hover:text-rose-500">
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
                           ))}
                         </div>
-                        <div className="flex gap-1.5">
-                          <input
-                            type="text"
-                            value={newLabelName}
-                            onChange={(e) => setNewLabelName(e.target.value)}
-                            placeholder="Label text..."
-                            className="tf-input text-[10px] px-2.5 py-1 flex-1 rounded-lg"
-                            required
-                          />
-                          <button type="submit" className="px-2.5 py-1 bg-indigo-650 text-white rounded-lg text-[10px] font-bold">
-                            Add
-                          </button>
-                        </div>
-                      </form>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
 
-            {/* Time Tracking Card */}
-            <div className="bg-slate-50/50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800/40 rounded-xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-[10px] font-bold text-slate-450 dark:text-slate-500 uppercase tracking-wider">Time Tracking</h4>
-                <Clock className="w-3.5 h-3.5 text-indigo-500" />
-              </div>
-              
-              <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
-                <div className="bg-slate-100/50 dark:bg-slate-900/40 p-2 rounded-lg">
-                  <span className="block text-[8px] text-slate-400 uppercase tracking-wider font-bold">Estimate</span>
-                  <span className="font-bold text-slate-700 dark:text-slate-200">{formatTime(card.estimatedTime)}</span>
-                </div>
-                <div className="bg-slate-100/50 dark:bg-slate-900/40 p-2 rounded-lg">
-                  <span className="block text-[8px] text-slate-400 uppercase tracking-wider font-bold">Logged</span>
-                  <span className="font-bold text-slate-700 dark:text-slate-200">{formatTime(card.loggedTime)}</span>
-                </div>
-                <div className="bg-slate-100/50 dark:bg-slate-900/40 p-2 rounded-lg">
-                  <span className="block text-[8px] text-slate-400 uppercase tracking-wider font-bold">Remaining</span>
-                  <span className="font-bold text-slate-700 dark:text-slate-200">
-                    {formatTime(Math.max(0, (card.estimatedTime || 0) - (card.loggedTime || 0)))}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    if (isTimerActive) {
-                      handleLogTimer();
-                    } else {
-                      setIsTimerActive(true);
-                    }
-                  }}
-                  className={`flex-1 text-xs font-bold py-2 rounded-xl transition-all ${
-                    isTimerActive 
-                      ? 'bg-rose-600 hover:bg-rose-700 text-white animate-pulse' 
-                      : 'bg-indigo-650 hover:bg-indigo-700 text-white'
-                  }`}
-                >
-                  {isTimerActive 
-                    ? `Stop (${Math.floor(timeElapsed / 60).toString().padStart(2, '0')}:${(timeElapsed % 60).toString().padStart(2, '0')})` 
-                    : 'Start Timer'}
-                </button>
-                
-                {isTimerActive && (
-                  <button
-                    onClick={() => {
-                      setIsTimerActive(false);
-                      setTimeElapsed(0);
-                    }}
-                    className="px-3 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-350 rounded-xl hover:bg-slate-300 text-xs font-bold transition-colors"
-                  >
-                    Reset
-                  </button>
+                        <form onSubmit={handleAddLabel} className="space-y-2 border-t border-slate-100 dark:border-slate-800/40 pt-2">
+                          <div className="flex gap-1 justify-center">
+                            {['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'].map((c) => (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={() => setNewLabelColor(c)}
+                                className={`w-4 h-4 rounded-full border ${
+                                  newLabelColor === c ? 'ring-2 ring-offset-1 ring-indigo-500 border-transparent' : 'border-slate-200 dark:border-slate-800'
+                                }`}
+                                style={{ backgroundColor: c }}
+                              />
+                            ))}
+                          </div>
+                          <div className="flex gap-1.5">
+                            <input
+                              type="text"
+                              value={newLabelName}
+                              onChange={(e) => setNewLabelName(e.target.value)}
+                              placeholder="Label text..."
+                              className="tf-input text-[10px] px-2.5 py-1 flex-1 rounded-lg"
+                              required
+                            />
+                            <button type="submit" className="px-2.5 py-1 bg-indigo-650 text-white rounded-lg text-[10px] font-bold">
+                              Add
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
-              {/* Manual Time Logger input */}
-              <div className="flex gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/40 items-center">
-                <input
-                  type="number"
-                  placeholder="Manual min..."
-                  value={manualLogVal}
-                  min={1}
-                  onChange={e => setManualLogVal(e.target.value)}
-                  className="flex-1 text-xs px-2.5 py-1.5 bg-transparent border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none"
-                />
+              {/* 4. Attachments Section */}
+              <div className="border-t border-slate-100 dark:border-slate-800/40 pt-4">
                 <button
-                  onClick={handleManualLog}
-                  className="text-xs bg-slate-100 dark:bg-slate-850 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg font-bold transition-colors"
+                  type="button"
+                  onClick={() => toggleSection('attachments')}
+                  className="w-full flex items-center justify-between text-xs font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider py-1 hover:text-indigo-500 transition-colors"
                 >
-                  Log
+                  <span className="flex items-center gap-2">
+                    <Paperclip className="w-3.5 h-3.5 text-indigo-500" /> Attachments ({card.attachments?.length || 0})
+                  </span>
+                  {sectionsExpanded.attachments ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                 </button>
-              </div>
-            </div>
+                {sectionsExpanded.attachments && (
+                  <div className="mt-3 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {card.attachments?.map((att: any) => {
+                        const isImage = att.mimeType?.startsWith('image/');
+                        const isPDF = att.mimeType === 'application/pdf';
+                        const canPreview = isImage || isPDF;
+                        const displayPath = `/uploads/${att.storagePath.replace('uploads/', '')}`;
+                        return (
+                          <div key={att.id} className="flex gap-3 p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800/40 rounded-xl relative group">
+                            {isImage && (
+                              <div className="w-14 h-14 bg-slate-200 dark:bg-slate-900 rounded-lg overflow-hidden shrink-0">
+                                <img src={displayPath} alt="thumb" className="w-full h-full object-cover" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0 flex flex-col justify-center text-xs">
+                              <span className="font-bold text-slate-800 dark:text-slate-200 truncate" title={att.filename}>{att.filename}</span>
+                              <span className="text-[10px] text-slate-400 mt-1">{(att.size ? att.size / 1024 : 0).toFixed(0)} KB • {att.mimeType || 'Unknown'}</span>
+                              <div className="flex items-center gap-2 mt-2">
+                                {canPreview && (
+                                  <a href={displayPath} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-indigo-500 hover:underline">
+                                    Preview
+                                  </a>
+                                )}
+                                <a href={displayPath} download={att.filename} className="text-[10px] font-bold text-indigo-500 hover:underline flex items-center gap-1">
+                                  <Download className="w-3 h-3" /> Download
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (currentBoard) {
+                                      await deleteAttachment(currentBoard.id, card.id, att.id);
+                                      addToast('Attachment Deleted', 'The file has been deleted from the card.', 'success');
+                                    }
+                                  }}
+                                  className="text-[10px] font-bold text-red-500 hover:underline"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
 
+                    {/* Upload new attachment */}
+                    <div className="flex gap-2 items-center mt-2">
+                      <input
+                        type="file"
+                        multiple
+                        onChange={async (e) => {
+                          if (e.target.files && currentBoard) {
+                            const files = Array.from(e.target.files);
+                            for (const file of files) {
+                              const reader = new FileReader();
+                              reader.onloadend = async () => {
+                                const base64Data = (reader.result as string).split(',')[1];
+                                  await uploadAttachment(currentBoard.id, card.id, {
+                                  filename: file.name,
+                                  mimeType: file.type,
+                                  size: file.size,
+                                  base64Data
+                                });
+                                addToast('Attachment Added', `File ${file.name} successfully uploaded.`, 'success');
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }
+                        }}
+                        className="text-[10px] text-gray-500 file:mr-3 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 5. Checklists Section */}
+              <div className="border-t border-slate-100 dark:border-slate-800/40 pt-4">
+                <button
+                  type="button"
+                  onClick={() => toggleSection('checklists')}
+                  className="w-full flex items-center justify-between text-xs font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider py-1 hover:text-indigo-500 transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <CheckSquare className="w-3.5 h-3.5 text-indigo-500" /> Checklists ({doneChecklist}/{totalChecklist})
+                  </span>
+                  {sectionsExpanded.checklists ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+                {sectionsExpanded.checklists && (
+                  <div className="mt-3 space-y-4">
+                    {totalChecklist > 0 && (
+                      <div className="flex items-center gap-3 text-xs font-mono font-bold text-indigo-500 dark:text-indigo-400 bg-indigo-500/5 dark:bg-indigo-500/10 px-3 py-2 rounded-xl border border-indigo-500/10">
+                        <span>Progress</span>
+                        <span className="tracking-widest hidden sm:inline">{getProgressBlocks(progress)}</span>
+                        <span className="ml-auto">{progress}%</span>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      {card.checklists?.map((item) => (
+                        <div key={item.id} className="flex items-center gap-3 group py-1 px-2 hover:bg-slate-50/50 dark:hover:bg-slate-950/30 rounded-lg transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={item.isCompleted}
+                            onChange={() => currentBoard && updateChecklistItem(currentBoard.id, item.id, { isCompleted: !item.isCompleted })}
+                            className="w-4 h-4 rounded border-slate-350 dark:border-slate-700 text-indigo-650 focus:ring-indigo-500 cursor-pointer"
+                          />
+                          <span className={`text-xs transition-colors ${item.isCompleted ? 'line-through text-slate-400 dark:text-slate-555' : 'text-slate-800 dark:text-slate-200'}`}>
+                            {item.content}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => currentBoard && deleteChecklistItem(currentBoard.id, item.id)}
+                            className="opacity-0 group-hover:opacity-100 ml-auto btn-icon p-1 hover:bg-rose-500/10 hover:text-rose-500 rounded transition-all"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <form onSubmit={handleAddChecklist} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newChecklistVal}
+                        onChange={e => setNewChecklistVal(e.target.value)}
+                        placeholder="Add checklist item…"
+                        className="tf-input flex-1 text-xs px-3 py-2 rounded-xl"
+                        style={{ borderColor: 'var(--border)' }}
+                      />
+                      <button type="submit" className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all">
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </div>
+
+              {/* 6. Time Tracking Section */}
+              <div className="border-t border-slate-100 dark:border-slate-800/40 pt-4">
+                <button
+                  type="button"
+                  onClick={() => toggleSection('timeTracking')}
+                  className="w-full flex items-center justify-between text-xs font-bold text-slate-400 dark:text-slate-555 uppercase tracking-wider py-1 hover:text-indigo-500 transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5 text-indigo-500" /> Time Tracking
+                  </span>
+                  {sectionsExpanded.timeTracking ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+                {sectionsExpanded.timeTracking && (
+                  <div className="mt-3 bg-slate-50/50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800/40 rounded-xl p-4 space-y-3">
+                    <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
+                      <div className="bg-slate-100/50 dark:bg-slate-900/40 p-2 rounded-lg">
+                        <span className="block text-[8px] text-slate-400 uppercase tracking-wider font-bold">Estimate</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-200">{formatTime(card.estimatedTime)}</span>
+                      </div>
+                      <div className="bg-slate-100/50 dark:bg-slate-900/40 p-2 rounded-lg">
+                        <span className="block text-[8px] text-slate-400 uppercase tracking-wider font-bold">Logged</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-200">{formatTime(card.loggedTime)}</span>
+                      </div>
+                      <div className="bg-slate-100/50 dark:bg-slate-900/40 p-2 rounded-lg">
+                        <span className="block text-[8px] text-slate-400 uppercase tracking-wider font-bold">Remaining</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-200">
+                          {formatTime(Math.max(0, (card.estimatedTime || 0) - (card.loggedTime || 0)))}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isTimerActive) {
+                            handleLogTimer();
+                          } else {
+                            setIsTimerActive(true);
+                          }
+                        }}
+                        className={`flex-1 text-xs font-bold py-2 rounded-xl transition-all ${
+                          isTimerActive 
+                            ? 'bg-rose-600 hover:bg-rose-700 text-white animate-pulse' 
+                            : 'bg-indigo-650 hover:bg-indigo-700 text-white'
+                        }`}
+                      >
+                        {isTimerActive 
+                          ? `Stop (${Math.floor(timeElapsed / 60).toString().padStart(2, '0')}:${(timeElapsed % 60).toString().padStart(2, '0')})` 
+                          : 'Start Timer'}
+                      </button>
+                      
+                      {isTimerActive && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsTimerActive(false);
+                            setTimeElapsed(0);
+                          }}
+                          className="px-3 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-350 rounded-xl hover:bg-slate-300 text-xs font-bold transition-colors"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Manual Estimate input */}
+                    <div className="flex gap-2 items-center">
+                      <span className="text-slate-450 dark:text-slate-500 font-semibold text-[10px] w-20 shrink-0">Estimate (min)</span>
+                      <input
+                        type="number"
+                        value={estTime || ''}
+                        onChange={e => setEstTime(Number(e.target.value))}
+                        onBlur={() => save({ estimatedTime: Number(estTime) })}
+                        placeholder="None"
+                        className="w-16 bg-transparent border border-slate-200 dark:border-slate-800 rounded px-1.5 py-0.5 font-bold text-slate-800 dark:text-slate-205 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs"
+                      />
+                    </div>
+
+                    {/* Manual Time Logger input */}
+                    <div className="flex gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/40 items-center">
+                      <input
+                        type="number"
+                        placeholder="Manual min..."
+                        value={manualLogVal}
+                        min={1}
+                        onChange={e => setManualLogVal(e.target.value)}
+                        className="flex-1 text-xs px-2.5 py-1.5 bg-transparent border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleManualLog}
+                        className="text-xs bg-slate-105 dark:bg-slate-850 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg font-bold transition-colors"
+                      >
+                        Log
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 7. Original Email Section */}
+              {card.emailDetails && (
+                <div className="border-t border-slate-100 dark:border-slate-800/40 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => toggleSection('email')}
+                    className="w-full flex items-center justify-between text-xs font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider py-1 hover:text-indigo-500 transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Mail className="w-3.5 h-3.5 text-indigo-500" /> Original Email
+                    </span>
+                    {sectionsExpanded.email ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
+                  {sectionsExpanded.email && (
+                    <div className="mt-3 space-y-4">
+                      <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border border-slate-100 dark:border-slate-800/40 rounded-xl space-y-2 text-xs">
+                        <h4 className="font-bold text-slate-805 dark:text-slate-105 text-sm leading-snug">{card.emailDetails.subject}</h4>
+                        <div className="grid grid-cols-1 gap-1 text-gray-400">
+                          <div><span className="font-semibold text-slate-500 inline-block w-16">From:</span> <span className="text-slate-700 dark:text-slate-300">{card.emailDetails.sender}</span></div>
+                          {(() => {
+                            try {
+                              const meta = card.emailDetails.replyLink ? JSON.parse(card.emailDetails.replyLink) : {};
+                              return (
+                                <>
+                                  {meta.recipients && <div><span className="font-semibold text-slate-500 inline-block w-16">To:</span> <span className="text-slate-700 dark:text-slate-300">{meta.recipients}</span></div>}
+                                  {meta.cc && <div><span className="font-semibold text-slate-500 inline-block w-16">Cc:</span> <span className="text-slate-700 dark:text-slate-300">{meta.cc}</span></div>}
+                                  {meta.bcc && <div><span className="font-semibold text-slate-500 inline-block w-16">Bcc:</span> <span className="text-slate-700 dark:text-slate-300">{meta.bcc}</span></div>}
+                                </>
+                              );
+                            } catch (e) {
+                              return null;
+                            }
+                          })()}
+                          <div><span className="font-semibold text-slate-500 inline-block w-16">Received:</span> <span className="text-slate-700 dark:text-slate-300">{new Date(card.emailDetails.receivedTime).toLocaleString()}</span></div>
+                        </div>
+                      </div>
+
+                      {/* Cleaned Description (Latest Message) */}
+                      <div className="space-y-1.5">
+                        <h5 className="text-[10px] font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider">Latest Message</h5>
+                        <div className="p-4 bg-slate-50/55 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800/40 rounded-xl text-xs leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-wrap doc-content">
+                          {card.emailDetails.bodyText}
+                        </div>
+                      </div>
+
+                      {/* Collapsible original email thread */}
+                      {card.emailDetails.bodyHtml && (
+                        <div className="pt-2 border-t border-slate-100 dark:border-slate-800/40">
+                          <button
+                            type="button"
+                            onClick={() => setPrevExpanded(!prevExpanded)}
+                            className="text-xs font-bold text-indigo-500 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                          >
+                            {prevExpanded ? '▲ Hide Previous Conversation' : '▼ View Previous Conversation'}
+                          </button>
+                          
+                          {prevExpanded && (
+                            <div 
+                              className="mt-3 p-4 rounded-xl border border-slate-205 overflow-x-auto min-h-[160px] select-text"
+                              style={{ backgroundColor: '#ffffff', color: '#111827' }}
+                            >
+                              <div dangerouslySetInnerHTML={{ __html: card.emailDetails.bodyHtml }} className="text-left text-slate-900" style={{ color: '#111827' }} />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Dependencies Section (if applicable) */}
+              {(card.dependencies?.length > 0 || availablePrereqs.length > 0) && (
+                <div className="border-t border-slate-100 dark:border-slate-800/40 pt-4">
+                  <h3 className="text-xs font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider flex items-center gap-2 mb-2">
+                    <Link2 className="w-4 h-4 text-indigo-500" /> Dependencies
+                  </h3>
+                  <div className="space-y-2">
+                    {card.dependencies?.map(d => (
+                      <div key={d.id} className="flex items-center justify-between p-2.5 bg-slate-50/50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800/40 rounded-xl text-xs">
+                        <span className="text-slate-650 dark:text-slate-400 font-medium">
+                          Blocked by: <span className="text-slate-800 dark:text-slate-200 font-bold ml-1">{d.dependsOnCard?.title}</span>
+                        </span>
+                        <button type="button" onClick={() => currentBoard && deleteDependency(currentBoard.id, card.id, d.id)} className="btn-icon p-1 hover:bg-rose-500/10 hover:text-rose-500 rounded transition-colors">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  {availablePrereqs.length > 0 && (
+                    <form onSubmit={handleAddDependency} className="flex gap-2 mt-2">
+                      <select value={newDepVal} onChange={e => setNewDepVal(e.target.value)} className="tf-input flex-1 text-xs px-3 py-2 rounded-xl" required>
+                        <option value="">Select prerequisite card…</option>
+                        {availablePrereqs.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+                      </select>
+                      <button type="submit" className="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all">Add</button>
+                    </form>
+                  )}
+                </div>
+              )}
+
+            </div>
+          </div>
+
+          {/* Right sidebar (30%): Collaboration only */}
+          <div className="w-full md:w-[22rem] shrink-0 border-t md:border-t-0 md:border-l border-slate-205 dark:border-slate-800 flex flex-col h-full bg-slate-50/30 dark:bg-[#0e121a] p-5 overflow-hidden">
+            
             {/* Activity Hub (Primary collaboration center) */}
-            <div className="flex-1 flex flex-col min-h-[300px]">
-              <h4 className="text-xs font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <div className="flex-grow flex flex-col min-h-0 h-full">
+              <h4 className="text-xs font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider mb-3 flex items-center gap-2 shrink-0">
                 <MessageSquare className="w-4 h-4 text-indigo-500" /> Activity Hub
               </h4>
               
-              {/* Comments timeline */}
-              <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin max-h-[320px]">
+              {/* Comments timeline (scrolls independently) */}
+              <div className="flex-grow overflow-y-auto space-y-4 pr-1 scrollbar-thin">
                 {card.comments?.length === 0 ? (
                   <div className="text-center py-6 text-slate-400 dark:text-slate-605 text-xs">
                     No activity yet. Start a discussion below!
@@ -890,123 +1136,133 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                   card.comments?.map(c => {
                     const extras = commentExtras[c.id] || { reactions: [], replies: [], attachments: [] };
                     return (
-                      <div key={c.id} className="space-y-2 text-xs border-b border-slate-100 dark:border-slate-800/40 pb-3">
-                        <div className="flex items-start gap-2.5">
+                      <div key={c.id} className="flex gap-3 text-xs text-left">
+                        {/* Avatar & Timeline Connector Line */}
+                        <div className="flex flex-col items-center shrink-0">
                           <img
                             src={getAvatarUrl(c.user.avatarUrl, c.user.name || c.user.username)}
                             alt="avatar"
-                            className="w-6 h-6 rounded-full shrink-0 object-cover mt-0.5"
+                            className="w-5 h-5 rounded-full object-cover z-10"
                           />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-baseline justify-between mb-0.5">
-                              <span className="font-bold text-slate-800 dark:text-slate-200">{c.user.name || c.user.username}</span>
-                              <span className="text-[9px] text-slate-400">{new Date(c.createdAt).toLocaleDateString()}</span>
+                          <div className="w-0.5 flex-grow bg-slate-100 dark:bg-slate-800/60 my-1 min-h-[1.5rem]" />
+                        </div>
+
+                        {/* Content area */}
+                        <div className="flex-1 min-w-0 pb-4">
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                            <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">{c.user.name || c.user.username}</span>
+                            <span>commented</span>
+                            <span>•</span>
+                            <span>{new Date(c.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          
+                          <p className="mt-1 text-slate-600 dark:text-slate-300 leading-relaxed break-words text-xs">{c.content}</p>
+                          
+                          {/* Rich Comments attachments */}
+                          {extras.attachments?.map((att, idx) => (
+                            <div key={idx} className="mt-2 flex items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-800 text-[10px]">
+                              <Paperclip className="w-3 h-3 text-indigo-500" />
+                              <span className="font-semibold text-slate-600 dark:text-slate-400 truncate max-w-[12rem]">{att.name}</span>
+                              <span className="text-[9px] text-slate-400">{att.size}</span>
                             </div>
-                            <p className="text-slate-650 dark:text-slate-350 leading-relaxed break-words">{c.content}</p>
-                            
-                            {/* Rich Comments attachments */}
-                            {extras.attachments?.map((att, idx) => (
-                              <div key={idx} className="mt-1.5 flex items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-800">
-                                <Paperclip className="w-3 h-3 text-indigo-500" />
-                                <span className="font-semibold text-slate-650 dark:text-slate-455 truncate max-w-[12rem]">{att.name}</span>
-                                <span className="text-[9px] text-slate-400">{att.size}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                          ))}
 
-                        {/* Reactions and replies controls */}
-                        <div className="flex items-center gap-2 pl-8">
-                          <div className="flex items-center gap-1">
-                            {['👍', '❤️', '😄', '🎉'].map(emoji => {
-                              const r = extras.reactions.find(react => react.emoji === emoji);
-                              const active = r?.users.includes(user?.name || user?.username || 'You');
-                              return (
-                                <button
-                                  key={emoji}
-                                  onClick={() => handleToggleReaction(c.id, emoji)}
-                                  className={`px-1.5 py-0.5 rounded text-[10px] border transition-colors ${
-                                    active 
-                                      ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-500' 
-                                      : 'bg-transparent border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900'
-                                  }`}
-                                >
-                                  {emoji} {r?.users.length || 0}
-                                </button>
-                              );
-                            })}
-                          </div>
+                          {/* Reactions & Reply controls */}
+                          <div className="flex items-center gap-2 mt-2">
+                            <div className="flex items-center gap-1">
+                              {['👍', '❤️', '😄', '🎉'].map(emoji => {
+                                const r = extras.reactions.find(react => react.emoji === emoji);
+                                const active = r?.users.includes(user?.name || user?.username || 'You');
+                                return (
+                                  <button
+                                    key={emoji}
+                                    type="button"
+                                    onClick={() => handleToggleReaction(c.id, emoji)}
+                                    className={`px-1.5 py-0.5 rounded text-[9px] border transition-colors ${
+                                      active 
+                                        ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-500' 
+                                        : 'bg-transparent border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900'
+                                    }`}
+                                  >
+                                    {emoji} {r?.users.length || 0}
+                                  </button>
+                                );
+                              })}
+                            </div>
 
-                          <button
-                            onClick={() => setReplyTargetId(replyTargetId === c.id ? null : c.id)}
-                            className="text-[10px] font-bold text-slate-450 hover:text-indigo-500 hover:underline flex items-center gap-1"
-                          >
-                            Reply
-                          </button>
-                        </div>
-
-                        {/* Replies Thread */}
-                        {extras.replies?.length > 0 && (
-                          <div className="pl-8 space-y-2 mt-2 border-l-2 border-slate-100 dark:border-slate-800/40">
-                            {extras.replies.map(r => (
-                              <div key={r.id} className="flex gap-2 text-[10px]">
-                                <img
-                                  src={getAvatarUrl(r.userAvatar, r.userName)}
-                                  alt="avatar"
-                                  className="w-4 h-4 rounded-full shrink-0 object-cover mt-0.5"
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-baseline justify-between mb-0.5">
-                                    <span className="font-bold text-slate-800 dark:text-slate-200">{r.userName}</span>
-                                    <span className="text-[9px] text-slate-400">{new Date(r.createdAt).toLocaleDateString()}</span>
-                                  </div>
-                                  <p className="text-slate-650 dark:text-slate-350 leading-relaxed break-words">{r.content}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Reply Form */}
-                        {replyTargetId === c.id && (
-                          <div className="pl-8 mt-2 animate-scale-in">
-                            <form
-                              onSubmit={(e) => {
-                                e.preventDefault();
-                                const inputEl = e.currentTarget.elements.namedItem('replyText') as HTMLInputElement;
-                                handleAddReply(c.id, inputEl.value);
-                                inputEl.value = '';
-                                setReplyTargetId(null);
-                              }}
-                              className="flex gap-1.5"
+                            <button
+                              type="button"
+                              onClick={() => setReplyTargetId(replyTargetId === c.id ? null : c.id)}
+                              className="text-[9px] font-bold text-slate-400 hover:text-indigo-500 hover:underline"
                             >
-                              <input
-                                name="replyText"
-                                type="text"
-                                placeholder="Reply..."
-                                className="flex-1 text-[10px] px-2 py-1 bg-transparent border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none"
-                                autoFocus
-                              />
-                              <button type="submit" className="px-2 py-1 bg-indigo-655 text-white rounded-lg text-[9px] font-bold">
-                                Send
-                              </button>
-                            </form>
+                              Reply
+                            </button>
                           </div>
-                        )}
+
+                          {/* Replies Thread */}
+                          {extras.replies?.length > 0 && (
+                            <div className="mt-3 pl-3 border-l border-slate-200 dark:border-slate-800 space-y-3">
+                              {extras.replies.map(r => (
+                                <div key={r.id} className="flex gap-2 text-[11px]">
+                                  <img
+                                    src={getAvatarUrl(r.userAvatar, r.userName)}
+                                    alt="avatar"
+                                    className="w-4 h-4 rounded-full shrink-0 object-cover mt-0.5"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5 text-[9px] text-slate-400">
+                                      <span className="font-bold text-slate-700 dark:text-slate-300">{r.userName}</span>
+                                      <span>replied</span>
+                                      <span>{new Date(r.createdAt).toLocaleDateString()}</span>
+                                    </div>
+                                    <p className="mt-0.5 text-slate-600 dark:text-slate-350 leading-relaxed break-words">{r.content}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Reply Form */}
+                          {replyTargetId === c.id && (
+                            <div className="mt-2 pl-3 border-l border-slate-200 dark:border-slate-800 animate-scale-in">
+                              <form
+                                onSubmit={(e) => {
+                                  e.preventDefault();
+                                  const inputEl = e.currentTarget.elements.namedItem('replyText') as HTMLInputElement;
+                                  handleAddReply(c.id, inputEl.value);
+                                  inputEl.value = '';
+                                  setReplyTargetId(null);
+                                }}
+                                className="flex gap-1.5"
+                              >
+                                <input
+                                  name="replyText"
+                                  type="text"
+                                  placeholder="Reply..."
+                                  className="flex-1 text-[10px] px-2.5 py-1 bg-transparent border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none"
+                                  autoFocus
+                                />
+                                <button type="submit" className="px-2.5 py-1 bg-indigo-650 text-white rounded-lg text-[9px] font-bold">
+                                  Send
+                                </button>
+                              </form>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     );
                   })
                 )}
               </div>
 
-              {/* Add Comment Area */}
-              <form onSubmit={handleAddComment} className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/40 space-y-2 shrink-0">
+              {/* Add Comment Area (Fixed at bottom) */}
+              <form onSubmit={handleAddComment} className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/40 space-y-2 shrink-0 bg-transparent">
                 <textarea
                   value={newCommentVal}
                   onChange={e => setNewCommentVal(e.target.value)}
                   placeholder="Write a comment..."
                   rows={2}
-                  className="w-full text-xs p-2.5 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-transparent text-slate-850 dark:text-slate-100 resize-none leading-relaxed"
+                  className="w-full text-xs p-2.5 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-transparent text-slate-800 dark:text-slate-100 resize-none leading-relaxed"
                 />
                 
                 <div className="flex justify-between items-center gap-2">

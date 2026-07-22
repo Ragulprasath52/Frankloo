@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Users, Search, Trash2, Send, AlertCircle, RefreshCw, X, MoreVertical, Plus, Copy,
-  CheckCircle, Shield, Check, Calendar, Activity, Mail, LogOut, Settings, Award, UserCheck, Key, HelpCircle
+  CheckCircle, Shield, Check, Activity, LogOut, Key
 } from 'lucide-react';
 import { useStore, getAvatarUrl } from '../store/useStore';
 
@@ -13,10 +13,10 @@ interface MembersModuleProps {
 
 // Role Badges config
 const ROLE_BADGES: Record<string, { label: string; bg: string; text: string; border: string }> = {
-  OWNER: { label: 'Owner', bg: 'bg-amber-50 dark:bg-amber-500/10', text: 'text-amber-700 dark:text-amber-400', border: 'border-amber-200 dark:border-amber-500/20' },
-  ADMIN: { label: 'Admin', bg: 'bg-purple-50 dark:bg-purple-500/10', text: 'text-purple-700 dark:text-purple-400', border: 'border-purple-200 dark:border-purple-500/20' },
-  MEMBER: { label: 'Member', bg: 'bg-blue-50 dark:bg-blue-500/10', text: 'text-blue-700 dark:text-blue-400', border: 'border-blue-200 dark:border-blue-500/20' },
-  VIEWER: { label: 'Guest', bg: 'bg-slate-50 dark:bg-slate-500/10', text: 'text-slate-700 dark:text-slate-400', border: 'border-slate-200 dark:border-slate-500/20' }
+  OWNER: { label: 'Owner', bg: 'bg-amber-500/5', text: 'text-amber-600 dark:text-amber-400 border-amber-500/10', border: 'border-amber-500/10' },
+  ADMIN: { label: 'Admin', bg: 'bg-purple-500/5', text: 'text-purple-600 dark:text-purple-400 border-purple-500/10', border: 'border-purple-500/10' },
+  MEMBER: { label: 'Member', bg: 'bg-slate-500/5', text: 'text-slate-600 dark:text-slate-400 border-slate-500/10', border: 'border-slate-500/10' },
+  VIEWER: { label: 'Guest', bg: 'bg-slate-500/5', text: 'text-slate-600 dark:text-slate-400 border-slate-500/10', border: 'border-slate-500/10' }
 };
 
 export default function MembersModule({ workspaceId, isEditor, onSelectBoard }: MembersModuleProps) {
@@ -356,7 +356,7 @@ export default function MembersModule({ workspaceId, isEditor, onSelectBoard }: 
           {isEditor && (
             <button 
               onClick={() => setInviteModalOpen(true)} 
-              className="flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:hover:bg-slate-200 dark:text-slate-950 font-medium text-xs py-2 px-3.5 rounded-lg shadow-sm active:scale-[0.98] transition-all"
+              className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-705 text-white font-semibold text-xs py-2 px-3.5 rounded-lg shadow-sm active:scale-[0.98] transition-all"
             >
               <Plus className="w-3.5 h-3.5" /> Invite Teammate
             </button>
@@ -540,7 +540,7 @@ export default function MembersModule({ workspaceId, isEditor, onSelectBoard }: 
                               e.stopPropagation();
                               setEditingRoleMemberId(m.id);
                             }}
-                            className={`inline-flex px-2 py-0.5 border rounded-full text-[10px] font-medium tracking-wide ${badge.bg} ${badge.text} ${badge.border} transition-opacity hover:opacity-90`}
+                            className={`inline-flex px-1.5 py-0.5 border rounded text-[9px] font-bold tracking-wider uppercase ${badge.bg} ${badge.text} ${badge.border} transition-opacity hover:opacity-90`}
                           >
                             {badge.label}
                           </button>
@@ -932,7 +932,7 @@ export default function MembersModule({ workspaceId, isEditor, onSelectBoard }: 
       {/* ── Invite Member Modal ── */}
       {inviteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={() => setInviteModalOpen(false)}>
-          <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded-xl p-5 w-full max-w-lg shadow-xl animate-scale-in text-xs max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded-xl p-5 w-full max-w-lg shadow-xl animate-scale-in text-xs max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
               <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Invite Workspace Member</h3>
               <button onClick={() => setInviteModalOpen(false)} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600">
@@ -1132,9 +1132,9 @@ export default function MembersModule({ workspaceId, isEditor, onSelectBoard }: 
                 </p>
               )}
 
-              <div className="flex gap-2 justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
-                <button type="button" onClick={() => setInviteModalOpen(false)} className="px-3.5 py-1.5 border border-slate-200 dark:border-[#30363d] rounded-lg text-slate-705 dark:text-slate-300 font-semibold hover:bg-slate-50 dark:hover:bg-slate-800">Cancel</button>
-                <button type="submit" disabled={inviting} className="px-3.5 py-1.5 bg-slate-900 dark:bg-slate-100 hover:opacity-90 disabled:opacity-60 text-white dark:text-slate-950 rounded-lg font-semibold flex items-center gap-1.5">
+              <div className="flex gap-2 justify-end pt-4 mt-2 border-t border-slate-100 dark:border-slate-800">
+                <button type="button" onClick={() => setInviteModalOpen(false)} className="px-3.5 py-1.5 border border-slate-205 dark:border-[#30363d] rounded-lg text-slate-700 dark:text-slate-300 font-semibold hover:bg-slate-50 dark:hover:bg-slate-800">Cancel</button>
+                <button type="submit" disabled={inviting} className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-705 disabled:opacity-60 text-white rounded-lg font-semibold flex items-center gap-1.5 shadow-sm">
                   {inviting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Invite Teammate
                 </button>
               </div>
