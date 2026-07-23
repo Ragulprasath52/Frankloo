@@ -11,7 +11,15 @@
  * @returns {{ cleanDescription: string, checklists: string[] }}
  */
 export function parseEmailBody(text = '', html = '') {
-  let body = text || stripHtml(html) || '';
+  const isHtml = (str) => /<html|<doctype|<head|<body|<style/i.test(str || '');
+  let body = '';
+  if (text && isHtml(text)) {
+    body = stripHtml(text);
+  } else if (text) {
+    body = text;
+  } else {
+    body = stripHtml(html);
+  }
 
   // 1. Quoted text removal
   // Patterns for email replies (e.g. "On Thu, Jul 2, 2026 at 3:00 PM ... wrote:")
@@ -96,6 +104,11 @@ export function stripHtml(html) {
   if (!html) return '';
   let text = html;
   
+  // Remove style, script, head blocks completely
+  text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+  text = text.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
+
   // Replace line breaks and paragraph tags with newlines
   text = text.replace(/<br\s*\/?>/gi, '\n');
   text = text.replace(/<\/p>/gi, '\n');

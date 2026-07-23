@@ -2070,7 +2070,6 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
   };
 
   const pieData = Object.entries(priorityCounts).map(([name, value]) => ({ name, value }));
-  const COLORS = ['#94a3b8', '#38bdf8', '#fbbf24', '#f87171'];
 
   // Burndown mock data
   const burndownData = [
@@ -2311,7 +2310,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
       </header>
 
       {/* Navigation Sub-Tabs bar — scrollable on mobile */}
-      <div className="px-2 sm:px-6 py-2 bg-slate-100/60 dark:bg-[#0c101b]/40 border-b border-gray-200 dark:border-gray-800 shrink-0 z-10 backdrop-blur-sm tab-bar">
+      <div className="px-2 sm:px-6 py-2 bg-slate-100/60 dark:bg-[#0c101b]/40 border-b border-gray-200 dark:border-gray-800 shrink-0 z-10 backdrop-blur-sm flex flex-nowrap md:flex-wrap items-center gap-1.5 overflow-x-auto scrollbar-none tab-bar">
         {(['kanban', 'calendar', 'dashboard', 'workload', 'automations'] as const).map((tab) => (
           <button
             key={tab}
@@ -2913,77 +2912,92 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
 
         {/* Dashboard View */}
         {activeTab === 'dashboard' && (
-          <div className="space-y-6 max-w-4xl mx-auto animate-fade-in">
+          <div className="space-y-8 max-w-6xl mx-auto animate-fade-in px-4 pb-12">
+            
+            {/* Header info */}
+            <div className="flex flex-col gap-1">
+              <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Board Analytics</h2>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Real-time charts, burndown rates, and priority analytics for board "{currentBoard.name}".</p>
+            </div>
+
+            {/* Stat Cards Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white dark:bg-[#161a22] border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Sprint Tasks</span>
-                  <h4 className="text-2xl font-bold text-[#172b4d] dark:text-[#b6c2cf] mt-1">{totalTasks}</h4>
+              {/* Card 1 */}
+              <div className="bg-white dark:bg-[#1c2028] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow flex items-center justify-between group">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Total Sprint Tasks</span>
+                  <h4 className="text-3xl font-extrabold text-slate-800 dark:text-slate-100 mt-1 tracking-tight">{totalTasks}</h4>
                 </div>
-                <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
-                  <Columns className="w-5 h-5" />
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-[#161a22] border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Completed Tasks</span>
-                  <h4 className="text-2xl font-bold text-emerald-500 mt-1">{completedTasks}</h4>
-                </div>
-                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5" />
+                <div className="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 flex items-center justify-center shrink-0 transition-transform group-hover:scale-105">
+                  <Columns className="w-6 h-6" />
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-[#161a22] border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Overdue Warnings</span>
-                  <h4 className="text-2xl font-bold text-rose-500 mt-1">{overdueTasks}</h4>
+              {/* Card 2 */}
+              <div className="bg-white dark:bg-[#1c2028] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow flex items-center justify-between group">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Completed Tasks</span>
+                  <h4 className="text-3xl font-extrabold text-emerald-500 mt-1 tracking-tight">{completedTasks}</h4>
                 </div>
-                <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center">
-                  <AlertCircle className="w-5 h-5" />
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 flex items-center justify-center shrink-0 transition-transform group-hover:scale-105">
+                  <CheckCircle className="w-6 h-6" />
+                </div>
+              </div>
+
+              {/* Card 3 */}
+              <div className="bg-white dark:bg-[#1c2028] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow flex items-center justify-between group">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Overdue Warnings</span>
+                  <h4 className="text-3xl font-extrabold text-rose-500 mt-1 tracking-tight">{overdueTasks}</h4>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-500 dark:text-rose-455 flex items-center justify-center shrink-0 transition-transform group-hover:scale-105">
+                  <AlertCircle className="w-6 h-6" />
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white dark:bg-[#161a22] border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-                <h3 className="font-bold text-xs text-gray-500 mb-4 uppercase tracking-wider">Sprint Burndown Rate</h3>
-                <div className="h-64">
+            {/* Charts Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Burndown Chart Card */}
+              <div className="bg-white dark:bg-[#1c2028] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 shadow-sm">
+                <h3 className="font-bold text-xs text-slate-455 dark:text-slate-400 mb-5 uppercase tracking-wider">Sprint Burndown Rate</h3>
+                <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
                      <LineChart data={burndownData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                      <XAxis dataKey="day" stroke="#94a3b8" fontSize={10} />
-                      <YAxis stroke="#94a3b8" fontSize={10} />
-                      <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b' }} />
-                      <Legend wrapperStyle={{ fontSize: '10px' }} />
-                      <Line type="monotone" dataKey="Ideal" stroke="#94a3b8" strokeDasharray="5 5" strokeWidth={1.5} />
-                      <Line type="monotone" dataKey="Actual" stroke="#6366f1" strokeWidth={2} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
+                      <XAxis dataKey="day" stroke="var(--text-muted)" fontSize={10} tickLine={false} />
+                      <YAxis stroke="var(--text-muted)" fontSize={10} tickLine={false} />
+                      <Tooltip contentStyle={{ backgroundColor: 'var(--bg-body)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
+                      <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
+                      <Line type="monotone" dataKey="Ideal" stroke="#64748b" strokeDasharray="5 5" strokeWidth={1.5} dot={false} />
+                      <Line type="monotone" dataKey="Actual" stroke="var(--accent)" strokeWidth={2.5} activeDot={{ r: 6 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-[#161a22] border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-                <h3 className="font-bold text-xs text-gray-500 mb-4 uppercase tracking-wider">Task Priority Ratios</h3>
-                <div className="h-64 flex items-center justify-center">
+              {/* Priority Chart Card */}
+              <div className="bg-white dark:bg-[#1c2028] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 shadow-sm">
+                <h3 className="font-bold text-xs text-slate-455 dark:text-slate-400 mb-5 uppercase tracking-wider">Task Priority Ratios</h3>
+                <div className="h-72 flex items-center justify-center">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
                         data={pieData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
+                        innerRadius={65}
+                        outerRadius={85}
+                        paddingAngle={4}
                         dataKey="value"
                       >
-                        {pieData.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
+                        {pieData.map((_, index) => {
+                          const colors = ['#64748b', '#0c66e4', '#f5cd47', '#f87168'];
+                          return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                        })}
                       </Pie>
-                      <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b' }} />
-                      <Legend wrapperStyle={{ fontSize: '10px' }} />
+                      <Tooltip contentStyle={{ backgroundColor: 'var(--bg-body)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
+                      <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -2994,39 +3008,97 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
 
         {/* Workload View */}
         {activeTab === 'workload' && (
-          <div className="bg-white/90 dark:bg-[#161a22]/90 backdrop-blur-md border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 shadow-xl max-w-md mx-auto space-y-5 animate-fade-in">
-            <h3 className="font-bold text-slate-800 dark:text-[#f0f6fc] text-sm tracking-tight border-b border-slate-100 dark:border-slate-800 pb-3">
-              Team Workload Distribution
-            </h3>
+          <div className="space-y-6 max-w-6xl mx-auto animate-fade-in px-4 pb-12">
             
-            <div className="space-y-4">
+            {/* Header info */}
+            <div className="flex flex-col gap-1">
+              <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Workload Distribution</h2>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Track and balance tasks assigned to team members across this board.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {currentWorkspace?.members.map((m) => {
                 const memberCards = allCards.filter(c => c.assignees.some(a => a.userId === m.user.id));
                 const percentage = Math.min(100, (memberCards.length / 8) * 100);
+                
+                // Capacity status
+                let statusLabel = 'Optimal';
+                let statusColor = 'text-emerald-500 bg-emerald-500/10';
+                if (memberCards.length >= 8) {
+                  statusLabel = 'Overloaded';
+                  statusColor = 'text-red-500 bg-red-500/10';
+                } else if (memberCards.length === 0) {
+                  statusLabel = 'Available';
+                  statusColor = 'text-slate-400 bg-slate-100 dark:bg-slate-800';
+                } else if (memberCards.length > 5) {
+                  statusLabel = 'Heavy';
+                  statusColor = 'text-amber-500 bg-amber-500/10';
+                }
+
                 return (
-                  <div key={m.id} className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 shrink-0 min-w-[140px] sm:min-w-[160px]">
-                      <img 
-                        src={getAvatarUrl(m.user.avatarUrl, m.user.name || m.user.username)} 
-                        alt="Avatar" 
-                        className="w-8 h-8 rounded-xl object-cover ring-2 ring-slate-100 dark:ring-slate-800 shrink-0"
-                      />
-                      <div className="min-w-0">
-                        <h4 className="font-bold text-xs text-slate-700 dark:text-[#b6c2cf] truncate">
-                          {m.user.name || m.user.username}
-                        </h4>
-                        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 whitespace-nowrap">
-                          {memberCards.length} {memberCards.length === 1 ? 'task' : 'tasks'} assigned
-                        </span>
+                  <div key={m.id} className="bg-white dark:bg-[#1c2028] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between hover:shadow-md transition-shadow">
+                    
+                    {/* User profile row */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <img 
+                          src={getAvatarUrl(m.user.avatarUrl, m.user.name || m.user.username)} 
+                          alt="Avatar" 
+                          className="w-10 h-10 rounded-xl object-cover ring-2 ring-slate-100 dark:ring-slate-800 shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200 truncate">
+                            {m.user.name || m.user.username}
+                          </h4>
+                          <span className="text-[10px] text-slate-455 font-medium block">
+                            @{m.user.username}
+                          </span>
+                        </div>
+                      </div>
+                      <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${statusColor}`}>
+                        {statusLabel}
+                      </span>
+                    </div>
+
+                    {/* Progress indicator */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[10px] font-bold text-slate-400">
+                        <span>CAPACITY UTILIZATION</span>
+                        <span>{memberCards.length} / 8 TASKS</span>
+                      </div>
+                      <div className="bg-slate-100 dark:bg-slate-800/60 h-2 rounded-full overflow-hidden relative">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-500 ease-out ${
+                            memberCards.length >= 8 
+                              ? 'bg-gradient-to-r from-red-500 to-rose-600' 
+                              : 'bg-gradient-to-r from-indigo-500 to-indigo-650'
+                          }`}
+                          style={{ width: `${percentage}%` }}
+                        />
                       </div>
                     </div>
 
-                    <div className="flex-1 bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden relative">
-                      <div 
-                        className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 transition-all duration-500 ease-out"
-                        style={{ width: `${percentage}%` }}
-                      />
+                    {/* Active Cards List */}
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800/40">
+                      <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Active Tasks</span>
+                      {memberCards.length === 0 ? (
+                        <p className="text-[11px] text-slate-400 italic">No tasks assigned currently.</p>
+                      ) : (
+                        <div className="space-y-1.5 max-h-24 overflow-y-auto pr-1 scrollbar-thin">
+                          {memberCards.slice(0, 3).map(c => (
+                            <div key={c.id} className="text-xs px-2.5 py-1 bg-slate-50 dark:bg-slate-900/40 border dark:border-slate-800 rounded-md text-slate-700 dark:text-slate-350 truncate">
+                              {c.title}
+                            </div>
+                          ))}
+                          {memberCards.length > 3 && (
+                            <span className="text-[9px] font-bold text-indigo-500 uppercase tracking-widest block pt-0.5">
+                              + {memberCards.length - 3} MORE TASKS
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
+
                   </div>
                 );
               })}
@@ -3036,124 +3108,140 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
 
         {/* Automations Tab */}
         {activeTab === 'automations' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto animate-fade-in">
-            <div className="bg-white dark:bg-[#161a22] border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm space-y-4">
-              <h3 className="font-bold text-[#172b4d] dark:text-[#b6c2cf] text-sm flex items-center gap-2">
-                <span>⚡</span> Build Board Automation Rule
-              </h3>
-              
-              <form onSubmit={handleCreateAutomationSubmit} className="space-y-4">
-                <div>
-                  <label className="tf-label">WHEN trigger event occurs</label>
-                  <select 
-                    value={trigType}
-                    onChange={(e) => setTrigType(e.target.value)}
-                    className="tf-input rounded-xl"
-                  >
-                    <option value="CARD_CREATED">A Card is Created</option>
-                    <option value="CARD_MOVED">A Card is Moved to Column</option>
-                  </select>
-                </div>
-
-                {trigType === 'CARD_MOVED' && (
-                  <div>
-                    <label className="tf-label">Target Column</label>
-                    <select 
-                      value={trigVal}
-                      onChange={(e) => setTrigVal(e.target.value)}
-                      className="tf-input rounded-xl"
-                      required
-                    >
-                      <option value="">Select Column...</option>
-                      {currentBoard.lists.map(l => (
-                        <option key={l.id} value={l.id}>{l.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div>
-                  <label className="tf-label">THEN trigger action</label>
-                  <select 
-                    value={actType}
-                    onChange={(e) => setActType(e.target.value)}
-                    className="tf-input rounded-xl"
-                  >
-                    <option value="SET_PRIORITY">Set Task Priority to</option>
-                    <option value="ADD_CHECKLIST">Append Checklist Item</option>
-                    <option value="MARK_COMPLETE">Auto-complete Checklist Items</option>
-                  </select>
-                </div>
-
-                {actType === 'SET_PRIORITY' && (
-                  <div>
-                    <label className="tf-label">Priority Level</label>
-                    <select 
-                      value={actVal}
-                      onChange={(e) => setActVal(e.target.value)}
-                      className="tf-input rounded-xl"
-                    >
-                      <option value="LOW">Low</option>
-                      <option value="MEDIUM">Medium</option>
-                      <option value="HIGH">High</option>
-                      <option value="URGENT">Urgent</option>
-                    </select>
-                  </div>
-                )}
-
-                {actType === 'ADD_CHECKLIST' && (
-                  <div>
-                    <label className="tf-label">Checklist Text</label>
-                    <input 
-                      type="text"
-                      value={actVal}
-                      onChange={(e) => setActVal(e.target.value)}
-                      placeholder="e.g. Run tests, Review code..."
-                      className="tf-input rounded-xl"
-                      required
-                    />
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  className="btn-primary w-full justify-center text-xs py-2.5 rounded-xl mt-2"
-                >
-                  Create Rule
-                </button>
-              </form>
+          <div className="space-y-6 max-w-6xl mx-auto animate-fade-in px-4 pb-12">
+            
+            {/* Header info */}
+            <div className="flex flex-col gap-1">
+              <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Board Automations</h2>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Configure trigger events to automatically perform board actions.</p>
             </div>
 
-            <div className="bg-white dark:bg-[#161a22] border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm space-y-4">
-              <h3 className="font-bold text-[#172b4d] dark:text-[#b6c2cf] text-sm">Active Rules List</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
               
-              <div className="space-y-3">
-                {currentBoard.automations?.length === 0 ? (
-                  <p className="text-xs text-gray-400">No automation rules created yet.</p>
-                ) : (
-                  currentBoard.automations?.map((r) => {
-                    const trigCol = currentBoard.lists.find(l => l.id === r.triggerVal)?.name;
-                    return (
-                      <div key={r.id} className="p-4 bg-slate-50 dark:bg-slate-900 border border-gray-200 dark:border-gray-850 rounded-xl flex items-center justify-between text-xs text-gray-500">
-                        <div className="leading-relaxed">
-                          <p>
-                            <span className="font-bold text-indigo-600">WHEN</span> {r.triggerType === 'CARD_CREATED' ? 'Card is created' : `Card moves to "${trigCol}"`}
-                          </p>
-                          <p className="mt-1">
-                            <span className="font-bold text-indigo-500">THEN</span> {r.actionType === 'SET_PRIORITY' ? `Set priority to "${r.actionVal}"` : r.actionType === 'ADD_CHECKLIST' ? `Add checklist item "${r.actionVal}"` : 'Auto-complete items'}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => deleteAutomationRule(boardId, r.id)}
-                          className="btn-icon text-gray-400 hover:text-rose-500 rounded-lg"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    );
-                  })
-                )}
+              {/* Build Automation Rule Card */}
+              <div className="bg-white dark:bg-[#1c2028] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 shadow-sm space-y-5">
+                <h3 className="font-bold text-slate-800 dark:text-[#f0f6fc] text-sm flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-800/40">
+                  <span className="w-6 h-6 rounded-lg bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 flex items-center justify-center text-xs">⚡</span> Build Board Automation Rule
+                </h3>
+                
+                <form onSubmit={handleCreateAutomationSubmit} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">WHEN trigger event occurs</label>
+                    <select 
+                      value={trigType}
+                      onChange={(e) => setTrigType(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-[#101214] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-2 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                      <option value="CARD_CREATED">A Card is Created</option>
+                      <option value="CARD_MOVED">A Card is Moved to Column</option>
+                    </select>
+                  </div>
+
+                  {trigType === 'CARD_MOVED' && (
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Target Column</label>
+                      <select 
+                        value={trigVal}
+                        onChange={(e) => setTrigVal(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-[#101214] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-2 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        required
+                      >
+                        <option value="">Select Column...</option>
+                        {currentBoard.lists.map(l => (
+                          <option key={l.id} value={l.id}>{l.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">THEN trigger action</label>
+                    <select 
+                      value={actType}
+                      onChange={(e) => setActType(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-[#101214] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-2 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                      <option value="SET_PRIORITY">Set Task Priority to</option>
+                      <option value="ADD_CHECKLIST">Append Checklist Item</option>
+                      <option value="MARK_COMPLETE">Auto-complete Checklist Items</option>
+                    </select>
+                  </div>
+
+                  {actType === 'SET_PRIORITY' && (
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Priority Level</label>
+                      <select 
+                        value={actVal}
+                        onChange={(e) => setActVal(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-[#101214] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-2 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value="LOW">Low</option>
+                        <option value="MEDIUM">Medium</option>
+                        <option value="HIGH">High</option>
+                        <option value="URGENT">Urgent</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {actType === 'ADD_CHECKLIST' && (
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Checklist Text</label>
+                      <input 
+                        type="text"
+                        value={actVal}
+                        onChange={(e) => setActVal(e.target.value)}
+                        placeholder="e.g. Run tests, Review code..."
+                        className="w-full bg-slate-50 dark:bg-[#101214] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-2.5 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        required
+                      />
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="btn-primary w-full justify-center text-xs py-2.5 rounded-xl mt-2 font-bold"
+                  >
+                    Create Rule
+                  </button>
+                </form>
               </div>
+
+              {/* Active Rules List Card */}
+              <div className="bg-white dark:bg-[#1c2028] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 shadow-sm space-y-5">
+                <h3 className="font-bold text-slate-800 dark:text-[#f0f6fc] text-sm pb-3 border-b border-slate-100 dark:border-slate-800/40">
+                  Active Rules List ({currentBoard.automations?.length || 0})
+                </h3>
+                
+                <div className="space-y-3.5 max-h-[360px] overflow-y-auto pr-1 scrollbar-thin">
+                  {currentBoard.automations?.length === 0 ? (
+                    <p className="text-xs text-slate-455 italic">No automation rules created yet.</p>
+                  ) : (
+                    currentBoard.automations?.map((r) => {
+                      const trigCol = currentBoard.lists.find(l => l.id === r.triggerVal)?.name;
+                      return (
+                        <div key={r.id} className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-805 rounded-xl flex items-center justify-between gap-3 shadow-sm hover:shadow-md transition-shadow">
+                          <div className="leading-relaxed text-xs">
+                            <p className="text-slate-800 dark:text-slate-200">
+                              <span className="font-bold text-indigo-650 dark:text-indigo-400">WHEN</span> {r.triggerType === 'CARD_CREATED' ? 'Card is created' : `Card moves to "${trigCol}"`}
+                            </p>
+                            <p className="mt-1 text-slate-500 dark:text-slate-400">
+                              <span className="font-bold text-emerald-650 dark:text-emerald-400">THEN</span> {r.actionType === 'SET_PRIORITY' ? `Set priority to "${r.actionVal}"` : r.actionType === 'ADD_CHECKLIST' ? `Add checklist item "${r.actionVal}"` : 'Auto-complete items'}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => deleteAutomationRule(boardId, r.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Rule"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
             </div>
           </div>
         )}

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { useStore } from './store/useStore';
-import type { Card } from './store/useStore';
 import { useThemeStore } from './store/useThemeStore';
 import { apiUrl } from './config/api';
 
@@ -34,7 +33,7 @@ function DashboardLayout() {
   // Navigation and Modal States
   const [activeTab, setActiveTab] = useState<string>('boards');
   const [activeBoardId, setActiveBoardId] = useState<string | null>(null);
-  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [wsSettingsOpen, setWsSettingsOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
 
@@ -119,16 +118,10 @@ function DashboardLayout() {
     }
   }, [currentWorkspace]);
 
-  // Listen to board modifications for card detail syncing
-  useEffect(() => {
-    if (selectedCard && currentBoard) {
-      const allCards = currentBoard.lists.flatMap(l => l.cards);
-      const updatedCard = allCards.find(c => c.id === selectedCard.id);
-      if (updatedCard) {
-        setSelectedCard(updatedCard);
-      }
-    }
-  }, [currentBoard]);
+  // Derive the live card from currentBoard so attachments/comments always stay fresh
+  const selectedCard = selectedCardId
+    ? currentBoard?.lists.flatMap(l => l.cards).find(c => c.id === selectedCardId) ?? null
+    : null;
 
   // Collapse sidebar when activeBoardId is set to give a full-screen board view
   useEffect(() => {
@@ -224,7 +217,7 @@ function DashboardLayout() {
           <BoardView 
             boardId={activeBoardId} 
             onBack={() => setActiveBoardId(null)}
-            onOpenCardDetails={(card) => setSelectedCard(card)}
+            onOpenCardDetails={(card) => setSelectedCardId(card.id)}
             onOpenGuide={() => setGuideOpen(true)}
           />
         ) : (
@@ -245,7 +238,7 @@ function DashboardLayout() {
       {selectedCard && (
         <CardModal 
           card={selectedCard} 
-          onClose={() => setSelectedCard(null)} 
+          onClose={() => setSelectedCardId(null)} 
         />
       )}
 

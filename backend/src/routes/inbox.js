@@ -1156,6 +1156,43 @@ export async function processIncomingEmail({ to, from, cc, subject, text, html, 
       }
     }
 
+    // Extract inline base64 images from HTML content
+    const inlineAttachments = [];
+    const isHtml = (str) => /<html|<doctype|<head|<body|<style/i.test(str || '');
+    const htmlToParse = html || (isHtml(text) ? text : '');
+    if (htmlToParse) {
+      const base64ImageRegex = /<img[^>]+src=["']data:image\/([a-zA-Z]*);base64,([^"']+)["'][^>]*>/g;
+      let match;
+      let imgIndex = 1;
+      const __dirname = path.dirname(fileURLToPath(import.meta.url));
+      const uploadDir = path.join(__dirname, '../../../uploads');
+      
+      while ((match = base64ImageRegex.exec(htmlToParse)) !== null) {
+        const extension = match[1] || 'png';
+        const base64Data = match[2];
+        const filename = `inline_image_${imgIndex++}.${extension}`;
+        const uniqueName = `${Date.now()}-${filename}`;
+        
+        try {
+          if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+          }
+          const filePath = path.join(uploadDir, uniqueName);
+          fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+          inlineAttachments.push({
+            filename,
+            mimeType: `image/${extension}`,
+            size: Math.round(base64Data.length * 0.75),
+            storagePath: `uploads/${uniqueName}`
+          });
+        } catch (err) {
+          console.error('Error saving inline base64 image:', err);
+        }
+      }
+    }
+
+    const allAttachments = [...(attachments || []), ...inlineAttachments];
+
     const card = await prisma.card.create({
       data: {
         title: parsed.title,
@@ -1185,7 +1222,7 @@ export async function processIncomingEmail({ to, from, cc, subject, text, html, 
         bodyHtml: html || text || '',
         bodyText: parsed.description,
         replyLink: metadataJson,
-        hasAttachments: attachments && attachments.length > 0
+        hasAttachments: allAttachments.length > 0
       }
     });
 
@@ -1202,13 +1239,13 @@ export async function processIncomingEmail({ to, from, cc, subject, text, html, 
     }
 
     // Attachments
-    if (attachments && attachments.length > 0) {
+    if (allAttachments.length > 0) {
       const ownerMember = await prisma.workspaceMember.findFirst({
         where: { workspaceId: board.workspaceId, role: 'OWNER' }
       });
       const uploaderId = ownerMember?.userId || 'system';
 
-      for (const att of attachments) {
+      for (const att of allAttachments) {
         await prisma.cardAttachment.create({
           data: {
             cardId: card.id,

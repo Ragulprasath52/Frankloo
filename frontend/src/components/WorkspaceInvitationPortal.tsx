@@ -47,6 +47,11 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
   const [customMessage, setCustomMessage] = useState('');
   const [sendingInvites, setSendingInvites] = useState(false);
 
+  // Board Access State (for invite modal)
+  const [selectAllBoards, setSelectAllBoards] = useState(true);
+  const [customBoardAccess, setCustomBoardAccess] = useState<Record<string, { enabled: boolean; role: string }>>({});
+  const [inviteBoardSearch, setInviteBoardSearch] = useState('');
+
   // Branding Customization States
   const [senderName, setSenderName] = useState('Frankloo');
   const [replyTo, setReplyTo] = useState('');
@@ -205,6 +210,17 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
     }
   };
 
+  // Board access initialiser when the modal opens
+  const initBoardAccess = () => {
+    const initialAccess: Record<string, { enabled: boolean; role: string }> = {};
+    (currentWorkspace?.boards || []).forEach((b: any) => {
+      initialAccess[b.id] = { enabled: false, role: 'EDITOR' };
+    });
+    setCustomBoardAccess(initialAccess);
+    setSelectAllBoards(true);
+    setInviteBoardSearch('');
+  };
+
   // Send Invitations
   const handleSendInvitations = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -215,7 +231,13 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
     }
     setSendingInvites(true);
     try {
-      const res = await inviteMember(workspaceId, emailsInput, inviteRole, customMessage);
+      let boardAccessPayload: any = 'ALL';
+      if (!selectAllBoards) {
+        boardAccessPayload = Object.entries(customBoardAccess)
+          .filter(([_, val]) => val.enabled)
+          .map(([boardId, val]) => ({ boardId, role: val.role }));
+      }
+      const res = await inviteMember(workspaceId, emailsInput, inviteRole, customMessage, boardAccessPayload);
       const successes = res.results.filter((r: any) => r.status === 'SUCCESS').length;
       const failures = res.results.filter((r: any) => r.status === 'FAILED').length;
       
@@ -941,7 +963,7 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
       {/* ── Send Invitation Modal Drawer overlay ── */}
       {sendInviteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setSendInviteModalOpen(false)}>
-          <div className="bg-white dark:bg-[#161b22] border border-slate-250 dark:border-[#30363d] rounded-2xl p-5 w-full max-w-md shadow-2xl animate-scale-in text-xs" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-[#161b22] border border-slate-250 dark:border-[#30363d] rounded-2xl p-5 w-full max-w-lg shadow-2xl animate-scale-in text-xs" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
               <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-205">Dispatch Workspace Invites</h3>
               <button onClick={() => setSendInviteModalOpen(false)} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/5 text-slate-400">
@@ -949,7 +971,7 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
               </button>
             </div>
 
-            <form onSubmit={(e) => { handleSendInvitations(e).then(() => { setSendInviteModalOpen(false); }); }} className="space-y-4 pt-4">
+            <form onSubmit={(e) => { handleSendInvitations(e).then(() => { setSendInviteModalOpen(false); }); }} className="space-y-4 pt-4 max-h-[80vh] overflow-y-auto pr-1">
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500 mb-1">Emails / Usernames (separated by comma, semicolon or newline)</label>
                 <textarea
@@ -961,18 +983,146 @@ export default function WorkspaceInvitationPortal({ workspaceId }: WorkspaceInvi
                 />
               </div>
 
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500 mb-1">Collaborator Role</label>
-                <select
-                  value={inviteRole}
-                  onChange={e => setInviteRole(e.target.value as any)}
-                  className="w-full pl-3 pr-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-850 dark:text-slate-200 text-xs font-semibold cursor-pointer"
-                >
-                  <option value="MEMBER">Member (standard collaborate, create cards/lists)</option>
-                  <option value="ADMIN">Admin (managing boards, members, integrations)</option>
-                  <option value="VIEWER">Guest (read-only, view boards/wiki docs)</option>
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500 mb-1">Workspace Role</label>
+                  <select
+                    value={inviteRole}
+                    onChange={e => setInviteRole(e.target.value as any)}
+                    className="w-full pl-3 pr-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-850 dark:text-slate-200 text-xs font-semibold cursor-pointer"
+                  >
+                    <option value="MEMBER">Member (Read & Write)</option>
+                    <option value="ADMIN">Admin (Full Access)</option>
+                    <option value="VIEWER">Guest (Read Only)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500 mb-1">Board Access</label>
+                  <div className="flex gap-3 pt-1">
+                    <label className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={selectAllBoards}
+                        onChange={() => setSelectAllBoards(true)}
+                        className="cursor-pointer focus:ring-indigo-500"
+                      />
+                      <span className="text-xs">All boards</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={!selectAllBoards}
+                        onChange={() => { setSelectAllBoards(false); initBoardAccess(); }}
+                        className="cursor-pointer focus:ring-indigo-500"
+                      />
+                      <span className="text-xs">Custom</span>
+                    </label>
+                  </div>
+                </div>
               </div>
+
+              {/* Custom Board Access Picker */}
+              {!selectAllBoards && (
+                <div className="border border-slate-200 dark:border-[#2d3139] rounded-xl p-3 bg-slate-50/50 dark:bg-[#0d0d0f]/20 space-y-2 animate-fade-in">
+                  <div className="flex justify-between items-center gap-2 pb-1.5 border-b border-slate-100 dark:border-[#2d3139]">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Select Boards</p>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="text"
+                        placeholder="Search boards..."
+                        value={inviteBoardSearch}
+                        onChange={e => setInviteBoardSearch(e.target.value)}
+                        className="flex-1 px-2.5 py-1 bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded-lg text-xs w-36"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = { ...customBoardAccess };
+                          (currentWorkspace?.boards || []).forEach((b: any) => {
+                            updated[b.id] = { ...updated[b.id], enabled: true };
+                          });
+                          setCustomBoardAccess(updated);
+                        }}
+                        className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline font-bold whitespace-nowrap"
+                      >
+                        Select All
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Selected board chips */}
+                  {Object.entries(customBoardAccess).some(([_, v]) => v.enabled) && (
+                    <div className="flex flex-wrap gap-1">
+                      {Object.entries(customBoardAccess)
+                        .filter(([_, val]) => val.enabled)
+                        .map(([boardId, val]) => {
+                          const board = (currentWorkspace?.boards || []).find((b: any) => b.id === boardId);
+                          if (!board) return null;
+                          return (
+                            <span key={boardId} className="inline-flex items-center gap-1 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/20 px-2 py-0.5 rounded-lg text-[10px] font-medium">
+                              {board.name}
+                              <span className="opacity-60">({val.role.toLowerCase()})</span>
+                              <button
+                                type="button"
+                                onClick={() => setCustomBoardAccess(prev => ({
+                                  ...prev,
+                                  [boardId]: { ...prev[boardId], enabled: false }
+                                }))}
+                                className="text-indigo-400 hover:text-indigo-700 dark:hover:text-white ml-0.5 leading-none"
+                              >
+                                &times;
+                              </button>
+                            </span>
+                          );
+                        })}
+                    </div>
+                  )}
+
+                  {/* Boards list with per-board role dropdown */}
+                  <div className="max-h-36 overflow-y-auto space-y-1 pr-1 divide-y divide-slate-100 dark:divide-[#2d3139]">
+                    {(currentWorkspace?.boards || [])
+                      .filter((b: any) => b.name.toLowerCase().includes(inviteBoardSearch.toLowerCase()))
+                      .map((b: any) => {
+                        const state = customBoardAccess[b.id] || { enabled: false, role: 'EDITOR' };
+                        return (
+                          <div key={b.id} className="flex items-center justify-between pt-1.5">
+                            <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700 dark:text-slate-300">
+                              <input
+                                type="checkbox"
+                                checked={state.enabled}
+                                onChange={() => setCustomBoardAccess(prev => ({
+                                  ...prev,
+                                  [b.id]: { ...state, enabled: !state.enabled }
+                                }))}
+                                className="rounded cursor-pointer focus:ring-indigo-500"
+                              />
+                              <span className="truncate max-w-[160px] text-xs">{b.name}</span>
+                            </label>
+                            {state.enabled && (
+                              <select
+                                value={state.role}
+                                onChange={e => setCustomBoardAccess(prev => ({
+                                  ...prev,
+                                  [b.id]: { ...state, role: e.target.value }
+                                }))}
+                                className="text-[10px] bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded px-1.5 py-0.5 font-semibold text-slate-700 dark:text-slate-300 cursor-pointer focus:outline-none"
+                              >
+                                <option value="VIEWER">Viewer</option>
+                                <option value="COMMENTER">Commenter</option>
+                                <option value="EDITOR">Editor</option>
+                                <option value="ADMIN">Admin</option>
+                              </select>
+                            )}
+                          </div>
+                        );
+                      })}
+                    {(currentWorkspace?.boards || []).length === 0 && (
+                      <p className="text-[10px] text-slate-400 italic py-2 text-center">No boards in this workspace yet.</p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 dark:text-slate-500 mb-1">Custom Message (Included in email template)</label>

@@ -262,10 +262,18 @@ export function parseEmailIntelligently(subject = '', text = '', html = '') {
   // 1. Clean Subject
   const extractedTitle = cleanSubject(subject);
   
-  // 2. Prefer cleanHtmlBody for rich email content when html is available, else text
-  const rawBodyText = html ? cleanHtmlBody(html) : (text || '');
+  // 2. Prefer cleanHtmlBody for rich email content when html is available, else text (or if text contains raw HTML code)
+  const isHtml = (str) => /<html|<doctype|<head|<body|<style/i.test(str || '');
+  let rawBodyText = '';
+  if (html) {
+    rawBodyText = cleanHtmlBody(html);
+  } else if (text && isHtml(text)) {
+    rawBodyText = cleanHtmlBody(text);
+  } else {
+    rawBodyText = text || '';
+  }
   const { latest, previous } = segmentEmailText(rawBodyText);
-  const bodyText = latest || cleanBodyText(text || html || '');
+  const bodyText = latest || cleanBodyText(html ? cleanHtmlBody(html) : (isHtml(text) ? cleanHtmlBody(text) : (text || '')));
 
   // Split text into sentences for sentence-level parsing
   const sentences = bodyText
@@ -464,11 +472,42 @@ export function parseEmailIntelligently(subject = '', text = '', html = '') {
   }
 
   // --- Description Synthesis ---
-  const descParagraphs = bodyText.split(/\n+/).map(p => p.trim()).filter(p => p.length > 10);
-  if (descParagraphs.length > 0) {
-    extractedDescription = descParagraphs.join('\n\n');
+  // Only include pure prose paragraphs — exclude list items, greetings, sign-offs, and metadata noise
+  const listLinePattern = /^\s*[-*+•]?\s*\[[\sx]?\]\s+/i;        // "- [ ] item"
+  const bulletLinePattern = /^\s*[-*+•]\s+/;                       // "- item" / "• item"
+  const numberedLinePattern = /^\d+\.\s+/;                         // "1. item"
+  const greetingPattern = /^(hi|hello|hey|dear|good\s+(morning|afternoon|evening))\b/i;
+  const signoffPattern = /^(best|regards|thanks|thank\s+you|sincerely|cheers|warm\s+regards|kind\s+regards|yours|sent\s+from)/i;
+  const metaPattern = /^\*?(source|simulated|note|from|to|cc|bcc|subject|date)[\s:*]/i;
+  const subjectRepeatPattern = new RegExp(extractedTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+
+  const rawLines = bodyText.split(/\n/);
+  const proseLines = [];
+
+  for (const line of rawLines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    // Skip list-style lines (they become checklist items)
+    if (listLinePattern.test(trimmed)) continue;
+    if (bulletLinePattern.test(trimmed)) continue;
+    if (numberedLinePattern.test(trimmed)) continue;
+    // Skip greetings and sign-offs
+    if (greetingPattern.test(trimmed)) continue;
+    if (signoffPattern.test(trimmed)) continue;
+    // Skip metadata / source annotation lines
+    if (metaPattern.test(trimmed)) continue;
+    // Skip lines that are just the email subject repeated
+    if (subjectRepeatPattern.test(trimmed) && trimmed.length < extractedTitle.length + 20) continue;
+    // Skip very short fragments (names, single words etc.)
+    if (trimmed.length < 8) continue;
+    proseLines.push(trimmed);
+  }
+
+  if (proseLines.length > 0) {
+    extractedDescription = proseLines.join('\n\n');
   } else {
-    extractedDescription = bodyText;
+    // Fallback: use the full bodyText only if nothing prose was found
+    extractedDescription = bodyText.trim();
   }
 
   return {

@@ -11,9 +11,9 @@ transparentDragImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEA
 export default function InboxPanel() {
   const { 
     currentWorkspace, inboxItems, fetchInboxItems, createInboxItem, 
-    updateInboxItem, convertInboxItem, mockIncomingInboxItems, replyToGmail,
+    updateInboxItem, convertInboxItem, replyToGmail,
     isInboxOpen, setInboxOpen, addToast, user,
-    syncStatus, lastSyncedTime, setDraggedEmail,
+    syncStatus, setDraggedEmail,
     batchConvertInboxItems, batchArchiveInboxItems, batchDeleteInboxItems,
     batchUpdateInboxItemsStatus, syncGmailInbox,
     fetchWorkspaceDetails
@@ -149,15 +149,6 @@ export default function InboxPanel() {
       console.error(err);
     }
   };
-
-  const handleMockIncoming = async () => {
-    try {
-      await mockIncomingInboxItems(currentWorkspace.id);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   // Manual refresh logic
   const handleManualRefresh = async () => {
     useStore.setState({ syncStatus: 'syncing' });
@@ -237,28 +228,6 @@ export default function InboxPanel() {
     }
   };
 
-  const getSyncStatusIndicator = () => {
-    if (syncStatus === 'syncing') {
-      return (
-        <span className="flex items-center gap-1.5 text-[10px] text-yellow-500 font-bold animate-pulse">
-          <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span> Syncing...
-        </span>
-      );
-    }
-    if (syncStatus === 'offline') {
-      return (
-        <span className="flex items-center gap-1.5 text-[10px] text-red-500 font-bold">
-          <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Connection lost
-        </span>
-      );
-    }
-    return (
-      <span className="flex items-center gap-1.5 text-[10px] text-emerald-500 font-bold" title={lastSyncedTime ? `Last synced: ${lastSyncedTime.toLocaleTimeString()}` : ''}>
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Synced {lastSyncedTime ? 'just now' : ''}
-      </span>
-    );
-  };
-
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
       setSelectedIds(filteredItems.map(i => i.id));
@@ -311,27 +280,19 @@ export default function InboxPanel() {
             )}
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            {/* Sync status */}
-            {getSyncStatusIndicator()}
             {/* Refresh button */}
             <button
               onClick={handleManualRefresh}
               disabled={syncStatus === 'syncing'}
-              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-550 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-555 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
               title="Refresh Inbox"
             >
               <RotateCw className={`w-3.5 h-3.5 ${syncStatus === 'syncing' ? 'animate-spin text-indigo-500' : ''}`} />
             </button>
-            <button
-              onClick={handleMockIncoming}
-              className="text-[9px] sm:text-[10px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-650 dark:text-slate-300 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded font-semibold border border-slate-250 dark:border-slate-700 whitespace-nowrap"
-            >
-              Mock Alerts
-            </button>
             {/* Close button */}
             <button
               onClick={() => setInboxOpen(false)}
-              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-550 dark:text-slate-450 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-555 dark:text-slate-455 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
               title="Close inbox"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
