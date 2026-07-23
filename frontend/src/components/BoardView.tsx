@@ -333,6 +333,14 @@ const KanbanColumn = React.memo(({
     setMenuOpen(false);
   };
 
+  // Converts #rrggbb to rgba(r,g,b,alpha)
+  const hexToRgba = (hex: string, alpha: number) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  };
+
   const { deleteList, updateList, updateCard, createCard, token } = useStore();
 
   const colRef = React.useRef<HTMLDivElement>(null);
@@ -791,7 +799,7 @@ const KanbanColumn = React.memo(({
       data-list-id={list.id}
       style={{
         '--col-width': width ? `${width}px` : '280px',
-        ...(columnColor ? { borderTopColor: columnColor } : {})
+        ...(columnColor ? { borderColor: hexToRgba(columnColor, 0.80) } : {})
       } as React.CSSProperties}
       draggable={isColumnDraggable && editingListId !== list.id}
       onDragStart={(e) => handleListDragStart(e, list.id)}
@@ -801,17 +809,24 @@ const KanbanColumn = React.memo(({
       }}
       onDragOver={handleDragOver}
       onDrop={(e) => handleDrop(e, list.id)}
-      className={`kb-column ${hasCustomBg ? 'kb-column-glass' : ''} ${
+      className={`kb-column ${hasCustomBg && !columnColor ? 'kb-column-glass' : ''} ${
         isGlow 
           ? 'ring-2 ring-indigo-500 ring-offset-1 border-indigo-500 shadow-lg shadow-indigo-500/20 dark:shadow-indigo-550/10' 
           : ''
       } transition-all duration-200`}
     >
-      {/* Column accent color bar */}
+      {/* Full-column color overlay — rendered as an absolute div to bypass !important CSS */}
       {columnColor && (
         <div
-          className="shrink-0 rounded-t-[9px]"
-          style={{ height: '3px', background: columnColor }}
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            borderRadius: '10px',
+            background: hexToRgba(columnColor, 0.28),
+            pointerEvents: 'none',
+            zIndex: 0,
+          }}
         />
       )}
       {/* Draggable column resize handle */}
