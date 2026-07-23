@@ -313,9 +313,26 @@ const KanbanColumn = React.memo(({
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [moveMode, setMoveMode] = React.useState(false);
   const [sortMode, setSortMode] = React.useState(false);
+  const [colorMode, setColorMode] = React.useState(false);
   const [isColumnDraggable, setIsColumnDraggable] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
-  
+
+  // Column accent color — stored in localStorage, no backend needed
+  const colorStorageKey = `col_color_${list.id}`;
+  const [columnColor, setColumnColor] = React.useState<string>(() => {
+    return localStorage.getItem(colorStorageKey) || '';
+  });
+  const applyColumnColor = (color: string) => {
+    setColumnColor(color);
+    if (color) {
+      localStorage.setItem(colorStorageKey, color);
+    } else {
+      localStorage.removeItem(colorStorageKey);
+    }
+    setColorMode(false);
+    setMenuOpen(false);
+  };
+
   const { deleteList, updateList, updateCard, createCard, token } = useStore();
 
   const colRef = React.useRef<HTMLDivElement>(null);
@@ -592,6 +609,58 @@ const KanbanColumn = React.memo(({
       );
     }
 
+    if (colorMode) {
+      const COLOR_PRESETS = [
+        { label: 'Red',     val: '#ef4444' },
+        { label: 'Orange',  val: '#f97316' },
+        { label: 'Amber',   val: '#f59e0b' },
+        { label: 'Lime',    val: '#84cc16' },
+        { label: 'Green',   val: '#22c55e' },
+        { label: 'Cyan',    val: '#06b6d4' },
+        { label: 'Blue',    val: '#3b82f6' },
+        { label: 'Indigo',  val: '#6366f1' },
+        { label: 'Violet',  val: '#8b5cf6' },
+        { label: 'Pink',    val: '#ec4899' },
+        { label: 'Rose',    val: '#f43f5e' },
+        { label: 'Slate',   val: '#64748b' },
+      ];
+      return (
+        <div className="space-y-2">
+          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider px-1">Column Color</div>
+          <div className="grid grid-cols-6 gap-1.5 px-1">
+            {COLOR_PRESETS.map(preset => (
+              <button
+                key={preset.val}
+                type="button"
+                title={preset.label}
+                onClick={() => applyColumnColor(preset.val)}
+                className={`w-6 h-6 rounded-full border-2 hover:scale-110 transition-transform ${
+                  columnColor === preset.val ? 'border-white shadow-md scale-110' : 'border-transparent'
+                }`}
+                style={{ background: preset.val }}
+              />
+            ))}
+          </div>
+          {columnColor && (
+            <button
+              type="button"
+              onClick={() => applyColumnColor('')}
+              className="w-full text-center py-1 text-[9px] text-rose-500 hover:underline font-bold"
+            >
+              Remove Color
+            </button>
+          )}
+          <div className="border-t border-slate-150 dark:border-slate-800 my-1" />
+          <button
+            onClick={() => setColorMode(false)}
+            className="w-full text-center py-1 text-[9px] text-indigo-500 hover:underline font-bold"
+          >
+            Back
+          </button>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-1">
         <button
@@ -612,6 +681,16 @@ const KanbanColumn = React.memo(({
           className="w-full text-left px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded font-semibold text-slate-750 dark:text-slate-250"
         >
           Rename List
+        </button>
+        <button
+          onClick={() => setColorMode(true)}
+          className="w-full text-left px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded font-semibold text-slate-750 dark:text-slate-250 flex items-center gap-2"
+        >
+          <span
+            className="w-3 h-3 rounded-full border border-slate-300 dark:border-slate-600 shrink-0"
+            style={{ background: columnColor || 'transparent' }}
+          />
+          Column Color
         </button>
 
         <div className="border-t border-slate-150 dark:border-slate-850 my-1" />
@@ -711,7 +790,8 @@ const KanbanColumn = React.memo(({
       ref={colRef}
       data-list-id={list.id}
       style={{
-        '--col-width': width ? `${width}px` : '280px'
+        '--col-width': width ? `${width}px` : '280px',
+        ...(columnColor ? { borderTopColor: columnColor } : {})
       } as React.CSSProperties}
       draggable={isColumnDraggable && editingListId !== list.id}
       onDragStart={(e) => handleListDragStart(e, list.id)}
@@ -727,6 +807,13 @@ const KanbanColumn = React.memo(({
           : ''
       } transition-all duration-200`}
     >
+      {/* Column accent color bar */}
+      {columnColor && (
+        <div
+          className="shrink-0 rounded-t-[9px]"
+          style={{ height: '3px', background: columnColor }}
+        />
+      )}
       {/* Draggable column resize handle */}
       <div 
         role="separator"
@@ -804,6 +891,7 @@ const KanbanColumn = React.memo(({
                 setMenuOpen(!menuOpen);
                 setMoveMode(false);
                 setSortMode(false);
+                setColorMode(false);
               }}
               className="w-5 h-5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors text-slate-400 shrink-0 cursor-pointer"
               title="List actions"
