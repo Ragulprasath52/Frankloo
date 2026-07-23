@@ -543,7 +543,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
       {/* ── TOP HERO BANNER ── */}
       {activeBoard ? (
         <div className="border-b border-gray-200/60 dark:border-gray-800/40 px-6 py-5 md:py-6 shrink-0 bg-white dark:bg-[#161a22] shadow-sm">
-          <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="max-w-[90rem] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-5">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-2 py-0.5 rounded">
@@ -641,7 +641,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
             </div>
           </div>
           
-          <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 mt-4 md:mt-5 pt-3 border-t border-gray-100 dark:border-gray-800">
+          <div className="max-w-[90rem] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 mt-4 md:mt-5 pt-3 border-t border-gray-100 dark:border-gray-800">
             <div className="flex gap-4">
               <button 
                 onClick={() => setActiveTab('inbox')}
@@ -684,7 +684,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
 
       {/* ── CORE VIEWS CONTENT ── */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6">
-        <div className="max-w-6xl mx-auto min-h-full flex flex-col">
+        <div className="max-w-[90rem] mx-auto min-h-full flex flex-col">
           {activeBoard ? (
             <>
               {activeTab === 'inbox' && (
@@ -738,13 +738,13 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                       <div className="hidden md:block overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                           <thead>
-                            <tr className="bg-slate-50 dark:bg-white/5 border-b border-gray-200 dark:border-gray-800 text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                              <th className="p-4 w-[160px]">Sender</th>
+                            <tr className="bg-slate-50 dark:bg-white/5 border-b border-gray-200 dark:border-gray-800 text-xs text-gray-450 dark:text-gray-400 font-extrabold uppercase tracking-wider">
+                              <th className="p-4 w-[180px]">Sender</th>
                               <th className="p-4">Subject & Preview</th>
-                              <th className="p-4 w-[110px] text-center">Attachments</th>
-                              <th className="p-4 w-[110px] text-center">Received</th>
-                              <th className="p-4 w-[110px] text-center">Status</th>
-                              <th className="p-4 w-[140px] text-right">Actions</th>
+                              <th className="p-4 w-[120px] text-center">Attachments</th>
+                              <th className="p-4 w-[120px] text-center">Received</th>
+                              <th className="p-4 w-[120px] text-center">Status</th>
+                              <th className="p-4 w-[150px] text-right">Actions</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-150 dark:divide-gray-800">
@@ -762,16 +762,16 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                                   className="group/row hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors"
                                 >
                                   {/* Sender with initials badge */}
-                                  <td className="p-4 whitespace-nowrap min-w-[150px]">
-                                    <div className="flex items-center gap-2.5">
-                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0 ${avatarColor}`}>
+                                  <td className="p-4 whitespace-nowrap min-w-[170px]">
+                                    <div className="flex items-center gap-3">
+                                      <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0 ${avatarColor}`}>
                                         {initials}
                                       </div>
                                       <div className="min-w-0">
-                                        <p className="font-bold text-xs text-[#172b4d] dark:text-[#b6c2cf] truncate">
+                                        <p className="font-bold text-sm text-[#172b4d] dark:text-[#b6c2cf] truncate">
                                           {details.sender?.split('<')[0]?.trim() || details.sender || 'Unknown'}
                                         </p>
-                                        <p className="text-[10px] text-gray-455 truncate">
+                                        <p className="text-xs text-gray-450 dark:text-gray-500 truncate mt-0.5">
                                           {details.sender?.match(/<([^>]+)>/)?.[1] || ''}
                                         </p>
                                       </div>
@@ -779,12 +779,12 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                                   </td>
                                   
                                   {/* Subject & body text excerpt */}
-                                  <td className="p-4 min-w-[200px]">
+                                  <td className="p-4 min-w-[240px]">
                                     <div className="min-w-0">
-                                      <p className={`text-xs text-[#172b4d] dark:text-[#f0f6fc] truncate ${isNew ? 'font-bold' : 'font-medium'}`}>
+                                      <p className={`text-sm text-[#172b4d] dark:text-[#f0f6fc] truncate ${isNew ? 'font-bold' : 'font-semibold'}`}>
                                         {item.title}
                                       </p>
-                                      <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate mt-0.5 max-w-[450px]">
+                                      <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-1 max-w-[500px]">
                                         {item.description}
                                       </p>
                                     </div>
@@ -793,27 +793,27 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                                   {/* Attachment Indicator */}
                                   <td className="p-4 text-center">
                                     {hasAtts ? (
-                                      <span className="bg-indigo-50 dark:bg-indigo-950/20 text-indigo-650 dark:text-indigo-400 px-2 py-0.5 rounded-full font-bold text-[10px] inline-flex items-center gap-0.5 border border-indigo-500/10">
-                                        <Paperclip className="w-3 h-3" /> {details.attachments.length}
+                                      <span className="bg-indigo-50 dark:bg-indigo-950/20 text-indigo-605 dark:text-indigo-400 px-2.5 py-0.5 rounded-full font-bold text-xs inline-flex items-center gap-1 border border-indigo-500/10">
+                                        <Paperclip className="w-3.5 h-3.5" /> {details.attachments.length}
                                       </span>
                                     ) : (
-                                      <span className="text-gray-300 dark:text-gray-700">—</span>
+                                      <span className="text-gray-300 dark:text-gray-700 text-xs font-semibold">—</span>
                                     )}
                                   </td>
                                   
                                   {/* Relative Received Time */}
-                                  <td className="p-4 text-center text-gray-400 whitespace-nowrap font-medium">
+                                  <td className="p-4 text-center text-xs text-gray-400 dark:text-gray-550 whitespace-nowrap font-bold">
                                     {formatRelativeTime(item.createdAt)}
                                   </td>
                                   
                                   {/* Inbox Status */}
                                   <td className="p-4 text-center whitespace-nowrap">
                                     {isNew ? (
-                                      <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-650 dark:text-indigo-455 font-bold rounded-full text-[9px] border border-indigo-500/10">
+                                      <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300 font-extrabold rounded-full text-[10px] border border-indigo-250 dark:border-indigo-500/20">
                                         New
                                       </span>
                                     ) : (
-                                      <span className="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-655 dark:text-emerald-450 font-bold rounded-full text-[9px] border border-emerald-500/10 inline-flex items-center gap-0.5">
+                                      <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 font-extrabold rounded-full text-[10px] border border-emerald-250 dark:border-emerald-500/20 inline-flex items-center gap-0.5">
                                         <Check className="w-3 h-3" /> Converted
                                       </span>
                                     )}
@@ -824,34 +824,34 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                                     <div className="flex justify-end gap-1.5 opacity-80 group-hover/row:opacity-100 transition-opacity">
                                       <button
                                         onClick={() => setSelectedEmail(item)}
-                                        className="btn-icon p-1.5 rounded-lg hover:text-indigo-500 hover:bg-indigo-500/10 transition-colors"
+                                        className="btn-icon p-2 rounded-lg hover:text-indigo-505 hover:bg-indigo-500/10 transition-colors"
                                         title="Preview email"
                                       >
-                                        <Eye className="w-3.5 h-3.5" />
+                                        <Eye className="w-4 h-4" />
                                       </button>
                                       {isNew && (
                                         <button
                                           onClick={() => handleOpenConvert(item)}
-                                          className="btn-icon p-1.5 rounded-lg hover:text-emerald-500 hover:bg-emerald-500/10 transition-colors text-emerald-600"
+                                          className="btn-icon p-2 rounded-lg hover:text-emerald-505 hover:bg-emerald-500/10 transition-colors text-emerald-600"
                                           title="Convert to Card"
                                         >
-                                          <CheckSquare className="w-3.5 h-3.5" />
+                                          <CheckSquare className="w-4 h-4" />
                                         </button>
                                       )}
                                       <button
                                         onClick={(e) => handleArchiveInboxItem(item.id, e)}
-                                        className="btn-icon p-1.5 rounded-lg hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
+                                        className="btn-icon p-2 rounded-lg hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
                                         title="Archive email"
                                       >
-                                        <Archive className="w-3.5 h-3.5" />
+                                        <Archive className="w-4 h-4" />
                                       </button>
                                       {isEditor && (
                                         <button
                                           onClick={(e) => handleDeleteInboxItem(item.id, e)}
-                                          className="btn-icon p-1.5 rounded-lg hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                          className="btn-icon p-2 rounded-lg hover:text-red-500 hover:bg-red-500/10 transition-colors"
                                           title="Delete email"
                                         >
-                                          <Trash2 className="w-3.5 h-3.5" />
+                                          <Trash2 className="w-4 h-4" />
                                         </button>
                                       )}
                                     </div>

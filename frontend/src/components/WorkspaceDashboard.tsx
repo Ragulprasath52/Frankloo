@@ -263,39 +263,39 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
 
 
           return (
-            <div className="p-6 max-w-6xl mx-auto w-full animate-fade-in" style={{ color: 'var(--text-primary)' }}>
+            <div className="p-8 md:p-12 max-w-[90rem] mx-auto w-full animate-fade-in" style={{ color: 'var(--text-primary)' }}>
               {/* ── Header ── */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8">
                 <div>
-                  <h1 className="text-base font-semibold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+                  <h1 className="text-2xl font-bold md:text-3xl" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
                     {currentWorkspace?.name}
                   </h1>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs px-3 py-1 rounded font-semibold" style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>
                       {currentWorkspace?.boards?.length || 0} board{(currentWorkspace?.boards?.length ?? 0) !== 1 ? 's' : ''}
                     </span>
-                    <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>
+                    <span className="text-xs px-3 py-1 rounded font-semibold" style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>
                       {currentWorkspace?.members?.length || 0} member{(currentWorkspace?.members?.length ?? 0) !== 1 ? 's' : ''}
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   {/* Search */}
                   <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
                     <input
                       ref={searchInputRef}
                       type="text"
                       placeholder="Search boards…"
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
-                      className="tf-input pl-8 pr-10 py-1.5 text-xs h-8"
-                      style={{ width: '200px' }}
+                      className="tf-input pl-9 pr-10 py-2 text-sm h-9"
+                      style={{ width: '240px' }}
                     />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold hidden sm:block" style={{ color: 'var(--text-muted)' }}>⌘K</span>
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold hidden sm:block" style={{ color: 'var(--text-muted)' }}>⌘K</span>
                   </div>
-                  <button onClick={() => setBoardModalOpen(true)} className="btn-primary text-xs h-8 px-3 gap-1.5">
-                    <Plus className="w-3.5 h-3.5" /> New board
+                  <button onClick={() => setBoardModalOpen(true)} className="btn-primary text-sm h-9 px-4 gap-2 font-semibold">
+                    <Plus className="w-4 h-4" /> New board
                   </button>
                 </div>
               </div>
@@ -318,12 +318,12 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
                 <>
                   {/* Starred section */}
                   {filteredBoards.some(b => favorites.includes(b.id)) && (
-                    <div className="mb-6">
-                      <div className="flex items-center gap-1.5 mb-3">
-                        <Star className="w-3.5 h-3.5" style={{ color: 'var(--warning)' }} />
-                        <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>STARRED</span>
+                    <div className="mb-8">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                        <span className="text-xs font-bold tracking-wider" style={{ color: 'var(--text-muted)' }}>STARRED BOARDS</span>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-6">
                         {filteredBoards.filter(b => favorites.includes(b.id)).map(b => (
                           <BoardCard key={b.id} b={b} onSelect={onSelectBoard} isFavorite={true} onToggleFavorite={toggleFavoriteBoard} isEditor={isEditor} onDuplicate={handleDuplicateBoard} onDelete={handleDeleteBoard} activeDropdownId={activeDropdownBoardId} setActiveDropdownId={setActiveDropdownBoardId} members={currentWorkspace?.members || []} />
                         ))}
@@ -334,23 +334,23 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
                   {/* All boards */}
                   <div>
                     {filteredBoards.some(b => favorites.includes(b.id)) && (
-                      <div className="flex items-center gap-1.5 mb-3">
-                        <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>ALL BOARDS</span>
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="text-xs font-bold tracking-wider" style={{ color: 'var(--text-muted)' }}>ALL BOARDS</span>
                       </div>
                     )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-6">
                       {filteredBoards.filter(b => !favorites.includes(b.id)).map(b => (
                         <BoardCard key={b.id} b={b} onSelect={onSelectBoard} isFavorite={false} onToggleFavorite={toggleFavoriteBoard} isEditor={isEditor} onDuplicate={handleDuplicateBoard} onDelete={handleDeleteBoard} activeDropdownId={activeDropdownBoardId} setActiveDropdownId={setActiveDropdownBoardId} members={currentWorkspace?.members || []} />
                       ))}
                       {/* New board tile */}
                       <button
                         onClick={() => setBoardModalOpen(true)}
-                        className="aspect-[5/3] rounded-lg flex items-center justify-center gap-1.5 text-xs font-medium transition-colors"
-                        style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)', border: '2px dashed var(--border)' }}
+                        className="aspect-[5/3] rounded-lg flex items-center justify-center gap-2 text-sm font-semibold transition-colors border-2 border-dashed"
+                        style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)', borderColor: 'var(--border)' }}
                         onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-active)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
                         onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
                       >
-                        <Plus className="w-4 h-4" /> New
+                        <Plus className="w-5 h-5" /> New Board
                       </button>
                     </div>
                   </div>
@@ -714,97 +714,88 @@ function BoardCard({
   return (
     <div
       onClick={() => onSelect(b.id)}
-      className="group relative flex flex-col rounded-lg overflow-hidden border transition-all duration-150 cursor-pointer aspect-[5/3]"
-      style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}
-      onMouseEnter={e => {
-        e.currentTarget.style.borderColor = 'var(--border-strong)';
-        e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.borderColor = 'var(--border)';
-        e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = 'none';
-      }}
+      className="group relative flex flex-col rounded-xl overflow-hidden transition-all duration-150 cursor-pointer h-24 hover:shadow-lg hover:-translate-y-0.5"
+      style={{ background: bgGradient }}
     >
-      {/* Cover Header */}
-      <div className="h-10 w-full relative" style={{ background: bgGradient }}>
-        {/* Star icon (always visible if favorite, otherwise visible on hover) */}
+      {/* Dark overlay on hover */}
+      <div className="absolute inset-0 bg-black/5 group-hover:bg-black/15 transition-colors duration-150" />
+
+      {/* Star Button */}
+      <button
+        onClick={e => onToggleFavorite(b.id, e)}
+        className={`absolute bottom-3 right-3 z-10 transition-opacity duration-150 ${isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+      >
+        <Star className={`w-4 h-4 ${isFavorite ? 'fill-amber-400 text-amber-400' : 'text-white/80'}`} />
+      </button>
+
+      {/* Options Dropdown */}
+      <div className="absolute top-2 right-2 z-10">
         <button
-          onClick={e => onToggleFavorite(b.id, e)}
-          className={`absolute top-1.5 left-2 z-10 transition-opacity ${isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+          onClick={e => {
+            e.preventDefault();
+            e.stopPropagation();
+            setActiveDropdownId(activeDropdownId === b.id ? null : b.id);
+          }}
+          className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/20 text-white"
         >
-          <Star className={`w-3.5 h-3.5 ${isFavorite ? 'fill-amber-400 text-amber-400' : 'text-white/80'}`} />
+          <MoreVertical className="w-4 h-4" />
         </button>
 
-        {/* Options */}
-        <div className="absolute top-1.5 right-2 z-10">
-          <button
-            onClick={e => {
-              e.preventDefault();
-              e.stopPropagation();
-              setActiveDropdownId(activeDropdownId === b.id ? null : b.id);
-            }}
-            className="w-5 h-5 flex items-center justify-center rounded hover:bg-black/10 text-white"
+        {activeDropdownId === b.id && (
+          <div
+            className="absolute right-0 mt-1 w-28 py-1 rounded-md shadow-lg z-20"
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
+            onClick={e => e.stopPropagation()}
           >
-            <MoreVertical className="w-3.5 h-3.5" />
-          </button>
-
-          {activeDropdownId === b.id && (
-            <div
-              className="absolute right-0 mt-1 w-28 py-1 rounded-md shadow-lg z-20"
-              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
-              onClick={e => e.stopPropagation()}
+            <button
+              onClick={e => {
+                setActiveDropdownId(null);
+                onDuplicate(b.id, e);
+              }}
+              className="w-full text-left px-2.5 py-1 text-[11px] flex items-center gap-1.5 hover:bg-black/5 dark:hover:bg-white/5"
+              style={{ color: 'var(--text-primary)' }}
             >
+              <Copy className="w-3 h-3" /> Duplicate
+            </button>
+            {isEditor && (
               <button
                 onClick={e => {
                   setActiveDropdownId(null);
-                  onDuplicate(b.id, e);
+                  onDelete(b.id, b.name, e);
                 }}
-                className="w-full text-left px-2.5 py-1 text-[11px] flex items-center gap-1.5 hover:bg-black/5 dark:hover:bg-white/5"
-                style={{ color: 'var(--text-primary)' }}
+                className="w-full text-left px-2.5 py-1 text-[11px] flex items-center gap-1.5 hover:bg-rose-500/10 border-t"
+                style={{ color: 'var(--danger)', borderColor: 'var(--border)' }}
               >
-                <Copy className="w-3 h-3" /> Duplicate
+                <Trash2 className="w-3 h-3" /> Delete
               </button>
-              {isEditor && (
-                <button
-                  onClick={e => {
-                    setActiveDropdownId(null);
-                    onDelete(b.id, b.name, e);
-                  }}
-                  className="w-full text-left px-2.5 py-1 text-[11px] flex items-center gap-1.5 hover:bg-rose-500/10 border-t"
-                  style={{ color: 'var(--danger)', borderColor: 'var(--border)' }}
-                >
-                  <Trash2 className="w-3 h-3" /> Delete
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Card Details */}
-      <div className="p-2.5 flex-1 flex flex-col justify-between min-h-0">
+      {/* Card Content (Trello Style Title in top-left) */}
+      <div className="p-3.5 flex-1 flex flex-col justify-between min-h-0 relative z-0">
         <div>
-          <h3 className="font-semibold text-xs truncate" style={{ color: 'var(--text-primary)' }}>
+          <h3 className="font-bold text-base text-white drop-shadow-sm line-clamp-2 leading-snug">
             {b.name}
           </h3>
-          <p className="text-[10px] line-clamp-2 mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            {b.description || 'No description.'}
-          </p>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between mt-1 pt-1.5 border-t" style={{ borderColor: 'var(--border)' }}>
+        {/* Footer Metrics & Members */}
+        <div className="flex items-center justify-between text-[10px] font-bold text-white/90 drop-shadow-sm select-none">
+          <span>
+            {completedTasks}/{totalTasks} tasks
+          </span>
+
           {/* Member stack */}
-          <div className="flex -space-x-1">
+          <div className="flex -space-x-1 shrink-0 mr-6">
             {members.slice(0, 3).map((m, idx) => {
               const init = (m.user?.name || m.user?.username || '?').substring(0, 2).toUpperCase();
               const colors = ['#6366f1', '#ec4899', '#10b981', '#f59e0b'];
               return (
                 <div
                   key={m.user?.id || idx}
-                  className="w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-bold text-white border border-white dark:border-[#161a20]"
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white border border-white dark:border-[#161a20]"
                   style={{ background: colors[idx % colors.length] }}
                   title={m.user?.name || m.user?.username}
                 >
@@ -813,15 +804,11 @@ function BoardCard({
               );
             })}
             {members.length > 3 && (
-              <div className="w-4 h-4 rounded-full flex items-center justify-center text-[7px] font-bold" style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>
+              <div className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold" style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>
                 +{members.length - 3}
               </div>
             )}
           </div>
-
-          <span className="text-[9px] font-semibold" style={{ color: 'var(--text-muted)' }}>
-            {completedTasks}/{totalTasks} tasks
-          </span>
         </div>
       </div>
     </div>

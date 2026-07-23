@@ -5,7 +5,8 @@ import {
   X, AlignLeft, CheckSquare, Link2, MessageSquare,
   Trash2, Plus, Archive,
   Paperclip, MoreHorizontal, Check, Download, Mail,
-  Compass, Flag, Calendar, Users, Tag, Clock, UserPlus
+  Compass, Flag, Calendar, Users, Tag, Clock, UserPlus,
+  ChevronUp, ChevronDown
 } from 'lucide-react';
 
 interface CardModalProps { card: Card; onClose: () => void; }
@@ -29,8 +30,8 @@ const cleanText = (text: string) => {
   let cleaned = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
   // Remove script blocks
   cleaned = cleaned.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-  // Remove all HTML tags
-  cleaned = cleaned.replace(/<\/?[^>]+(>|$)/g, '');
+  // Remove all HTML tags safely (preserving bracketed email formats)
+  cleaned = cleaned.replace(/<(?!mailto:)[a-zA-Z\/][^>]*>/g, '');
   // Decode common HTML entities
   cleaned = cleaned
     .replace(/&amp;/g, '&')
@@ -70,6 +71,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
   const [labelManagerOpen, setLabelManagerOpen] = useState(false);
   const [moreSettingsOpen, setMoreSettingsOpen] = useState(false);
   const [isEditingDesc, setIsEditingDesc] = useState(false);
+  const [descExpanded, setDescExpanded] = useState(true);
   const [replyTargetId, setReplyTargetId] = useState<string | null>(null);
 
   const [datePickerOpen, setDatePickerOpen] = useState(false);
@@ -694,16 +696,43 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                     </div>
                   </div>
                 ) : (
-                  <div 
-                    className="p-3.5 bg-slate-50/70 dark:bg-[#22272b]/80 border border-slate-150/40 dark:border-slate-800/40 rounded-lg text-sm leading-relaxed text-slate-800 dark:text-[#b6c2cf] font-normal whitespace-pre-wrap font-sans hover:bg-slate-100/60 dark:hover:bg-[#2c333a] transition-all cursor-pointer"
-                    onClick={() => setIsEditingDesc(true)}
-                  >
-                    {description ? (
-                      description
-                    ) : (
-                      <span className="text-slate-400 dark:text-slate-500 italic">
-                        Add a more detailed description…
-                      </span>
+                  <div className="relative">
+                    <div 
+                      className={`p-3.5 bg-slate-50/70 dark:bg-[#22272b]/80 border border-slate-150/40 dark:border-slate-800/40 rounded-lg text-sm leading-relaxed text-slate-800 dark:text-[#b6c2cf] font-normal whitespace-pre-wrap font-sans hover:bg-slate-100/60 dark:hover:bg-[#2c333a] transition-all cursor-pointer scrollbar-thin ${
+                        !descExpanded ? 'max-h-48 overflow-hidden relative' : 'max-h-[420px] overflow-y-auto'
+                      }`}
+                      onClick={() => setIsEditingDesc(true)}
+                    >
+                      {description ? (
+                        description
+                      ) : (
+                        <span className="text-slate-400 dark:text-slate-500 italic">
+                          Add a more detailed description…
+                        </span>
+                      )}
+                      {!descExpanded && description && description.length > 300 && (
+                        <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-slate-50 dark:from-[#22272b] to-transparent pointer-events-none" />
+                      )}
+                    </div>
+
+                    {description && description.length > 300 && (
+                      <div className="flex justify-center mt-2.5">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setDescExpanded(!descExpanded); }}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-[#b6c2cf] hover:text-indigo-500 transition-colors bg-slate-100 dark:bg-[#2c333a] hover:bg-slate-200 dark:hover:bg-[#3c444e] px-4 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 cursor-pointer"
+                        >
+                          {descExpanded ? (
+                            <>
+                              <ChevronUp className="w-3.5 h-3.5" /> Show less
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="w-3.5 h-3.5" /> Show more
+                            </>
+                          )}
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}

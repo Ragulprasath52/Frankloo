@@ -7,7 +7,7 @@ import {
   Columns, Calendar as CalendarIcon, 
   BarChart3, UserCheck, Play, ArrowLeft, Plus, X, Trash2, MoreHorizontal,
   CalendarCheck, CheckCircle, PlusCircle, Copy, Check, Info, Lock, Paintbrush,
-  AlertCircle, Sparkles, ChevronRight, Upload, HelpCircle, Users,
+  AlertCircle, Sparkles, ChevronRight, ChevronLeft, Upload, HelpCircle, Users,
   Pencil, Inbox, Mail, RotateCw, GripVertical, Share2,
   Pin, Eye, Trash, Paperclip, Search, Archive
 } from 'lucide-react';
@@ -123,7 +123,7 @@ const KanbanCard = React.memo(({
             value={editingCardTitle}
             onChange={(e) => setEditingCardTitle(e.target.value)}
             onKeyDown={(e) => handleCardQuickRenameKeyDown(e, card.id)}
-            className="w-full text-xs p-2 border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 resize-none font-semibold"
+            className="w-full text-sm p-2 border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 resize-none font-semibold"
             style={{ borderColor: 'var(--border)' }}
             autoFocus
             rows={2}
@@ -147,7 +147,7 @@ const KanbanCard = React.memo(({
         <div className="flex items-start justify-between gap-1.5">
           <div className="flex items-start gap-1.5 min-w-0 pointer-events-none">
             {cardEmoji && <span className="text-xs shrink-0 leading-none mt-0.5">{cardEmoji}</span>}
-            <h4 className="text-xs font-semibold leading-snug break-words" style={{ color: 'var(--text-primary)' }}>
+            <h4 className="text-sm font-semibold leading-snug break-words" style={{ color: 'var(--text-primary)' }}>
               {card.title}
             </h4>
           </div>
@@ -168,7 +168,7 @@ const KanbanCard = React.memo(({
       {/* Checklist Progress line (Extremely thin) */}
       {checklistCount > 0 && (
         <div className="pointer-events-none space-y-0.5">
-          <div className="flex items-center justify-between text-[8px] font-bold text-slate-450 dark:text-slate-550">
+          <div className="flex items-center justify-between text-[10px] font-bold text-slate-450 dark:text-slate-550">
             <span>Progress</span>
             <span>{completedChecklistCount}/{checklistCount}</span>
           </div>
@@ -185,7 +185,7 @@ const KanbanCard = React.memo(({
       )}
 
       {/* Metadata Inline Row: Priority, Due Date, and Assignees */}
-      <div className="flex items-center justify-between pt-1.5 border-t border-slate-100/50 dark:border-slate-800/40 pointer-events-none text-[9px]">
+      <div className="flex items-center justify-between pt-1.5 border-t border-slate-100/50 dark:border-slate-800/40 pointer-events-none text-[10px]">
         <div className="flex items-center gap-1.5">
           <span className={`font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
             card.priority === 'URGENT' ? 'bg-red-500/10 text-red-650' :
@@ -197,7 +197,7 @@ const KanbanCard = React.memo(({
           </span>
 
           {card.dueDate && (
-            <span className={`flex items-center gap-0.5 font-bold rounded px-1 py-0.5 ${
+            <span className={`flex items-center gap-0.5 font-bold rounded px-1.5 py-0.5 ${
               new Date(card.dueDate) < new Date() && listId !== 'done'
                 ? 'bg-rose-500/10 text-rose-650'
                 : 'bg-slate-100/50 dark:bg-slate-900/50 text-slate-550'
@@ -215,11 +215,11 @@ const KanbanCard = React.memo(({
               src={getAvatarUrl(a.user.avatarUrl, a.user.name || a.user.username)}
               alt=""
               title={a.user.name || a.user.username}
-              className="w-4 h-4 rounded-full object-cover border border-white dark:border-slate-900"
+              className="w-5 h-5 rounded-full object-cover border border-white dark:border-slate-900"
             />
           ))}
           {card.assignees.length > 3 && (
-            <span className="w-4 h-4 rounded-full bg-slate-150 dark:bg-slate-805 text-slate-500 dark:text-slate-400 flex items-center justify-center font-bold text-[7px] border border-white dark:border-slate-900">
+            <span className="w-5 h-5 rounded-full bg-slate-150 dark:bg-slate-805 text-slate-500 dark:text-slate-400 flex items-center justify-center font-bold text-[8px] border border-white dark:border-slate-900">
               +{card.assignees.length - 3}
             </span>
           )}
@@ -844,7 +844,7 @@ const KanbanColumn = React.memo(({
       />
 
       {/* Column Header */}
-      <div className="flex items-center justify-between px-3 py-1.5 shrink-0 border-b border-gray-200/50 dark:border-gray-800/40 cursor-default bg-slate-50/20 dark:bg-black/5">
+      <div className="flex items-center justify-between px-3 py-2 shrink-0 border-b border-gray-200/50 dark:border-gray-800/40 cursor-default bg-slate-50/20 dark:bg-black/5">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           {editingListId === list.id ? (
             <input
@@ -853,7 +853,7 @@ const KanbanColumn = React.memo(({
               onChange={(e) => setEditingListName(e.target.value)}
               onBlur={() => saveListName(list.id)}
               onKeyDown={(e) => handleListNameKeyDown(e, list.id)}
-              className="text-xs font-bold px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
+              className="text-sm font-bold px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
               style={{ color: 'var(--text-primary)' }}
               autoFocus
               onClick={(e) => e.stopPropagation()}
@@ -866,11 +866,11 @@ const KanbanColumn = React.memo(({
                 setEditingListId(list.id);
                 setEditingListName(list.name);
               }}
-              className={`text-xs font-bold uppercase tracking-wider text-[#172b4d] dark:text-[#cbd5e1] truncate ${isBoardEditor ? 'cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50' : ''} px-1 py-0.5 rounded flex items-center gap-1 min-w-0`}
+              className={`text-sm font-bold text-[#172b4d] dark:text-[#cbd5e1] truncate ${isBoardEditor ? 'cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50' : ''} px-1 py-0.5 rounded flex items-center gap-1 min-w-0`}
               title={isBoardEditor ? "Rename column" : undefined}
             >
-              <span className="truncate max-w-[8rem]">{list.name}</span>
-              {isBoardEditor && <Pencil className="w-2.5 h-2.5 opacity-0 group-hover/list:opacity-60 transition-opacity text-slate-550 shrink-0" />}
+              <span className="truncate max-w-[9rem]">{list.name}</span>
+              {isBoardEditor && <Pencil className="w-3 h-3 opacity-0 group-hover/list:opacity-60 transition-opacity text-slate-550 shrink-0" />}
             </span>
           )}
 
@@ -889,7 +889,7 @@ const KanbanColumn = React.memo(({
           )}
 
           <span 
-            className="text-[9px] font-bold px-1.5 py-0.25 rounded-full shrink-0"
+            className="text-xs font-bold px-2 py-0.5 rounded-full shrink-0"
             style={{ 
               background: 'var(--bg-body)', 
               color: 'var(--text-secondary)',
@@ -1058,7 +1058,8 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
     createList, archiveList, createCard, updateCard, updateBoard,
     createAutomationRule, deleteAutomationRule, currentWorkspace, convertInboxItem, token,
     addToast, showConfirm, fetchArchivedItems, updateList, updateBoardMember, revokeBoardMember,
-    inboxItems, fetchInboxItems, updateInboxItem, deleteInboxItem, draggedEmail, setDraggedEmail, batchConvertInboxItems, inviteMember
+    inboxItems, fetchInboxItems, updateInboxItem, deleteInboxItem, draggedEmail, setDraggedEmail, batchConvertInboxItems, inviteMember,
+    isSidebarCollapsed
   } = useStore();
 
   const themeStore = useThemeStore();
@@ -1162,7 +1163,9 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
     if (!isResizingInbox) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const calculatedWidth = window.innerWidth - e.clientX;
+      const isMobile = window.innerWidth < 1024;
+      const sidebarWidth = isSidebarCollapsed ? 48 : 220;
+      const calculatedWidth = isMobile ? e.clientX : (e.clientX - sidebarWidth);
       if (calculatedWidth >= 280 && calculatedWidth <= 500) {
         setInboxWidth(calculatedWidth);
         localStorage.setItem('frankloo-inbox-width', calculatedWidth.toString());
@@ -1179,7 +1182,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizingInbox]);
+  }, [isResizingInbox, isSidebarCollapsed]);
 
   const boardInboxStagedItems = inboxItems.filter(item => item.status !== 'ARCHIVED' && item.status !== 'CONVERTED');
   const boardInboxUnreadCount = boardInboxStagedItems.length;
@@ -2483,6 +2486,353 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
         {/* Kanban View */}
         {activeTab === 'kanban' && (
           <div className="flex gap-0 w-full h-full items-stretch overflow-hidden relative">
+            {/* Board Staging Inbox Column (Sticky/Pinned on the Left) */}
+            {isBoardInboxOpen && (
+              <div 
+                style={{ 
+                  width: isInboxCollapsed ? '48px' : `${inboxWidth}px`,
+                  transition: isResizingInbox ? 'none' : 'width 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+                className="fixed md:relative inset-x-0 bottom-0 md:top-0 md:inset-x-auto h-[75vh] md:h-full flex flex-col shrink-0 z-[100] md:z-30 border-t md:border-t-0 md:border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c0e12] shadow-2xl md:shadow-none overflow-hidden"
+              >
+                {/* Divider resize handle - Desktop relative mode only (resizable on the right) */}
+                {!isInboxCollapsed && (
+                  <div 
+                    onMouseDown={startResizingInbox}
+                    className="hidden md:block absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-indigo-500/40 bg-transparent transition-colors z-50"
+                  />
+                )}
+
+                {/* Collapsed view content */}
+                {isInboxCollapsed ? (
+                  <div className="flex flex-col items-center py-4 h-full w-full select-none justify-start bg-white dark:bg-[#0c0e12]">
+                    <button 
+                      onClick={() => {
+                        setIsInboxCollapsed(false);
+                        localStorage.setItem('frankloo-inbox-collapsed', 'false');
+                      }}
+                      className="p-2 rounded-xl text-indigo-650 dark:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#161a22] transition-all relative cursor-pointer bg-transparent border-0 flex items-center justify-center"
+                      title="Expand Inbox"
+                    >
+                      <Inbox className="w-5 h-5" />
+                      {boardInboxUnreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0">
+                          {boardInboxUnreadCount}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col h-full w-full select-none">
+                    {/* Mobile drag handle */}
+                    <div className="md:hidden flex items-center justify-center py-2 shrink-0 cursor-pointer hover:bg-slate-150/40" onClick={() => setIsBoardInboxOpen(false)}>
+                      <div className="w-12 h-1 bg-slate-300 dark:bg-slate-700 rounded-full" />
+                    </div>
+
+                    {/* Header */}
+                    <div className="p-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/20 dark:bg-[#161a22]/30 shrink-0 gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Inbox className="w-4 h-4 text-indigo-500 shrink-0" />
+                        <span className="font-extrabold text-sm text-slate-800 dark:text-[#f0f6fc] truncate">Inbox</span>
+                        <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">
+                          {boardInboxUnreadCount} Pending
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => setInboxSearchQuery(q => q ? '' : ' ')}
+                          className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0"
+                          title="Search"
+                        >
+                          <Search className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (currentWorkspace) {
+                              addToast('Refreshing', 'Refreshing inbox items...', 'info');
+                              try {
+                                  await fetchInboxItems(currentWorkspace.id);
+                                  addToast('Refreshed', 'Inbox updated successfully.', 'success');
+                                } catch (err: any) {
+                                  addToast('Refresh Failed', err.message || 'Error updating inbox.', 'error');
+                                }
+                              }
+                            }}
+                            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0"
+                            title="Refresh Inbox"
+                          >
+                            <RotateCw className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setIsInboxCollapsed(true);
+                              localStorage.setItem('frankloo-inbox-collapsed', 'true');
+                            }}
+                            className="hidden md:inline-flex p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0"
+                            title="Collapse Inbox"
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setIsBoardInboxOpen(false)}
+                            className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0"
+                            title="Close"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Filter and Search controls */}
+                      <div className="p-3 bg-slate-50/10 dark:bg-slate-900/10 border-b border-slate-200 dark:border-slate-850 shrink-0 space-y-2">
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <input
+                              type="text"
+                              value={inboxSearchQuery}
+                              onChange={e => setInboxSearchQuery(e.target.value)}
+                              placeholder="Search emails or sender..."
+                              className="tf-input w-full text-xs py-1.5 !pl-7 !pr-7 rounded-lg"
+                            />
+                            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
+                            {inboxSearchQuery.trim() && (
+                              <button
+                                onClick={() => setInboxSearchQuery('')}
+                                className="absolute right-2.5 top-2 text-gray-400 hover:text-gray-600 text-xs bg-transparent border-0 cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 text-[10px] items-center">
+                          <span className="text-slate-400 font-bold shrink-0">Source:</span>
+                          <select
+                            value={inboxSourceFilter}
+                            onChange={e => setInboxSourceFilter(e.target.value)}
+                            className="bg-transparent border border-slate-200 dark:border-slate-800 rounded px-1.5 py-0.5 text-slate-600 dark:text-slate-300 font-semibold"
+                          >
+                            <option value="ALL">All</option>
+                            <option value="GMAIL">Gmail</option>
+                            <option value="EMAIL">Email</option>
+                            <option value="SLACK">Slack</option>
+                            <option value="GITHUB">GitHub</option>
+                          </select>
+
+                          <span className="text-slate-400 font-bold shrink-0 ml-auto">Priority:</span>
+                          <select
+                            value={inboxPriorityFilter}
+                            onChange={e => setInboxPriorityFilter(e.target.value)}
+                            className="bg-transparent border border-slate-200 dark:border-slate-800 rounded px-1.5 py-0.5 text-slate-600 dark:text-slate-300 font-semibold"
+                          >
+                            <option value="ALL">All</option>
+                            <option value="LOW">Low</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="HIGH">High</option>
+                            <option value="URGENT">Urgent</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Email Cards List */}
+                      <div className="flex-1 overflow-y-auto p-3 space-y-2.5 scrollbar-thin bg-slate-50/5">
+                        {(() => {
+                          const filtered = inboxItems
+                            .filter(item => item.status !== 'ARCHIVED' && item.status !== 'CONVERTED')
+                            .filter(item => {
+                              if (inboxSourceFilter !== 'ALL' && item.source !== inboxSourceFilter) return false;
+                              if (inboxPriorityFilter !== 'ALL' && item.priority !== inboxPriorityFilter) return false;
+                              if (inboxSearchQuery.trim()) {
+                                const query = inboxSearchQuery.toLowerCase();
+                                const details = JSON.parse(item.sourceDetails || '{}');
+                                const matchTitle = item.title?.toLowerCase().includes(query);
+                                const matchDesc = item.description?.toLowerCase().includes(query);
+                                const matchSender = details.sender?.toLowerCase().includes(query);
+                                const matchSubject = details.subject?.toLowerCase().includes(query);
+                                return matchTitle || matchDesc || matchSender || matchSubject;
+                              }
+                              return true;
+                            });
+
+                          // Sort: pinned items first
+                          const sorted = [...filtered].sort((a, b) => {
+                            const aPinned = pinnedInboxItemIds.includes(a.id);
+                            const bPinned = pinnedInboxItemIds.includes(b.id);
+                            if (aPinned && !bPinned) return -1;
+                            if (!aPinned && bPinned) return 1;
+                            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                          });
+
+                          if (sorted.length === 0) {
+                            return (
+                              <div className="border border-dashed border-slate-200 dark:border-slate-800 rounded-xl py-12 text-center text-slate-500 text-xs">
+                                <Mail className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                                No staging messages
+                              </div>
+                            );
+                          }
+
+                          return sorted.map(item => {
+                            const sourceDetailsObj = JSON.parse(item.sourceDetails || '{}');
+                            const hasAttachments = sourceDetailsObj.attachments && sourceDetailsObj.attachments.length > 0;
+                            const isPinned = pinnedInboxItemIds.includes(item.id);
+                            const isUnread = item.status === 'NEW';
+                            const formattedTime = new Date(item.createdAt).toLocaleDateString([], {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            });
+
+                            return (
+                              <div
+                                key={item.id}
+                                draggable
+                                onDragStart={e => {
+                                  e.dataTransfer.setData('inboxItemId', item.id);
+                                  e.dataTransfer.setDragImage(transparentDragImg, 0, 0);
+                                  setDraggedEmail(item);
+                                }}
+                                onDragEnd={() => {
+                                  setDraggedEmail(null);
+                                }}
+                                className={`group/inbox bg-white dark:bg-[#181a1c] border border-slate-200 dark:border-slate-800 rounded-xl p-3 hover:border-indigo-400 dark:hover:border-indigo-700 hover:shadow-md transition cursor-grab active:cursor-grabbing text-xs space-y-2 relative ${
+                                  draggedEmail?.id === item.id ? 'opacity-40' : ''
+                                }`}
+                              >
+                                {/* Unread Glow & Pin Banner */}
+                                <div className="flex items-center gap-1.5">
+                                  {isUnread && (
+                                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" title="Unread" />
+                                  )}
+                                  <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                                    item.source === 'GMAIL' || item.source === 'EMAIL' 
+                                      ? 'bg-red-500/10 text-red-500' 
+                                      : item.source === 'SLACK' 
+                                      ? 'bg-amber-500/10 text-amber-500' 
+                                      : 'bg-indigo-500/10 text-indigo-500'
+                                  }`}>
+                                    {item.source}
+                                  </span>
+                                  <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase ${
+                                    item.priority === 'URGENT' 
+                                      ? 'bg-red-600/10 text-red-600' 
+                                      : item.priority === 'HIGH' 
+                                      ? 'bg-orange-500/10 text-orange-500' 
+                                      : item.priority === 'MEDIUM' 
+                                      ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' 
+                                      : 'bg-slate-400/10 text-slate-500'
+                                  }`}>
+                                    {item.priority}
+                                  </span>
+
+                                  {isPinned && (
+                                    <Pin className="w-3 h-3 text-amber-500 shrink-0 rotate-45 ml-auto" />
+                                  )}
+                                </div>
+
+                                {/* Subject / Title */}
+                                <h4 className="font-extrabold text-slate-800 dark:text-white leading-snug line-clamp-1">
+                                  {item.title}
+                                </h4>
+
+                                {/* Preview Text */}
+                                {item.description && (
+                                  <p className="text-[10px] text-slate-555 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                                    {item.description}
+                                  </p>
+                                )}
+
+                                {/* Sender and Footer Meta */}
+                                <div className="flex items-center justify-between text-[9px] text-slate-400 font-semibold pt-1 border-t border-slate-100 dark:border-slate-900 gap-1.5">
+                                  {sourceDetailsObj.sender && (
+                                    <span className="truncate max-w-[120px] font-bold text-slate-500 dark:text-slate-400">
+                                      {sourceDetailsObj.sender}
+                                    </span>
+                                  )}
+                                  
+                                  <div className="flex items-center gap-1 shrink-0 ml-auto">
+                                    {hasAttachments && (
+                                      <span title="Attachments"><Paperclip className="w-2.5 h-2.5 text-gray-400" /></span>
+                                    )}
+                                    <span>{formattedTime}</span>
+                                  </div>
+                                </div>
+
+                                {/* Quick Triage Buttons - Reveal on Hover */}
+                                <div className="absolute inset-0 bg-white/95 dark:bg-[#181a1c]/95 opacity-0 group-hover/inbox:opacity-100 transition-opacity flex items-center justify-center gap-2 rounded-xl px-2 py-1 select-none">
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      if (!currentWorkspace) return;
+                                      try {
+                                        await updateInboxItem(currentWorkspace.id, item.id, { status: 'ARCHIVED' });
+                                        addToast('Archived', 'Item archived successfully.', 'success');
+                                      } catch (err: any) {
+                                        addToast('Error', err.message || 'Failed to archive.', 'error');
+                                      }
+                                    }}
+                                    className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-350 transition-colors cursor-pointer bg-transparent border-0"
+                                    title="Archive"
+                                  >
+                                    <Archive className="w-4 h-4" />
+                                  </button>
+
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      if (!currentWorkspace) return;
+                                      try {
+                                        await deleteInboxItem(currentWorkspace.id, item.id);
+                                        addToast('Deleted', 'Staged item deleted.', 'success');
+                                      } catch (err: any) {
+                                        addToast('Error', err.message || 'Failed to delete.', 'error');
+                                      }
+                                    }}
+                                    className="p-2 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-955/40 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 transition-colors cursor-pointer bg-transparent border-0"
+                                    title="Delete"
+                                  >
+                                    <Trash className="w-4 h-4" />
+                                  </button>
+
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      togglePinInboxItem(item.id);
+                                    }}
+                                    className={`p-2 rounded-lg transition-colors cursor-pointer bg-transparent border-0 ${
+                                      isPinned
+                                        ? 'bg-amber-100 dark:bg-amber-955/40 text-amber-600 dark:text-amber-400'
+                                        : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600'
+                                    }`}
+                                    title={isPinned ? 'Unpin' : 'Pin to Top'}
+                                  >
+                                    <Pin className="w-4 h-4" />
+                                  </button>
+
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPreviewInboxItem(item);
+                                    }}
+                                    className="p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-955/40 dark:hover:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 transition-colors cursor-pointer bg-transparent border-0"
+                                    title="Full Preview"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
             <div 
               ref={boardScrollRef}
               onPointerDown={handleBoardPointerDown}
@@ -2577,352 +2927,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
           )}
         </div>
 
-        {/* Board Staging Inbox Drawer */}
-        {isBoardInboxOpen && (
-          <div 
-            style={{ 
-              width: isInboxCollapsed ? '48px' : `${inboxWidth}px`,
-              transition: isResizingInbox ? 'none' : 'width 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-            }}
-            className="fixed md:relative inset-x-0 bottom-0 md:top-0 md:inset-x-auto md:right-0 h-[75vh] md:h-full flex flex-col shrink-0 z-[100] md:z-30 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c0e12] shadow-2xl md:shadow-none overflow-hidden"
-          >
-            {/* Divider resize handle - Desktop relative mode only */}
-            {!isInboxCollapsed && (
-              <div 
-                onMouseDown={startResizingInbox}
-                className="hidden md:block absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-indigo-500/40 bg-transparent transition-colors z-50"
-              />
-            )}
 
-            {/* Collapsed view content */}
-            {isInboxCollapsed ? (
-              <div className="flex flex-col items-center py-4 h-full w-full select-none justify-start bg-white dark:bg-[#0c0e12]">
-                <button 
-                  onClick={() => {
-                    setIsInboxCollapsed(false);
-                    localStorage.setItem('frankloo-inbox-collapsed', 'false');
-                  }}
-                  className="p-2 rounded-xl text-indigo-650 dark:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#161a22] transition-all relative cursor-pointer bg-transparent border-0 flex items-center justify-center"
-                  title="Expand Inbox"
-                >
-                  <Inbox className="w-5 h-5" />
-                  {boardInboxUnreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0">
-                      {boardInboxUnreadCount}
-                    </span>
-                  )}
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-col h-full w-full select-none">
-                {/* Mobile drag handle */}
-                <div className="md:hidden flex items-center justify-center py-2 shrink-0 cursor-pointer hover:bg-slate-150/40" onClick={() => setIsBoardInboxOpen(false)}>
-                  <div className="w-12 h-1 bg-slate-300 dark:bg-slate-700 rounded-full" />
-                </div>
-
-                {/* Header */}
-                <div className="p-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/20 dark:bg-[#161a22]/30 shrink-0 gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Inbox className="w-4 h-4 text-indigo-500 shrink-0" />
-                    <span className="font-extrabold text-sm text-slate-800 dark:text-[#f0f6fc] truncate">Inbox</span>
-                    <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">
-                      {boardInboxUnreadCount} Pending
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      onClick={() => setInboxSearchQuery(q => q ? '' : ' ')}
-                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0"
-                      title="Search"
-                    >
-                      <Search className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (currentWorkspace) {
-                          addToast('Refreshing', 'Refreshing inbox items...', 'info');
-                          try {
-                            await fetchInboxItems(currentWorkspace.id);
-                            addToast('Refreshed', 'Inbox updated successfully.', 'success');
-                          } catch (err: any) {
-                            addToast('Refresh Failed', err.message || 'Error updating inbox.', 'error');
-                          }
-                        }
-                      }}
-                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0"
-                      title="Refresh Inbox"
-                    >
-                      <RotateCw className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsInboxCollapsed(true);
-                        localStorage.setItem('frankloo-inbox-collapsed', 'true');
-                      }}
-                      className="hidden md:inline-flex p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0"
-                      title="Collapse Inbox"
-                    >
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setIsBoardInboxOpen(false)}
-                      className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0"
-                      title="Close"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Filter and Search controls */}
-                <div className="p-3 bg-slate-50/10 dark:bg-slate-900/10 border-b border-slate-200 dark:border-slate-850 shrink-0 space-y-2">
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <input
-                        type="text"
-                        value={inboxSearchQuery}
-                        onChange={e => setInboxSearchQuery(e.target.value)}
-                        placeholder="Search emails or sender..."
-                        className="tf-input w-full text-xs py-1.5 !pl-7 !pr-7 rounded-lg"
-                      />
-                      <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
-                      {inboxSearchQuery.trim() && (
-                        <button
-                          onClick={() => setInboxSearchQuery('')}
-                          className="absolute right-2.5 top-2 text-gray-400 hover:text-gray-600 text-xs bg-transparent border-0 cursor-pointer"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 text-[10px] items-center">
-                    <span className="text-slate-400 font-bold shrink-0">Source:</span>
-                    <select
-                      value={inboxSourceFilter}
-                      onChange={e => setInboxSourceFilter(e.target.value)}
-                      className="bg-transparent border border-slate-200 dark:border-slate-800 rounded px-1.5 py-0.5 text-slate-600 dark:text-slate-300 font-semibold"
-                    >
-                      <option value="ALL">All</option>
-                      <option value="GMAIL">Gmail</option>
-                      <option value="EMAIL">Email</option>
-                      <option value="SLACK">Slack</option>
-                      <option value="GITHUB">GitHub</option>
-                    </select>
-
-                    <span className="text-slate-400 font-bold shrink-0 ml-auto">Priority:</span>
-                    <select
-                      value={inboxPriorityFilter}
-                      onChange={e => setInboxPriorityFilter(e.target.value)}
-                      className="bg-transparent border border-slate-200 dark:border-slate-800 rounded px-1.5 py-0.5 text-slate-600 dark:text-slate-300 font-semibold"
-                    >
-                      <option value="ALL">All</option>
-                      <option value="LOW">Low</option>
-                      <option value="MEDIUM">Medium</option>
-                      <option value="HIGH">High</option>
-                      <option value="URGENT">Urgent</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Email Cards List */}
-                <div className="flex-1 overflow-y-auto p-3 space-y-2.5 scrollbar-thin bg-slate-50/5">
-                  {(() => {
-                    const filtered = inboxItems
-                      .filter(item => item.status !== 'ARCHIVED' && item.status !== 'CONVERTED')
-                      .filter(item => {
-                        if (inboxSourceFilter !== 'ALL' && item.source !== inboxSourceFilter) return false;
-                        if (inboxPriorityFilter !== 'ALL' && item.priority !== inboxPriorityFilter) return false;
-                        if (inboxSearchQuery.trim()) {
-                          const query = inboxSearchQuery.toLowerCase();
-                          const details = JSON.parse(item.sourceDetails || '{}');
-                          const matchTitle = item.title?.toLowerCase().includes(query);
-                          const matchDesc = item.description?.toLowerCase().includes(query);
-                          const matchSender = details.sender?.toLowerCase().includes(query);
-                          const matchSubject = details.subject?.toLowerCase().includes(query);
-                          return matchTitle || matchDesc || matchSender || matchSubject;
-                        }
-                        return true;
-                      });
-
-                    // Sort: pinned items first
-                    const sorted = [...filtered].sort((a, b) => {
-                      const aPinned = pinnedInboxItemIds.includes(a.id);
-                      const bPinned = pinnedInboxItemIds.includes(b.id);
-                      if (aPinned && !bPinned) return -1;
-                      if (!aPinned && bPinned) return 1;
-                      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-                    });
-
-                    if (sorted.length === 0) {
-                      return (
-                        <div className="border border-dashed border-slate-200 dark:border-slate-800 rounded-xl py-12 text-center text-slate-500 text-xs">
-                          <Mail className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                          No staging messages
-                        </div>
-                      );
-                    }
-
-                    return sorted.map(item => {
-                      const sourceDetailsObj = JSON.parse(item.sourceDetails || '{}');
-                      const hasAttachments = sourceDetailsObj.attachments && sourceDetailsObj.attachments.length > 0;
-                      const isPinned = pinnedInboxItemIds.includes(item.id);
-                      const isUnread = item.status === 'NEW';
-                      const formattedTime = new Date(item.createdAt).toLocaleDateString([], {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      });
-
-                      return (
-                        <div
-                          key={item.id}
-                          draggable
-                          onDragStart={e => {
-                            e.dataTransfer.setData('inboxItemId', item.id);
-                            e.dataTransfer.setDragImage(transparentDragImg, 0, 0);
-                            setDraggedEmail(item);
-                          }}
-                          onDragEnd={() => {
-                            setDraggedEmail(null);
-                          }}
-                          className={`group/inbox bg-white dark:bg-[#181a1c] border border-slate-200 dark:border-slate-800 rounded-xl p-3 hover:border-indigo-400 dark:hover:border-indigo-700 hover:shadow-md transition cursor-grab active:cursor-grabbing text-xs space-y-2 relative ${
-                            draggedEmail?.id === item.id ? 'opacity-40' : ''
-                          }`}
-                        >
-                          {/* Unread Glow & Pin Banner */}
-                          <div className="flex items-center gap-1.5">
-                            {isUnread && (
-                              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" title="Unread" />
-                            )}
-                            <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                              item.source === 'GMAIL' || item.source === 'EMAIL' 
-                                ? 'bg-red-500/10 text-red-500' 
-                                : item.source === 'SLACK' 
-                                ? 'bg-amber-500/10 text-amber-500' 
-                                : 'bg-indigo-500/10 text-indigo-500'
-                            }`}>
-                              {item.source}
-                            </span>
-                            <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase ${
-                              item.priority === 'URGENT' 
-                                ? 'bg-red-600/10 text-red-600' 
-                                : item.priority === 'HIGH' 
-                                ? 'bg-orange-500/10 text-orange-500' 
-                                : item.priority === 'MEDIUM' 
-                                ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' 
-                                : 'bg-slate-400/10 text-slate-500'
-                            }`}>
-                              {item.priority}
-                            </span>
-
-                            {isPinned && (
-                              <Pin className="w-3 h-3 text-amber-500 shrink-0 rotate-45 ml-auto" />
-                            )}
-                          </div>
-
-                          {/* Subject / Title */}
-                          <h4 className="font-extrabold text-slate-800 dark:text-white leading-snug line-clamp-1">
-                            {item.title}
-                          </h4>
-
-                          {/* Preview Text */}
-                          {item.description && (
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
-                              {item.description}
-                            </p>
-                          )}
-
-                          {/* Sender and Footer Meta */}
-                          <div className="flex items-center justify-between text-[9px] text-slate-400 font-semibold pt-1 border-t border-slate-100 dark:border-slate-900 gap-1.5">
-                            {sourceDetailsObj.sender && (
-                              <span className="truncate max-w-[120px] font-bold text-slate-500 dark:text-slate-400">
-                                {sourceDetailsObj.sender}
-                              </span>
-                            )}
-                            
-                            <div className="flex items-center gap-1 shrink-0 ml-auto">
-                              {hasAttachments && (
-                                <span title="Attachments"><Paperclip className="w-2.5 h-2.5 text-gray-400" /></span>
-                              )}
-                              <span>{formattedTime}</span>
-                            </div>
-                          </div>
-
-                          {/* Quick Triage Buttons - Reveal on Hover */}
-                          <div className="absolute inset-0 bg-slate-55/95 dark:bg-[#181a1c]/95 opacity-0 group-hover/inbox:opacity-100 transition-opacity flex items-center justify-center gap-2 rounded-xl px-2 py-1 select-none">
-                            <button
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                if (!currentWorkspace) return;
-                                try {
-                                  await updateInboxItem(currentWorkspace.id, item.id, { status: 'ARCHIVED' });
-                                  addToast('Archived', 'Item archived successfully.', 'success');
-                                } catch (err: any) {
-                                  addToast('Error', err.message || 'Failed to archive.', 'error');
-                                }
-                              }}
-                              className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-350 transition-colors cursor-pointer bg-transparent border-0"
-                              title="Archive"
-                            >
-                              <Archive className="w-4 h-4" />
-                            </button>
-
-                            <button
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                if (!currentWorkspace) return;
-                                try {
-                                  await deleteInboxItem(currentWorkspace.id, item.id);
-                                  addToast('Deleted', 'Staged item deleted.', 'success');
-                                } catch (err: any) {
-                                  addToast('Error', err.message || 'Failed to delete.', 'error');
-                                }
-                              }}
-                              className="p-2 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 transition-colors cursor-pointer bg-transparent border-0"
-                              title="Delete"
-                            >
-                              <Trash className="w-4 h-4" />
-                            </button>
-
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                togglePinInboxItem(item.id);
-                              }}
-                              className={`p-2 rounded-lg transition-colors cursor-pointer bg-transparent border-0 ${
-                                isPinned
-                                  ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
-                                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600'
-                              }`}
-                              title={isPinned ? 'Unpin' : 'Pin to Top'}
-                            >
-                              <Pin className="w-4 h-4" />
-                            </button>
-
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setPreviewInboxItem(item);
-                              }}
-                              className="p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 transition-colors cursor-pointer bg-transparent border-0"
-                              title="Full Preview"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     )}
 

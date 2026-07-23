@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { 
-  Inbox, ChevronRight, Mail, Slack, Github, 
+  Inbox, ChevronLeft, Mail, Slack, Github, 
   Calendar, Zap, Archive, CheckSquare, Search, Plus, Info, Clock, Send, ArrowLeft, RotateCw, CheckCircle2
 } from 'lucide-react';
 
@@ -267,7 +267,7 @@ export default function InboxPanel() {
               )}
             </div>
           )}
-        </button>n>
+        </button>
         {/* Header (Sticky) */}
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 shrink-0 flex items-center justify-between bg-slate-50 dark:bg-[#161a1d] gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
