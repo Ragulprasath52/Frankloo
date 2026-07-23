@@ -248,16 +248,16 @@ export default function InboxPanel() {
 
       {/* Main Drawer Content */}
       <div
-        className={`fixed top-0 right-0 h-screen bg-white dark:bg-[#101214] text-slate-800 dark:text-slate-100 flex flex-col border-l border-slate-250 dark:border-slate-800 transition-transform duration-300 ease-in-out z-50 shadow-2xl overflow-hidden w-full md:w-[25rem] ${
-          isInboxOpen ? 'translate-x-0' : 'translate-x-full'
+        className={`fixed top-0 left-0 h-screen bg-white dark:bg-[#101214] text-slate-800 dark:text-slate-100 flex flex-col border-r border-slate-250 dark:border-slate-800 transition-transform duration-300 ease-in-out z-50 shadow-2xl overflow-hidden w-full md:w-[25rem] ${
+          isInboxOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Toggle Button — only visible on md+ (not on mobile, where full-width inbox has X button) */}
         <button
           onClick={() => setInboxOpen(!isInboxOpen)}
-          className="hidden md:flex absolute top-1/2 -translate-y-1/2 -left-10 bg-slate-900 dark:bg-[#1d2125] border border-slate-700 text-slate-400 hover:text-white w-10 h-10 rounded-l-lg items-center justify-center transition-all shadow-md focus:outline-none z-50"
+          className="hidden md:flex absolute top-1/2 -translate-y-1/2 -right-10 bg-slate-900 dark:bg-[#1d2125] border border-slate-705 text-slate-400 hover:text-white w-10 h-10 rounded-r-lg items-center justify-center transition-all shadow-md focus:outline-none z-50"
         >
-          {isInboxOpen ? <ChevronRight className="w-5 h-5" /> : (
+          {isInboxOpen ? <ChevronLeft className="w-5 h-5" /> : (
             <div className="relative">
               <Inbox className="w-5 h-5" />
               {unreadCount > 0 && (
@@ -267,7 +267,7 @@ export default function InboxPanel() {
               )}
             </div>
           )}
-        </button>
+        </button>n>
         {/* Header (Sticky) */}
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 shrink-0 flex items-center justify-between bg-slate-50 dark:bg-[#161a1d] gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
