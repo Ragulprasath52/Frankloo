@@ -638,21 +638,47 @@ export default function CardModal({ card, onClose }: CardModalProps) {
 
             <div className="space-y-3 pt-2">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-555 flex items-center gap-1.5">
-                  <AlignLeft className="w-3.5 h-3.5 text-indigo-500" /> Description
+                <h4 className="text-sm font-semibold text-slate-805 dark:text-slate-200 flex items-center gap-2">
+                  <AlignLeft className="w-4 h-4 text-slate-500" /> Description
                 </h4>
+                {!isEditingDesc && description && (
+                  <button
+                    onClick={() => setIsEditingDesc(true)}
+                    className="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-[#2c333a] dark:hover:bg-[#3c444e] text-slate-800 dark:text-[#b6c2cf] rounded-md transition-colors"
+                  >
+                    Edit
+                  </button>
+                )}
               </div>
 
               <div className="animate-scale-in">
                 {isEditingDesc ? (
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     <textarea
                       value={description}
                       onChange={e => setDescription(e.target.value)}
-                      rows={4}
-                      className="w-full text-xs p-3 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-[#161b22] text-slate-800 dark:text-slate-100 resize-none leading-relaxed"
+                      rows={8}
+                      className="w-full text-sm p-3 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-[#22272b] text-slate-850 dark:text-[#b6c2cf] resize-y leading-relaxed font-sans"
                     />
-                    <div className="flex gap-2 justify-end">
+                    <div className="flex gap-2 justify-start">
+                      <button
+                        onClick={() => {
+                          save({ description });
+                          setIsEditingDesc(false);
+                        }}
+                        className="px-3 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-750 text-white rounded-md font-semibold"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => {
+                          setDescription(cleanText(card.description || ''));
+                          setIsEditingDesc(false);
+                        }}
+                        className="px-3 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 dark:bg-[#2c333a] dark:hover:bg-[#3c444e] text-slate-650 dark:text-[#b6c2cf] rounded-md font-semibold"
+                      >
+                        Cancel
+                      </button>
                       {card.emailDetails && (
                         <button
                           type="button"
@@ -660,37 +686,25 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                             setDescription(cleanText(card.description || ''));
                             setIsEditingDesc(false);
                           }}
-                          className="px-3 py-1.5 text-xs bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-300 rounded-md hover:bg-slate-200 font-semibold"
+                          className="px-3 py-1.5 text-xs bg-slate-100 hover:bg-slate-205 dark:bg-slate-800 text-slate-650 dark:text-slate-300 rounded-md font-semibold ml-auto"
                         >
-                          Reset to Original
+                          Reset
                         </button>
                       )}
-                      <button
-                        onClick={() => {
-                          setDescription(cleanText(card.description || ''));
-                          setIsEditingDesc(false);
-                        }}
-                        className="px-3 py-1.5 text-xs bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-300 rounded-md hover:bg-slate-200 font-semibold"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => {
-                          save({ description });
-                          setIsEditingDesc(false);
-                        }}
-                        className="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-semibold"
-                      >
-                        Save Changes
-                      </button>
                     </div>
                   </div>
                 ) : (
                   <div 
-                    className="p-3 bg-slate-50/50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800/40 rounded-lg text-xs leading-relaxed text-slate-700 dark:text-slate-200 font-normal whitespace-pre-wrap doc-content hover:bg-slate-50 dark:hover:bg-slate-850/20 transition-colors cursor-pointer"
+                    className="p-3.5 bg-slate-50/70 dark:bg-[#22272b]/80 border border-slate-150/40 dark:border-slate-800/40 rounded-lg text-sm leading-relaxed text-slate-800 dark:text-[#b6c2cf] font-normal whitespace-pre-wrap font-sans hover:bg-slate-100/60 dark:hover:bg-[#2c333a] transition-all cursor-pointer"
                     onClick={() => setIsEditingDesc(true)}
                   >
-                    {description ? description : <span className="text-slate-400 italic">No description details. Click here to document guidelines…</span>}
+                    {description ? (
+                      description
+                    ) : (
+                      <span className="text-slate-400 dark:text-slate-500 italic">
+                        Add a more detailed description…
+                      </span>
+                    )}
                   </div>
                 )}
               </div>

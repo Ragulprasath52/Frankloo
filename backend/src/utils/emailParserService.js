@@ -472,43 +472,8 @@ export function parseEmailIntelligently(subject = '', text = '', html = '') {
   }
 
   // --- Description Synthesis ---
-  // Only include pure prose paragraphs — exclude list items, greetings, sign-offs, and metadata noise
-  const listLinePattern = /^\s*[-*+•]?\s*\[[\sx]?\]\s+/i;        // "- [ ] item"
-  const bulletLinePattern = /^\s*[-*+•]\s+/;                       // "- item" / "• item"
-  const numberedLinePattern = /^\d+\.\s+/;                         // "1. item"
-  const greetingPattern = /^(hi|hello|hey|dear|good\s+(morning|afternoon|evening))\b/i;
-  const signoffPattern = /^(best|regards|thanks|thank\s+you|sincerely|cheers|warm\s+regards|kind\s+regards|yours|sent\s+from)/i;
-  const metaPattern = /^\*?(source|simulated|note|from|to|cc|bcc|subject|date)[\s:*]/i;
-  const subjectRepeatPattern = new RegExp(extractedTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-
-  const rawLines = bodyText.split(/\n/);
-  const proseLines = [];
-
-  for (const line of rawLines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    // Skip list-style lines (they become checklist items)
-    if (listLinePattern.test(trimmed)) continue;
-    if (bulletLinePattern.test(trimmed)) continue;
-    if (numberedLinePattern.test(trimmed)) continue;
-    // Skip greetings and sign-offs
-    if (greetingPattern.test(trimmed)) continue;
-    if (signoffPattern.test(trimmed)) continue;
-    // Skip metadata / source annotation lines
-    if (metaPattern.test(trimmed)) continue;
-    // Skip lines that are just the email subject repeated
-    if (subjectRepeatPattern.test(trimmed) && trimmed.length < extractedTitle.length + 20) continue;
-    // Skip very short fragments (names, single words etc.)
-    if (trimmed.length < 8) continue;
-    proseLines.push(trimmed);
-  }
-
-  if (proseLines.length > 0) {
-    extractedDescription = proseLines.join('\n\n');
-  } else {
-    // Fallback: use the full bodyText only if nothing prose was found
-    extractedDescription = bodyText.trim();
-  }
+  // Trello-style: Keep the full body text (including forwarded headers, signatures, and disclaimers).
+  extractedDescription = rawBodyText.trim();
 
   return {
     title: extractedTitle,
