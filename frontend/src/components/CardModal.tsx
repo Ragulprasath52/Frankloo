@@ -109,6 +109,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
   const [commentAttachment, setCommentAttachment] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileInputRefForCard = useRef<HTMLInputElement>(null);
+  const isCoverUpload = useRef(false);
   const [activeAttachmentMenuId, setActiveAttachmentMenuId] = useState<string | null>(null);
 
   const [commentExtras, setCommentExtras] = useState<Record<string, { reactions: CommentReactions[], replies: CommentReply[], attachments: { name: string, size: string }[] }>>({});
@@ -437,7 +438,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Or upload cover</span>
                     <button
                       type="button"
-                      onClick={() => fileInputRefForCard.current?.click()}
+                      onClick={() => { isCoverUpload.current = true; fileInputRefForCard.current?.click(); }}
                       className="w-full py-1.5 text-[10px] font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-[#2c333a] dark:hover:bg-[#3c444e] text-slate-808 dark:text-[#b6c2cf] rounded-lg transition-colors border-0 cursor-pointer"
                     >
                       Upload cover image
@@ -455,9 +456,10 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                           key={idx}
                           type="button"
                           onClick={async () => {
-                            setCoverImage(url);
+                            const hdUrl = url.replace('w=150', 'w=1080');
+                            setCoverImage(hdUrl);
                             if (currentBoard) {
-                              await updateCard(currentBoard.id, card.id, { coverImage: url });
+                              await updateCard(currentBoard.id, card.id, { coverImage: hdUrl });
                             }
                           }}
                           className="h-8 rounded border-0 cursor-pointer hover:scale-105 transition-transform overflow-hidden p-0 bg-transparent"
@@ -1155,7 +1157,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Attachments</span>
                           <button
                             type="button"
-                            onClick={() => fileInputRefForCard.current?.click()}
+                            onClick={() => { isCoverUpload.current = true; fileInputRefForCard.current?.click(); }}
                             className="w-full py-1.5 text-xs font-semibold bg-slate-105 hover:bg-slate-200 dark:bg-[#2c333a] dark:hover:bg-[#3c444e] text-slate-808 dark:text-[#b6c2cf] rounded-lg transition-colors border-0 cursor-pointer"
                           >
                             Upload a cover image
@@ -1179,9 +1181,10 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                                 key={idx}
                                 type="button"
                                 onClick={async () => {
-                                  setCoverImage(url);
+                                  const hdUrl = url.replace('w=150', 'w=1080');
+                                  setCoverImage(hdUrl);
                                   if (currentBoard) {
-                                    await updateCard(currentBoard.id, card.id, { coverImage: url });
+                                    await updateCard(currentBoard.id, card.id, { coverImage: hdUrl });
                                   }
                                 }}
                                 className="h-10 rounded-md border-0 cursor-pointer hover:scale-105 transition-transform overflow-hidden p-0 bg-transparent"
@@ -1409,12 +1412,18 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                         const reader = new FileReader();
                         reader.onloadend = async () => {
                           const base64Data = (reader.result as string).split(',')[1];
-                          await uploadAttachment(currentBoard.id, card.id, {
+                          const uploaded = await uploadAttachment(currentBoard.id, card.id, {
                             filename: file.name,
                             mimeType: file.type,
                             size: file.size,
                             base64Data
                           });
+                          if (isCoverUpload.current && uploaded?.storagePath) {
+                            const fullPath = `http://localhost:5000/${uploaded.storagePath.replace(/^\/?/, '')}`;
+                            setCoverImage(fullPath);
+                            await updateCard(currentBoard.id, card.id, { coverImage: fullPath });
+                          }
+                          isCoverUpload.current = false;
                           addToast('Attachment Added', `File ${file.name} successfully uploaded.`, 'success');
                         };
                         reader.readAsDataURL(file);

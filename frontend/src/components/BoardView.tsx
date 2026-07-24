@@ -96,7 +96,14 @@ const KanbanCard = React.memo(({
       style={{ touchAction: 'none' }}
     >
       {card.coverImage && (
-        <div className="w-full h-3 rounded overflow-hidden pointer-events-none mb-1">
+        <div 
+          className={`overflow-hidden pointer-events-none mb-2 rounded-t-[7px] -mx-[10px] -mt-[10px] ${
+            card.coverImage.startsWith('linear-gradient') || card.coverImage.startsWith('radial-gradient') || card.coverImage.startsWith('#')
+              ? 'h-8'
+              : 'h-28'
+          }`}
+          style={{ width: 'calc(100% + 20px)' }}
+        >
           {card.coverImage.startsWith('linear-gradient') || card.coverImage.startsWith('radial-gradient') || card.coverImage.startsWith('#') ? (
             <div
               className="w-full h-full"
