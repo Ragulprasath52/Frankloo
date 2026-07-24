@@ -1420,7 +1420,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                             base64Data
                           });
                           if (isCoverUpload.current && uploaded?.storagePath) {
-                            const fullPath = `http://localhost:5000/${uploaded.storagePath.replace(/^\/?/, '')}`;
+                            const fullPath = `${BACKEND_BASE_URL}/${uploaded.storagePath.replace(/^\/?/, '')}`;
                             setCoverImage(fullPath);
                             await updateCard(currentBoard.id, card.id, { coverImage: fullPath });
                           }
