@@ -4010,7 +4010,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
 
                     <div className="space-y-1">
                       <span className="block text-[9px] font-extrabold text-slate-400 uppercase">Message Body</span>
-                      <div className="bg-slate-50/20 dark:bg-slate-900/20 border border-slate-150 dark:border-slate-850 p-4 rounded-2xl whitespace-pre-wrap font-sans text-xs leading-relaxed max-h-[350px] overflow-y-auto">
+                      <div className="bg-slate-50/20 dark:bg-slate-900/20 border border-slate-150 dark:border-slate-850 p-4 rounded-2xl whitespace-pre-wrap font-sans text-xs leading-relaxed max-h-[350px] overflow-y-auto text-slate-800 dark:text-slate-150">
                         {previewInboxItem.description || 'No description provided.'}
                       </div>
                     </div>
@@ -4019,13 +4019,24 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                       <div className="space-y-2">
                         <span className="block text-[9px] font-extrabold text-slate-400 uppercase">Attachments ({details.attachments.length})</span>
                         <div className="flex flex-wrap gap-2">
-                          {details.attachments.map((att: any, idx: number) => (
-                            <div key={idx} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700/50 text-[10px]">
-                              <Paperclip className="w-3.5 h-3.5 text-gray-400" />
-                              <span className="font-semibold max-w-[150px] truncate">{att.filename}</span>
-                              <span className="text-slate-400 text-[8px]">({Math.round(att.size / 1024)} KB)</span>
-                            </div>
-                          ))}
+                          {details.attachments.map((att: any, idx: number) => {
+                            const pathVal = att.storagePath || att.path || '';
+                            const displayPath = pathVal.startsWith('http') ? pathVal : `http://localhost:5000/${pathVal.replace(/^\/?/, '')}`;
+                            return (
+                              <a 
+                                key={idx} 
+                                href={displayPath} 
+                                download={att.filename} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-205 dark:border-slate-700/50 text-[10px] hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-500 transition-colors no-underline text-slate-700 dark:text-slate-300 font-semibold cursor-pointer"
+                              >
+                                <Paperclip className="w-3.5 h-3.5 text-gray-400" />
+                                <span className="font-semibold max-w-[150px] truncate">{att.filename}</span>
+                                <span className="text-slate-400 text-[8px]">({Math.round(att.size / 1024)} KB)</span>
+                              </a>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
