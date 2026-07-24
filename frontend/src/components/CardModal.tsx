@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore, getAvatarUrl } from '../store/useStore';
 import type { Card } from '../store/useStore';
+import { BACKEND_BASE_URL } from '../config/api';
 import {
   X, AlignLeft, CheckSquare, Link2, MessageSquare,
   Trash2, Plus, Archive,
@@ -1441,7 +1442,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                     <div className="space-y-2">
                       {liveCard.attachments.map((att: any) => {
                         const pathVal = att.storagePath || att.path || '';
-                        const displayPath = pathVal.startsWith('http') ? pathVal : `http://localhost:5000/${pathVal.replace(/^\/?/, '')}`;
+                        const displayPath = pathVal.startsWith('http') ? pathVal : `${BACKEND_BASE_URL}/${pathVal.replace(/^\/?/, '')}`;
                         const ext = att.filename.split('.').pop()?.toUpperCase() || 'FILE';
                         const formattedDate = new Date(att.createdAt || Date.now()).toLocaleDateString([], {
                           day: 'numeric',

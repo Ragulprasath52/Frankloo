@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore, getAvatarUrl } from '../store/useStore';
 import type { Card } from '../store/useStore';
-import { apiUrl } from '../config/api';
+import { apiUrl, BACKEND_BASE_URL } from '../config/api';
 
 import { 
   Columns, Calendar as CalendarIcon, 
@@ -4028,7 +4028,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                         <div className="flex flex-wrap gap-2">
                           {details.attachments.map((att: any, idx: number) => {
                             const pathVal = att.storagePath || att.path || '';
-                            const displayPath = pathVal.startsWith('http') ? pathVal : `http://localhost:5000/${pathVal.replace(/^\/?/, '')}`;
+                            const displayPath = pathVal.startsWith('http') ? pathVal : `${BACKEND_BASE_URL}/${pathVal.replace(/^\/?/, '')}`;
                             return (
                               <a 
                                 key={idx} 
