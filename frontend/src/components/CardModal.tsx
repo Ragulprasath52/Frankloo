@@ -53,6 +53,10 @@ export default function CardModal({ card, onClose }: CardModalProps) {
     addToast, user, uploadAttachment, deleteAttachment
   } = useStore();
 
+  const liveCard = currentBoard?.lists
+    .flatMap(l => l.cards)
+    .find(c => c.id === card.id) || card;
+
   const [title, setTitle] = useState(card.title);
   const [description, setDescription] = useState(cleanText(card.description || ''));
   const [priority, setPriority] = useState(card.priority);
@@ -306,8 +310,8 @@ export default function CardModal({ card, onClose }: CardModalProps) {
     catch (err: any) { addToast('Dependency Error', err.message || 'Failed to add dependency', 'error'); }
   };
 
-  const totalChecklist = card.checklists?.length || 0;
-  const doneChecklist = card.checklists?.filter(i => i.isCompleted).length || 0;
+  const totalChecklist = liveCard.checklists?.length || 0;
+  const doneChecklist = liveCard.checklists?.filter(i => i.isCompleted).length || 0;
   const progress = totalChecklist > 0 ? Math.round((doneChecklist / totalChecklist) * 100) : 0;
 
   const getProgressBlocks = (percent: number) => {
@@ -1141,7 +1145,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                 )}
 
                 <div className="space-y-1.5">
-                  {card.checklists?.map((item) => (
+                  {liveCard.checklists?.map((item) => (
                     <div key={item.id} className="flex items-center gap-3 group py-1 px-2 hover:bg-slate-50/50 dark:hover:bg-slate-955/30 rounded-md transition-colors">
                       <input
                         type="checkbox"
@@ -1219,12 +1223,12 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                 />
               </div>
 
-              {card.attachments && card.attachments.length > 0 && (
+              {liveCard.attachments && liveCard.attachments.length > 0 && (
                 <div className="space-y-4">
                   <div>
                     <h5 className="text-xs font-bold text-slate-455 dark:text-slate-550 mt-1 mb-2">Files</h5>
                     <div className="space-y-2">
-                      {card.attachments.map((att: any) => {
+                      {liveCard.attachments.map((att: any) => {
                         const pathVal = att.storagePath || att.path || '';
                         const displayPath = pathVal.startsWith('http') ? pathVal : `http://localhost:5000/${pathVal.replace(/^\/?/, '')}`;
                         const ext = att.filename.split('.').pop()?.toUpperCase() || 'FILE';
@@ -1636,12 +1640,12 @@ export default function CardModal({ card, onClose }: CardModalProps) {
               
               {/* Comments timeline (scrolls independently) */}
               <div className="flex-grow overflow-y-auto space-y-4 pr-1 scrollbar-thin" style={{ willChange: 'scroll-position', overscrollBehavior: 'contain' }}>
-                {card.comments?.length === 0 ? (
+                {liveCard.comments?.length === 0 ? (
                   <div className="text-center py-6 text-slate-400 dark:text-slate-605 text-xs">
                     No activity yet. Start a discussion below!
                   </div>
                 ) : (
-                  card.comments?.map(c => {
+                  liveCard.comments?.map(c => {
                     const extras = commentExtras[c.id] || { reactions: [], replies: [], attachments: [] };
                     return (
                       <div key={c.id} className="flex gap-3 text-xs text-left">
