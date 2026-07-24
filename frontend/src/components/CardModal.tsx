@@ -415,7 +415,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                     ))}
                   </div>
                   
-                  <div className="flex gap-1.5">
+                  <div className="flex gap-1.5 mt-2">
                     <input
                       type="text" value={coverImage}
                       onChange={e => setCoverImage(e.target.value)}
@@ -431,6 +431,41 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                         Clear
                       </button>
                     )}
+                  </div>
+
+                  <div className="space-y-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800/40">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Or upload cover</span>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRefForCard.current?.click()}
+                      className="w-full py-1.5 text-[10px] font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-[#2c333a] dark:hover:bg-[#3c444e] text-slate-808 dark:text-[#b6c2cf] rounded-lg transition-colors border-0 cursor-pointer"
+                    >
+                      Upload cover image
+                    </button>
+                    
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Photos from Unsplash</span>
+                    <div className="grid grid-cols-4 gap-1">
+                      {[
+                        'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=150&auto=format&fit=crop&q=60',
+                        'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=150&auto=format&fit=crop&q=60',
+                        'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=150&auto=format&fit=crop&q=60',
+                        'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=150&auto=format&fit=crop&q=60'
+                      ].map((url, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={async () => {
+                            setCoverImage(url);
+                            if (currentBoard) {
+                              await updateCard(currentBoard.id, card.id, { coverImage: url });
+                            }
+                          }}
+                          className="h-8 rounded border-0 cursor-pointer hover:scale-105 transition-transform overflow-hidden p-0 bg-transparent"
+                        >
+                          <img src={url} alt="unsplash" className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
