@@ -26,7 +26,6 @@ export function parseEmailBody(text = '', html = '') {
   const quotePatterns = [
     /^\s*On\s+.*\s+wrote:\s*$/mi,
     /^\s*-+\s*Original Message\s*-+\s*$/mi,
-    /^\s*From:\s+.*$/mi,
     /^\s*On\s+.*,\s+.*\s+wrote:\s*$/mi,
     /^\s*On\s+.*,\s+.*<.*>\s+wrote:\s*$/mi,
     /^\s*On\s+.*at\s+.*<.*>\s+wrote:\s*$/mi,

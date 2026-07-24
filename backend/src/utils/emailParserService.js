@@ -125,7 +125,6 @@ export function cleanBodyText(bodyText = '') {
   const quotePatterns = [
     /^\s*On\s+.*\s+wrote:\s*$/i,
     /^\s*-+\s*Original Message\s*-+\s*$/i,
-    /^\s*From:\s+.*$/i,
     /^\s*>+.*$/ // lines starting with >
   ];
   
@@ -232,7 +231,6 @@ export function segmentEmailText(bodyText = '') {
   const quotePatterns = [
     /^\s*On\s+.*\s+wrote:\s*$/i,
     /^\s*-+\s*Original Message\s*-+\s*$/i,
-    /^\s*From:\s+.*$/i,
     /^\s*>+.*$/
   ];
 
