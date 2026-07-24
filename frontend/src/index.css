@@ -927,3 +927,14 @@ body.is-resizing-column * { user-select: none !important; }
 :root .recharts-text                       { fill: var(--text-secondary)         !important; }
 :root .recharts-cartesian-axis-tick-value  { fill: var(--text-muted)             !important; }
 :root .recharts-legend-item-text           { color: var(--text-secondary)        !important; }
+
+/* Inbox email preview body text color override */
+.inbox-preview-body {
+  color: #1e293b !important; /* slate-800 */
+}
+.dark .inbox-preview-body {
+  color: #f1f5f9 !important; /* slate-100 */
+}
+.inbox-preview-body * {
+  color: inherit !important;
+}

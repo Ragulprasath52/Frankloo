@@ -4010,7 +4010,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
 
                     <div className="space-y-1">
                       <span className="block text-[9px] font-extrabold text-slate-400 uppercase">Message Body</span>
-                      <div className="bg-slate-50/20 dark:bg-slate-900/20 border border-slate-150 dark:border-slate-850 p-4 rounded-2xl whitespace-pre-wrap font-sans text-xs leading-relaxed max-h-[350px] overflow-y-auto text-slate-800 dark:text-slate-150">
+                      <div className="bg-slate-50/20 dark:bg-slate-900/20 border border-slate-150 dark:border-slate-850 p-4 rounded-2xl whitespace-pre-wrap font-sans text-xs leading-relaxed max-h-[350px] overflow-y-auto inbox-preview-body">
                         {previewInboxItem.description || 'No description provided.'}
                       </div>
                     </div>
