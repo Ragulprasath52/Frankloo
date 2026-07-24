@@ -88,6 +88,9 @@ export default function CardModal({ card, onClose }: CardModalProps) {
   const [recurringVal, setRecurringVal] = useState('Never');
   const [reminderVal, setReminderVal] = useState('1 Day before');
 
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
+  const [coverSize, setCoverSize] = useState<'HEADER' | 'FULL'>('HEADER');
+
   const [isEmailViewerOpen, setIsEmailViewerOpen] = useState(false);
   const [checklistPopoverOpen, setChecklistPopoverOpen] = useState(false);
   const [checklistTitleInput, setChecklistTitleInput] = useState('Checklist');
@@ -346,7 +349,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
       >
         {/* Banner Cover Image */}
         {coverImage && (
-          <div className="relative h-24 w-full overflow-hidden border-b border-slate-200 dark:border-slate-800 shrink-0">
+          <div className={`relative w-full overflow-hidden border-b border-slate-200 dark:border-slate-800 shrink-0 ${coverSize === 'FULL' ? 'h-40' : 'h-24'}`}>
             {coverImage.startsWith('linear-gradient') || coverImage.startsWith('radial-gradient') || coverImage.startsWith('#') ? (
               <div className="w-full h-full" style={{ background: coverImage }} />
             ) : imageError ? (
@@ -593,6 +596,20 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                           <div>
                             <p className="text-xs font-semibold text-slate-800 dark:text-[#b6c2cf]">Attachment</p>
                             <p className="text-[10px] text-slate-500 dark:text-slate-400">Add links, pages, work items, and more</p>
+                          </div>
+                        </button>
+
+
+                        {/* Cover */}
+                        <button
+                          type="button"
+                          onClick={() => { setAddCardMenuOpen(false); setCoverPickerOpen(true); }}
+                          className="w-full flex items-start gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors border-0 bg-transparent text-left cursor-pointer"
+                        >
+                          <div className="w-4 h-4 rounded bg-indigo-500 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold text-slate-800 dark:text-[#b6c2cf]">Cover</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400">Add colors or photos to this card</p>
                           </div>
                         </button>
 
@@ -989,6 +1006,156 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                             </button>
                           );
                         })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Cover Button */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setCoverPickerOpen(!coverPickerOpen)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-250 dark:border-slate-800 bg-slate-50/50 dark:bg-[#161a22]/30 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                  >
+                    <div className="w-3.5 h-3.5 rounded bg-indigo-500 shrink-0" /> Cover
+                  </button>
+                  {coverPickerOpen && (
+                    <div 
+                      className="absolute left-0 mt-2 z-[999] w-72 max-h-[480px] overflow-y-auto bg-white dark:bg-[#1d2127] border border-slate-205 dark:border-slate-800 rounded-xl shadow-2xl p-4 animate-scale-in text-left scrollbar-thin"
+                      onClick={e => e.stopPropagation()}
+                      onWheel={e => e.stopPropagation()}
+                      style={{ overscrollBehavior: 'contain' }}
+                    >
+                      <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800 mb-3">
+                        <span className="text-xs font-bold text-slate-805 dark:text-[#b6c2cf] mx-auto">Cover</span>
+                        <button
+                          type="button"
+                          onClick={() => setCoverPickerOpen(false)}
+                          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 dark:text-slate-555 border-0 bg-transparent cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="space-y-4">
+                        {/* Size option */}
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Size</span>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            {/* Header cover size */}
+                            <button
+                              type="button"
+                              onClick={() => setCoverSize('HEADER')}
+                              className={`p-2 rounded-lg border text-left cursor-pointer transition-all bg-transparent ${
+                                coverSize === 'HEADER' 
+                                  ? 'border-blue-500 ring-1 ring-blue-500' 
+                                  : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                              }`}
+                            >
+                              <div className="h-6 w-full bg-slate-200 dark:bg-slate-805 rounded mb-1.5" />
+                              <div className="h-1.5 w-12 bg-slate-400 dark:bg-slate-600 rounded mb-1" />
+                              <div className="h-1.5 w-8 bg-slate-300 dark:bg-slate-700 rounded" />
+                            </button>
+                            {/* Full cover size */}
+                            <button
+                              type="button"
+                              onClick={() => setCoverSize('FULL')}
+                              className={`p-2 rounded-lg border text-left cursor-pointer transition-all bg-transparent ${
+                                coverSize === 'FULL' 
+                                  ? 'border-blue-500 ring-1 ring-blue-500' 
+                                  : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                              }`}
+                            >
+                              <div className="h-12 w-full bg-slate-200 dark:bg-slate-805 rounded flex flex-col justify-end p-1.5">
+                                <div className="h-1.5 w-12 bg-slate-400 dark:bg-slate-600 rounded mb-1" />
+                                <div className="h-1.5 w-8 bg-slate-300 dark:bg-slate-700 rounded" />
+                              </div>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Remove Cover Button */}
+                        {coverImage && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setCoverImage('');
+                              if (currentBoard) {
+                                await updateCard(currentBoard.id, card.id, { coverImage: null });
+                              }
+                            }}
+                            className="w-full py-1.5 text-xs font-semibold bg-slate-105 hover:bg-slate-200 dark:bg-[#2c333a] dark:hover:bg-[#3c444e] text-slate-808 dark:text-[#b6c2cf] rounded-lg transition-colors border-0 cursor-pointer"
+                          >
+                            Remove cover
+                          </button>
+                        )}
+
+                        {/* Colors Grid */}
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Colors</span>
+                          <div className="grid grid-cols-5 gap-1.5">
+                            {[
+                              '#218559', '#eab308', '#d97706', '#dc2626', '#8b5cf6',
+                              '#2563eb', '#06b6d4', '#84cc16', '#db2777', '#6b7280'
+                            ].map(color => (
+                              <button
+                                key={color}
+                                type="button"
+                                onClick={async () => {
+                                  setCoverImage(color);
+                                  if (currentBoard) {
+                                    await updateCard(currentBoard.id, card.id, { coverImage: color });
+                                  }
+                                }}
+                                className="h-7 rounded-md border-0 cursor-pointer hover:scale-105 transition-transform"
+                                style={{ backgroundColor: color }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Upload Cover */}
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Attachments</span>
+                          <button
+                            type="button"
+                            onClick={() => fileInputRefForCard.current?.click()}
+                            className="w-full py-1.5 text-xs font-semibold bg-slate-105 hover:bg-slate-200 dark:bg-[#2c333a] dark:hover:bg-[#3c444e] text-slate-808 dark:text-[#b6c2cf] rounded-lg transition-colors border-0 cursor-pointer"
+                          >
+                            Upload a cover image
+                          </button>
+                          <p className="text-[9px] text-slate-400 mt-1">Tip: Drag an image on to the card to upload it.</p>
+                        </div>
+
+                        {/* Unsplash Photos */}
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Photos from Unsplash</span>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {[
+                              'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=150&auto=format&fit=crop&q=60',
+                              'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=150&auto=format&fit=crop&q=60',
+                              'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=150&auto=format&fit=crop&q=60',
+                              'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=150&auto=format&fit=crop&q=60',
+                              'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=150&auto=format&fit=crop&q=60',
+                              'https://images.unsplash.com/photo-1472214222541-d510753a49fa?w=150&auto=format&fit=crop&q=60'
+                            ].map((url, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={async () => {
+                                  setCoverImage(url);
+                                  if (currentBoard) {
+                                    await updateCard(currentBoard.id, card.id, { coverImage: url });
+                                  }
+                                }}
+                                className="h-10 rounded-md border-0 cursor-pointer hover:scale-105 transition-transform overflow-hidden p-0 bg-transparent"
+                              >
+                                <img src={url} alt="unsplash" className="w-full h-full object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
