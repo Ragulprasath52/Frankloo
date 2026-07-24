@@ -6,7 +6,7 @@ import {
   Trash2, Plus, Archive,
   Paperclip, MoreHorizontal, Check, Download, Mail,
   Compass, Flag, Calendar, Users, Tag, Clock, UserPlus,
-  ChevronUp, ChevronDown
+  ChevronUp, ChevronDown, ExternalLink
 } from 'lucide-react';
 
 interface CardModalProps { card: Card; onClose: () => void; }
@@ -75,8 +75,18 @@ export default function CardModal({ card, onClose }: CardModalProps) {
   const [replyTargetId, setReplyTargetId] = useState<string | null>(null);
 
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [addCardMenuOpen, setAddCardMenuOpen] = useState(false);
+  const [calendarDate, setCalendarDate] = useState(new Date(card.dueDate || Date.now()));
+  const [startDateEnabled, setStartDateEnabled] = useState(false);
+  const [startDateVal, setStartDateVal] = useState('');
+  const [dueDateEnabled, setDueDateEnabled] = useState(!!card.dueDate);
+  const [dueTimeVal, setDueTimeVal] = useState('06:22 PM');
+  const [recurringVal, setRecurringVal] = useState('Never');
+  const [reminderVal, setReminderVal] = useState('1 Day before');
 
   const [isEmailViewerOpen, setIsEmailViewerOpen] = useState(false);
+  const [checklistPopoverOpen, setChecklistPopoverOpen] = useState(false);
+  const [checklistTitleInput, setChecklistTitleInput] = useState('Checklist');
 
   // Custom visual label & emoji states
   const [labels, setLabels] = useState<{ name: string; color: string }[]>([]);
@@ -91,6 +101,8 @@ export default function CardModal({ card, onClose }: CardModalProps) {
   const [newDepVal, setNewDepVal] = useState('');
   const [commentAttachment, setCommentAttachment] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRefForCard = useRef<HTMLInputElement>(null);
+  const [activeAttachmentMenuId, setActiveAttachmentMenuId] = useState<string | null>(null);
 
   const [commentExtras, setCommentExtras] = useState<Record<string, { reactions: CommentReactions[], replies: CommentReply[], attachments: { name: string, size: string }[] }>>({});
 
@@ -485,19 +497,117 @@ export default function CardModal({ card, onClose }: CardModalProps) {
 
               {/* Action Toolbar Below Title */}
               <div className="flex flex-wrap gap-2 mt-2 select-none">
-                {/* Add Action Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newItem = prompt("Enter new checklist item:");
-                    if (newItem && newItem.trim() && currentBoard) {
-                      createChecklistItem(currentBoard.id, card.id, newItem.trim());
-                    }
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-250 dark:border-slate-800 bg-slate-50/50 dark:bg-[#161a22]/30 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Add
-                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setAddCardMenuOpen(!addCardMenuOpen)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-250 dark:border-slate-800 bg-slate-50/50 dark:bg-[#161a22]/30 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer bg-[#091e42]/05 dark:bg-white/10"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Add
+                  </button>
+
+                  {addCardMenuOpen && (
+                    <div 
+                      className="absolute left-0 mt-2 z-[999] w-72 bg-white dark:bg-[#1d2127] border border-slate-205 dark:border-slate-800 rounded-xl shadow-xl p-3 animate-scale-in"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800 mb-2">
+                        <span className="text-xs font-bold text-slate-600 dark:text-[#b6c2cf] mx-auto">Add to card</span>
+                        <button
+                          type="button"
+                          onClick={() => setAddCardMenuOpen(false)}
+                          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 dark:text-slate-555 border-0 bg-transparent cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="space-y-1.5 text-left">
+                        {/* Labels */}
+                        <button
+                          type="button"
+                          onClick={() => { setAddCardMenuOpen(false); setLabelManagerOpen(true); }}
+                          className="w-full flex items-start gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors border-0 bg-transparent text-left cursor-pointer"
+                        >
+                          <Tag className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold text-slate-800 dark:text-[#b6c2cf]">Labels</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400">Organize, categorize, and prioritize</p>
+                          </div>
+                        </button>
+
+                        {/* Dates */}
+                        <button
+                          type="button"
+                          onClick={() => { setAddCardMenuOpen(false); setDatePickerOpen(true); }}
+                          className="w-full flex items-start gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors border-0 bg-transparent text-left cursor-pointer"
+                        >
+                          <Clock className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold text-slate-800 dark:text-[#b6c2cf]">Dates</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400">Start dates, due dates, and reminders</p>
+                          </div>
+                        </button>
+
+                        {/* Checklist */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddCardMenuOpen(false);
+                            setChecklistTitleInput('Checklist');
+                            setChecklistPopoverOpen(true);
+                          }}
+                          className="w-full flex items-start gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors border-0 bg-transparent text-left cursor-pointer"
+                        >
+                          <CheckSquare className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold text-slate-800 dark:text-[#b6c2cf]">Checklist</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400">Add subtasks</p>
+                          </div>
+                        </button>
+
+                        {/* Members */}
+                        <button
+                          type="button"
+                          onClick={() => { setAddCardMenuOpen(false); setAssigneeSelectOpen(true); }}
+                          className="w-full flex items-start gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors border-0 bg-transparent text-left cursor-pointer"
+                        >
+                          <Users className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold text-slate-800 dark:text-[#b6c2cf]">Members</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400">Assign members</p>
+                          </div>
+                        </button>
+
+                        {/* Attachment */}
+                        <button
+                          type="button"
+                          onClick={() => { setAddCardMenuOpen(false); fileInputRefForCard.current?.click(); }}
+                          className="w-full flex items-start gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors border-0 bg-transparent text-left cursor-pointer"
+                        >
+                          <Paperclip className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold text-slate-800 dark:text-[#b6c2cf]">Attachment</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400">Add links, pages, work items, and more</p>
+                          </div>
+                        </button>
+
+                        {/* Custom Fields */}
+                        <button
+                          type="button"
+                          onClick={() => { setAddCardMenuOpen(false); setLabelManagerOpen(true); }}
+                          className="w-full flex items-start gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors border-0 bg-transparent text-left cursor-pointer"
+                        >
+                          <Compass className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold text-slate-800 dark:text-[#b6c2cf]">Custom Fields</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400">Create your own fields</p>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* Labels Button */}
                 <div className="relative">
@@ -562,33 +672,277 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                     <Clock className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Dates
                   </button>
                   {datePickerOpen && (
-                    <div className="absolute left-0 mt-2 top-full z-50 w-48 bg-white dark:bg-[#161a22] border border-slate-205 dark:border-slate-800 rounded-lg shadow-lg p-2.5 animate-scale-in" onClick={e => e.stopPropagation()}>
-                      <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider pb-1 border-b mb-2" style={{ borderColor: 'var(--border)' }}>
-                        Select Due Date
+                    <div 
+                      className="absolute left-0 mt-2 top-full z-[999] w-72 max-h-[480px] overflow-y-auto bg-white dark:bg-[#1d2127] border border-slate-205 dark:border-slate-800 rounded-xl shadow-2xl p-4 animate-scale-in scrollbar-thin" 
+                      onClick={e => e.stopPropagation()}
+                      onWheel={e => e.stopPropagation()}
+                      style={{ overscrollBehavior: 'contain' }}
+                    >
+                      {/* Header */}
+                      <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800 mb-3">
+                        <span className="text-xs font-bold text-slate-805 dark:text-[#b6c2cf] mx-auto">Dates</span>
+                        <button
+                          type="button"
+                          onClick={() => setDatePickerOpen(false)}
+                          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 dark:text-slate-500 border-0 bg-transparent cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                      <input
-                        type="date"
-                        value={dueDate}
-                        onChange={e => { setDueDate(e.target.value); save({ dueDate: e.target.value ? new Date(e.target.value).toISOString() : null }); }}
-                        className="bg-transparent border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-xs font-semibold text-slate-800 dark:text-slate-200 cursor-pointer focus:outline-none w-full"
-                      />
+
+                      {/* Calendar Navigation */}
+                      <div className="flex justify-between items-center mb-3">
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setCalendarDate(new Date(calendarDate.getFullYear() - 1, calendarDate.getMonth(), 1))}
+                            className="p-1 text-slate-500 hover:text-slate-800 dark:hover:text-white bg-transparent border-0 cursor-pointer text-xs"
+                          >
+                            &laquo;
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1))}
+                            className="p-1 text-slate-500 hover:text-slate-800 dark:hover:text-white bg-transparent border-0 cursor-pointer text-xs"
+                          >
+                            &lsaquo;
+                          </button>
+                        </div>
+                        <span className="text-xs font-bold text-slate-700 dark:text-[#b6c2cf]">
+                          {calendarDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                        </span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1))}
+                            className="p-1 text-slate-500 hover:text-slate-800 dark:hover:text-white bg-transparent border-0 cursor-pointer text-xs"
+                          >
+                            &rsaquo;
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCalendarDate(new Date(calendarDate.getFullYear() + 1, calendarDate.getMonth(), 1))}
+                            className="p-1 text-slate-500 hover:text-slate-800 dark:hover:text-white bg-transparent border-0 cursor-pointer text-xs"
+                          >
+                            &raquo;
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Day of Week Headers */}
+                      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-1 select-none">
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                          <div key={d}>{d}</div>
+                        ))}
+                      </div>
+
+                      {/* Calendar Grid */}
+                      <div className="grid grid-cols-7 gap-1 text-center mb-4">
+                        {(() => {
+                          const year = calendarDate.getFullYear();
+                          const month = calendarDate.getMonth();
+                          const firstDayIndex = new Date(year, month, 1).getDay();
+                          const totalDays = new Date(year, month + 1, 0).getDate();
+                          const prevTotalDays = new Date(year, month, 0).getDate();
+
+                          const days = [];
+                          for (let i = firstDayIndex - 1; i >= 0; i--) {
+                            days.push({ day: prevTotalDays - i, isCurrentMonth: false, date: new Date(year, month - 1, prevTotalDays - i) });
+                          }
+                          for (let i = 1; i <= totalDays; i++) {
+                            days.push({ day: i, isCurrentMonth: true, date: new Date(year, month, i) });
+                          }
+                          const totalSlots = 42;
+                          const nextDaysCount = totalSlots - days.length;
+                          for (let i = 1; i <= nextDaysCount; i++) {
+                            days.push({ day: i, isCurrentMonth: false, date: new Date(year, month + 1, i) });
+                          }
+
+                          return days.map((dObj, idx) => {
+                            const isSelected = dueDate && new Date(dueDate).toDateString() === dObj.date.toDateString();
+                            const isToday = new Date().toDateString() === dObj.date.toDateString();
+                            
+                            return (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => {
+                                  setDueDate(dObj.date.toISOString().split('T')[0]);
+                                  setDueDateEnabled(true);
+                                }}
+                                className={`h-6 text-[11px] rounded flex items-center justify-center font-medium border-0 cursor-pointer select-none transition-colors ${
+                                  !dObj.isCurrentMonth
+                                    ? 'text-slate-300 dark:text-slate-600 bg-transparent'
+                                    : isSelected
+                                      ? 'bg-blue-600 text-white font-bold'
+                                      : isToday
+                                        ? 'border border-blue-500 text-blue-600 font-bold bg-blue-500/5'
+                                        : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-[#b6c2cf] bg-transparent'
+                                }`}
+                              >
+                                {dObj.day}
+                              </button>
+                            );
+                          });
+                        })()}
+                      </div>
+
+                      {/* Start Date Option */}
+                      <div className="space-y-3 border-t border-slate-100 dark:border-slate-800 pt-3 text-left">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Start date</span>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={startDateEnabled}
+                              onChange={(e) => setStartDateEnabled(e.target.checked)}
+                              className="rounded border-slate-350 text-blue-600 focus:ring-blue-550 cursor-pointer"
+                            />
+                            <input
+                              type="text"
+                              placeholder="M/D/YYYY"
+                              disabled={!startDateEnabled}
+                              value={startDateVal}
+                              onChange={(e) => setStartDateVal(e.target.value)}
+                              className="flex-1 bg-transparent border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-xs text-slate-808 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Due Date Option */}
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Due date</span>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={dueDateEnabled}
+                              onChange={(e) => setDueDateEnabled(e.target.checked)}
+                              className="rounded border-slate-350 text-blue-600 focus:ring-blue-550 cursor-pointer"
+                            />
+                            <input
+                              type="date"
+                              disabled={!dueDateEnabled}
+                              value={dueDate}
+                              onChange={(e) => setDueDate(e.target.value)}
+                              className="flex-1 bg-transparent border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-xs text-slate-808 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                            />
+                            <select
+                              disabled={!dueDateEnabled}
+                              value={dueTimeVal}
+                              onChange={(e) => setDueTimeVal(e.target.value)}
+                              className="w-24 bg-transparent border border-slate-200 dark:border-slate-800 rounded px-1.5 py-1 text-xs text-slate-808 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                            >
+                              {['08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM', '06:00 PM', '06:22 PM', '07:00 PM', '08:00 PM', '09:00 PM', '10:00 PM'].map(t => (
+                                <option key={t} value={t}>{t}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Recurring Option */}
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Recurring</span>
+                          <select
+                            value={recurringVal}
+                            onChange={(e) => setRecurringVal(e.target.value)}
+                            className="w-full bg-transparent border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1 text-xs text-slate-808 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          >
+                            {['Never', 'Daily', 'Weekly', 'Monthly', 'Custom'].map(r => (
+                              <option key={r} value={r}>{r}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Reminder Option */}
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Set due date reminder</span>
+                          <select
+                            value={reminderVal}
+                            onChange={(e) => setReminderVal(e.target.value)}
+                            className="w-full bg-transparent border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1 text-xs text-slate-808 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          >
+                            {['None', 'At time of due date', '5 Minutes before', '10 Minutes before', '15 Minutes before', '1 Hour before', '2 Hours before', '1 Day before', '2 Days before'].map(rm => (
+                              <option key={rm} value={rm}>{rm}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-normal">
+                          Reminders will be sent to all members and watchers of this card.
+                        </p>
+
+                        {/* Save Action */}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (currentBoard) {
+                              const finalDueDate = dueDateEnabled && dueDate ? new Date(dueDate).toISOString() : null;
+                              await updateCard(currentBoard.id, card.id, { dueDate: finalDueDate });
+                              addToast('Date Saved', 'The due date has been updated.', 'success');
+                            }
+                            setDatePickerOpen(false);
+                          }}
+                          className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs transition-colors border-0 cursor-pointer"
+                        >
+                          Save
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
 
                 {/* Checklist Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const checkText = prompt("Enter checklist item title:");
-                    if (checkText && checkText.trim() && currentBoard) {
-                      createChecklistItem(currentBoard.id, card.id, checkText.trim());
-                    }
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-250 dark:border-slate-800 bg-slate-50/50 dark:bg-[#161a22]/30 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
-                >
-                  <CheckSquare className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Checklist
-                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => { setChecklistPopoverOpen(!checklistPopoverOpen); setChecklistTitleInput('Checklist'); }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-250 dark:border-slate-800 bg-slate-50/50 dark:bg-[#161a22]/30 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                  >
+                    <CheckSquare className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Checklist
+                  </button>
+                  {checklistPopoverOpen && (
+                    <div 
+                      className="absolute left-0 mt-2 z-[999] w-72 bg-white dark:bg-[#1d2127] border border-slate-205 dark:border-slate-800 rounded-xl shadow-2xl p-4 animate-scale-in text-left"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800 mb-3">
+                        <span className="text-xs font-bold text-slate-805 dark:text-[#b6c2cf] mx-auto">Add checklist</span>
+                        <button
+                          type="button"
+                          onClick={() => setChecklistPopoverOpen(false)}
+                          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 dark:text-slate-500 border-0 bg-transparent cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Title</label>
+                          <input
+                            type="text"
+                            value={checklistTitleInput}
+                            onChange={e => setChecklistTitleInput(e.target.value)}
+                            className="w-full bg-transparent border border-slate-200 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-808 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            autoFocus
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (checklistTitleInput.trim() && currentBoard) {
+                              createChecklistItem(currentBoard.id, card.id, checklistTitleInput.trim());
+                              setChecklistPopoverOpen(false);
+                              addToast('Checklist Created', `Checklist "${checklistTitleInput.trim()}" added.`, 'success');
+                            }
+                          }}
+                          className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs transition-colors border-0 cursor-pointer"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* Members Button */}
                 <div className="relative">
@@ -827,70 +1181,142 @@ export default function CardModal({ card, onClose }: CardModalProps) {
 
             {/* Attachments Section */}
             <div className="pt-2">
-              <h4 className="text-xs font-semibold text-slate-400 dark:text-slate-555 uppercase tracking-wider flex items-center gap-2 mb-2">
-                <Paperclip className="w-3.5 h-3.5 text-indigo-500" /> Attachments ({card.attachments?.length || 0})
-              </h4>
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {card.attachments?.map((att: any) => {
-                    const pathVal = att.storagePath || att.path || '';
-                    const displayPath = pathVal.startsWith('http') ? pathVal : `http://localhost:5000/${pathVal.replace(/^\/?/, '')}`;
-                    return (
-                      <div key={att.id} className="flex gap-2.5 p-2 bg-slate-50/50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800/40 rounded-lg items-center">
-                        <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-md flex items-center justify-center font-bold text-xs text-slate-500">
-                          {att.filename.split('.').pop()?.toUpperCase() || 'FILE'}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-xs text-slate-800 dark:text-slate-200 truncate">{att.filename}</p>
-                          <div className="flex gap-2 mt-1">
-                            <a href={displayPath} download={att.filename} className="text-[10px] font-semibold text-indigo-500 hover:underline flex items-center gap-1">
-                              <Download className="w-3 h-3" /> Download
-                            </a>
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                if (currentBoard) {
-                                  await deleteAttachment(currentBoard.id, card.id, att.id);
-                                  addToast('Attachment Deleted', 'The file has been deleted from the card.', 'success');
-                                }
-                              }}
-                              className="text-[10px] font-semibold text-red-500 hover:underline"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="file"
-                    multiple
-                    onChange={async (e) => {
-                      if (e.target.files && currentBoard) {
-                        const files = Array.from(e.target.files);
-                        for (const file of files) {
-                          const reader = new FileReader();
-                          reader.onloadend = async () => {
-                            const base64Data = (reader.result as string).split(',')[1];
-                              await uploadAttachment(currentBoard.id, card.id, {
-                              filename: file.name,
-                              mimeType: file.type,
-                              size: file.size,
-                              base64Data
-                            });
-                            addToast('Attachment Added', `File ${file.name} successfully uploaded.`, 'success');
-                          };
-                          reader.readAsDataURL(file);
-                        }
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold text-slate-805 dark:text-slate-200 flex items-center gap-2">
+                  <Paperclip className="w-4 h-4 text-indigo-500" /> Attachments
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => fileInputRefForCard.current?.click()}
+                  className="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-[#2c333a] dark:hover:bg-[#3c444e] text-slate-800 dark:text-[#b6c2cf] rounded-md transition-colors"
+                >
+                  Add
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRefForCard}
+                  multiple
+                  onChange={async (e) => {
+                    if (e.target.files && currentBoard) {
+                      const files = Array.from(e.target.files);
+                      for (const file of files) {
+                        const reader = new FileReader();
+                        reader.onloadend = async () => {
+                          const base64Data = (reader.result as string).split(',')[1];
+                          await uploadAttachment(currentBoard.id, card.id, {
+                            filename: file.name,
+                            mimeType: file.type,
+                            size: file.size,
+                            base64Data
+                          });
+                          addToast('Attachment Added', `File ${file.name} successfully uploaded.`, 'success');
+                        };
+                        reader.readAsDataURL(file);
                       }
-                    }}
-                    className="text-[10px] text-gray-500 file:mr-3 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                  />
-                </div>
+                    }
+                  }}
+                  className="hidden"
+                />
               </div>
+
+              {card.attachments && card.attachments.length > 0 && (
+                <div className="space-y-4">
+                  <div>
+                    <h5 className="text-xs font-bold text-slate-455 dark:text-slate-550 mt-1 mb-2">Files</h5>
+                    <div className="space-y-2">
+                      {card.attachments.map((att: any) => {
+                        const pathVal = att.storagePath || att.path || '';
+                        const displayPath = pathVal.startsWith('http') ? pathVal : `http://localhost:5000/${pathVal.replace(/^\/?/, '')}`;
+                        const ext = att.filename.split('.').pop()?.toUpperCase() || 'FILE';
+                        const formattedDate = new Date(att.createdAt || Date.now()).toLocaleDateString([], {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        });
+
+                        return (
+                          <div 
+                            key={att.id} 
+                            className="group/att flex items-center gap-3 p-2 bg-[#22272b]/30 dark:bg-[#22272b]/60 border border-slate-150/40 dark:border-slate-800/40 rounded-xl relative"
+                          >
+                            {/* File icon preview block */}
+                            <div className="w-12 h-10 bg-[#22272b]/60 dark:bg-[#161a22] rounded-lg flex items-center justify-center font-bold text-xs text-slate-400 shrink-0 select-none">
+                              {ext}
+                            </div>
+
+                            {/* File metadata details */}
+                            <div className="min-w-0 flex-grow text-left">
+                              <h6 className="font-bold text-xs text-slate-800 dark:text-[#b6c2cf] truncate leading-tight">
+                                {att.filename}
+                              </h6>
+                              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium">
+                                Added {formattedDate}
+                              </p>
+                            </div>
+
+                            {/* Actions Right Buttons block */}
+                            <div className="flex items-center gap-1.5 shrink-0 relative" onClick={(e) => e.stopPropagation()}>
+                              {/* Open link */}
+                              <a 
+                                href={displayPath} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                                title="Open in new tab"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
+
+                              {/* Triage menu */}
+                              <button
+                                type="button"
+                                onClick={() => setActiveAttachmentMenuId(activeAttachmentMenuId === att.id ? null : att.id)}
+                                className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-650 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer bg-transparent border-0 flex items-center justify-center"
+                                title="Options"
+                              >
+                                <MoreHorizontal className="w-4 h-4" />
+                              </button>
+
+                              {/* Options Dropdown menu overlay */}
+                              {activeAttachmentMenuId === att.id && (
+                                <div 
+                                  className="absolute right-0 mt-8 top-0 w-32 py-1 rounded-lg shadow-xl z-[999] border"
+                                  style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}
+                                >
+                                  <a
+                                    href={displayPath}
+                                    download={att.filename}
+                                    onClick={() => setActiveAttachmentMenuId(null)}
+                                    className="w-full text-left px-3 py-1.5 text-xs flex items-center gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-[#b6c2cf] no-underline font-semibold"
+                                  >
+                                    <Download className="w-3.5 h-3.5" /> Download
+                                  </a>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      setActiveAttachmentMenuId(null);
+                                      if (currentBoard) {
+                                        await deleteAttachment(currentBoard.id, card.id, att.id);
+                                        addToast('Attachment Deleted', 'The file has been deleted from the card.', 'success');
+                                      }
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 text-xs flex items-center gap-1.5 hover:bg-rose-500/10 text-red-500 border-t font-semibold bg-transparent border-0 cursor-pointer"
+                                    style={{ borderColor: 'var(--border)' }}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Dependencies Section */}
