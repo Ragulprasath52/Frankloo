@@ -59,6 +59,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
   const [duplicateList, setDuplicateList] = useState<any[]>([]);
   const [highlights, setHighlights] = useState<any>(null);
   const [hoveredField, setHoveredField] = useState<string | null>(null);
+  const [selectionData, setSelectionData] = useState<{ text: string; x: number; y: number } | null>(null);
 
   // Settings states
   const [emailEnabled, setEmailEnabled] = useState(true);
@@ -370,6 +371,36 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
 
   const handleRemoveConvertChecklist = (index: number) => {
     setConvertChecklist(convertChecklist.filter((_, idx) => idx !== index));
+  };
+
+  const handleTextSelection = () => {
+    const selection = window.getSelection();
+    if (!selection) return;
+    const selectedText = selection.toString().trim();
+    if (selectedText.length > 0) {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      setSelectionData({
+        text: selectedText,
+        x: rect.left + rect.width / 2,
+        y: rect.top - 46
+      });
+    } else {
+      setSelectionData(null);
+    }
+  };
+
+  const clearSelection = () => {
+    window.getSelection()?.removeAllRanges();
+    setSelectionData(null);
+  };
+
+  const handleAddChecklistItem = (text: string) => {
+    if (!convertChecklist.includes(text)) {
+      setConvertChecklist([...convertChecklist, text]);
+      addToast('Checklist Item Added', `"${text.substring(0, 20)}..." added to checklist.`, 'success');
+    }
+    clearSelection();
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1605,7 +1636,59 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                     <FileText className="w-3.5 h-3.5" />
                     <span>Email Source Reference</span>
                   </div>
-                  <div className="flex-grow bg-slate-50 dark:bg-white/5 border border-gray-150 dark:border-gray-800 p-3.5 rounded-xl overflow-y-auto font-mono text-[10px]">
+                  <div 
+                    onMouseUp={handleTextSelection}
+                    className="flex-grow bg-slate-50 dark:bg-white/5 border border-gray-150 dark:border-gray-800 p-3.5 rounded-xl overflow-y-auto font-mono text-[10px] relative"
+                  >
+                    {selectionData && (
+                      <div 
+                        className="fixed z-[9999] flex items-center gap-1 p-1 bg-slate-900/90 dark:bg-slate-950/95 backdrop-blur-md border border-slate-700/50 shadow-2xl rounded-xl text-[10px] text-white font-bold select-none transition-all duration-150 animate-in fade-in slide-in-from-bottom-2"
+                        style={{
+                          left: `${selectionData.x}px`,
+                          top: `${selectionData.y}px`,
+                          transform: 'translateX(-50%)'
+                        }}
+                        onMouseDown={e => e.preventDefault()}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConvertItemTitle(selectionData.text);
+                            clearSelection();
+                          }}
+                          className="px-2 py-1 rounded hover:bg-white/10 text-white transition-colors"
+                        >
+                          Set Title
+                        </button>
+                        <div className="w-px h-3 bg-slate-750" />
+                        <button
+                          type="button"
+                          onClick={() => handleAddChecklistItem(selectionData.text)}
+                          className="px-2 py-1 rounded hover:bg-emerald-500/20 text-emerald-450 hover:text-emerald-400 transition-colors"
+                        >
+                          + Checklist
+                        </button>
+                        <div className="w-px h-3 bg-slate-750" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConvertItemDescription(selectionData.text);
+                            clearSelection();
+                          }}
+                          className="px-2 py-1 rounded hover:bg-indigo-500/20 text-indigo-400 hover:text-indigo-350 transition-colors"
+                        >
+                          Set Desc
+                        </button>
+                        <div className="w-px h-3 bg-slate-750" />
+                        <button
+                          type="button"
+                          onClick={clearSelection}
+                          className="p-1 rounded hover:bg-rose-500/20 text-rose-455 hover:text-rose-400 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
                     {(() => {
                       const details = JSON.parse(convertItem.sourceDetails || '{}');
                       const emailText = details.text || convertItem.description || '';
