@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore';
 import { 
   Inbox, Trash2, Settings, ShieldAlert, Cpu, Check, Copy, 
   RefreshCw, FileText, Download, CheckSquare, Plus, X, 
-  ExternalLink, ShieldCheck, PlayCircle, Paperclip, Clock, 
+  ExternalLink, ShieldCheck, Paperclip, Clock, 
   Archive, Eye, Edit3
 } from 'lucide-react';
 import { getEmailDomain } from '../config/api';
@@ -20,7 +20,7 @@ type SettingsSubTab = 'automation' | 'logs' | 'advanced';
 export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard }: BoardInboxModuleProps) {
   const { 
     currentWorkspace, inboxItems, fetchInboxItems, convertInboxItem, 
-    sendTestEmail, fetchEmailLogs, addToast, deleteInboxItem, updateInboxItem,
+    fetchEmailLogs, addToast, deleteInboxItem, updateInboxItem,
     gmailRules, fetchGmailRules, createGmailRule, deleteGmailRule, updateBoard,
     parseEmailIntelligently, checkDuplicates, mergeCard
   } = useStore();
@@ -177,19 +177,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
     }
   };
 
-  const handleTestEmail = async () => {
-    if (!selectedBoardId) return;
-    try {
-      await sendTestEmail(workspaceId, selectedBoardId);
-      addToast('Test Email Sent', 'Simulated incoming email dispatched successfully. Refreshing inbox...', 'success');
-      setTimeout(() => {
-        fetchInboxItems(workspaceId);
-        loadLogs();
-      }, 1000);
-    } catch (err: any) {
-      addToast('Test Failed', err.message || 'Failed to simulate test email', 'error');
-    }
-  };
+
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -663,16 +651,6 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
               >
                 Settings & Advanced
               </button>
-            </div>
-            
-            <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto mt-2 md:mt-0">
-              <button
-                onClick={handleTestEmail}
-                className="text-[10px] text-emerald-600 dark:text-emerald-450 bg-emerald-500/5 hover:bg-emerald-500/15 border border-emerald-500/20 px-2.5 py-1.5 rounded-lg flex items-center gap-1 font-bold shrink-0"
-              >
-                <PlayCircle className="w-3.5 h-3.5" /> Simulate Test Email
-              </button>
-
             </div>
           </div>
         </div>
