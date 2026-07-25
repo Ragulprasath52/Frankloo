@@ -241,6 +241,26 @@ export default function CardModal({ card, onClose }: CardModalProps) {
     }
   }, [card]);
 
+  const closeAllPopovers = () => {
+    setDatePickerOpen(false);
+    setCoverPickerOpen(false);
+    setChecklistPopoverOpen(false);
+    setAssigneeSelectOpen(false);
+    setLabelManagerOpen(false);
+    setMoreSettingsOpen(false);
+  };
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-popover-container="true"]')) {
+        closeAllPopovers();
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
   // Lock background body scroll when modal is open
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
@@ -399,10 +419,14 @@ export default function CardModal({ card, onClose }: CardModalProps) {
             <span className="text-indigo-500 dark:text-indigo-400">{columnName}</span>
           </div>
 
-          <div className="flex items-center gap-1.5 relative">
+          <div className="flex items-center gap-1.5 relative" data-popover-container="true">
             <button
-              onClick={() => setMoreSettingsOpen(!moreSettingsOpen)}
-              className="p-1.5 rounded-lg hover:bg-slate-150 dark:hover:bg-slate-800 text-slate-550 hover:text-slate-800 dark:hover:text-white transition-colors"
+              onClick={() => {
+                const nextState = !moreSettingsOpen;
+                closeAllPopovers();
+                setMoreSettingsOpen(nextState);
+              }}
+              className="p-1.5 rounded-lg hover:bg-slate-150 dark:hover:bg-slate-800 text-slate-555 hover:text-slate-800 dark:hover:text-white transition-colors"
               title="More settings"
             >
               <MoreHorizontal className="w-4 h-4" />
@@ -565,10 +589,14 @@ export default function CardModal({ card, onClose }: CardModalProps) {
 
               {/* Action Toolbar Below Title */}
               <div className="flex flex-wrap gap-2 mt-2 select-none">
-                <div className="relative">
+                <div className="relative" data-popover-container="true">
                   <button
                     type="button"
-                    onClick={() => setAddCardMenuOpen(!addCardMenuOpen)}
+                    onClick={() => {
+                      const nextState = !addCardMenuOpen;
+                      closeAllPopovers();
+                      setAddCardMenuOpen(nextState);
+                    }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-250 dark:border-slate-800 bg-slate-50/50 dark:bg-[#161a22]/30 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer bg-[#091e42]/05 dark:bg-white/10"
                   >
                     <Plus className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Add
@@ -692,10 +720,14 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                 </div>
 
                 {/* Labels Button */}
-                <div className="relative">
+                <div className="relative" data-popover-container="true">
                   <button
                     type="button"
-                    onClick={() => setLabelManagerOpen(!labelManagerOpen)}
+                    onClick={() => {
+                      const nextState = !labelManagerOpen;
+                      closeAllPopovers();
+                      setLabelManagerOpen(nextState);
+                    }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-250 dark:border-slate-800 bg-slate-50/50 dark:bg-[#161a22]/30 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
                   >
                     <Tag className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Labels
@@ -745,10 +777,14 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                 </div>
 
                 {/* Dates Button */}
-                <div className="relative flex items-center">
+                <div className="relative flex items-center" data-popover-container="true">
                   <button
                     type="button"
-                    onClick={() => setDatePickerOpen(!datePickerOpen)}
+                    onClick={() => {
+                      const nextState = !datePickerOpen;
+                      closeAllPopovers();
+                      setDatePickerOpen(nextState);
+                    }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-250 dark:border-slate-800 bg-slate-50/50 dark:bg-[#161a22]/30 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
                   >
                     <Clock className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Dates
@@ -978,10 +1014,15 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                 </div>
 
                 {/* Checklist Button */}
-                <div className="relative">
+                <div className="relative" data-popover-container="true">
                   <button
                     type="button"
-                    onClick={() => { setChecklistPopoverOpen(!checklistPopoverOpen); setChecklistTitleInput('Checklist'); }}
+                    onClick={() => {
+                      const nextState = !checklistPopoverOpen;
+                      closeAllPopovers();
+                      setChecklistPopoverOpen(nextState);
+                      setChecklistTitleInput('Checklist');
+                    }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-250 dark:border-slate-800 bg-slate-50/50 dark:bg-[#161a22]/30 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
                   >
                     <CheckSquare className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Checklist
@@ -1031,10 +1072,14 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                 </div>
 
                 {/* Members Button */}
-                <div className="relative">
+                <div className="relative" data-popover-container="true">
                   <button
                     type="button"
-                    onClick={() => setAssigneeSelectOpen(!assigneeSelectOpen)}
+                    onClick={() => {
+                      const nextState = !assigneeSelectOpen;
+                      closeAllPopovers();
+                      setAssigneeSelectOpen(nextState);
+                    }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-250 dark:border-slate-800 bg-slate-50/50 dark:bg-[#161a22]/30 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
                   >
                     <UserPlus className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Members
@@ -1077,10 +1122,14 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                 </div>
 
                 {/* Cover Button */}
-                <div className="relative">
+                <div className="relative" data-popover-container="true">
                   <button
                     type="button"
-                    onClick={() => setCoverPickerOpen(!coverPickerOpen)}
+                    onClick={() => {
+                      const nextState = !coverPickerOpen;
+                      closeAllPopovers();
+                      setCoverPickerOpen(nextState);
+                    }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-250 dark:border-slate-800 bg-slate-50/50 dark:bg-[#161a22]/30 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
                   >
                     <div className="w-3.5 h-3.5 rounded bg-indigo-500 shrink-0" /> Cover
