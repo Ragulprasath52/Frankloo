@@ -200,6 +200,28 @@ export default function CardModal({ card, onClose }: CardModalProps) {
     setManualLogVal('');
   };
 
+  const formatToDDMMYYYY = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr;
+  };
+
+  const parseFromDDMMYYYY = (val: string) => {
+    const parts = val.split('/');
+    if (parts.length === 3) {
+      const day = parts[0].padStart(2, '0');
+      const month = parts[1].padStart(2, '0');
+      const year = parts[2];
+      if (day.length === 2 && month.length === 2 && year.length === 4) {
+        return `${year}-${month}-${day}`;
+      }
+    }
+    return val;
+  };
+
   useEffect(() => {
     setTitle(card.title);
     setDescription(cleanText(card.description || ''));
@@ -791,7 +813,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
 
                       {/* Day of Week Headers */}
                       <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-1 select-none">
-                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
                           <div key={d}>{d}</div>
                         ))}
                       </div>
@@ -801,7 +823,10 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                         {(() => {
                           const year = calendarDate.getFullYear();
                           const month = calendarDate.getMonth();
-                          const firstDayIndex = new Date(year, month, 1).getDay();
+                          let rawFirstDay = new Date(year, month, 1).getDay();
+                          // Adjust Sunday (0) to index 6, Monday (1) to index 0, etc.
+                          const firstDayIndex = rawFirstDay === 0 ? 6 : rawFirstDay - 1;
+                          
                           const totalDays = new Date(year, month + 1, 0).getDate();
                           const prevTotalDays = new Date(year, month, 0).getDate();
 
@@ -880,10 +905,11 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                               className="rounded border-slate-350 text-blue-600 focus:ring-blue-550 cursor-pointer"
                             />
                             <input
-                              type="date"
+                              type="text"
+                              placeholder="DD/MM/YYYY"
                               disabled={!dueDateEnabled}
-                              value={dueDate}
-                              onChange={(e) => setDueDate(e.target.value)}
+                              value={formatToDDMMYYYY(dueDate)}
+                              onChange={(e) => setDueDate(parseFromDDMMYYYY(e.target.value))}
                               className="flex-1 bg-transparent border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-xs text-slate-808 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
                             />
                             <select
