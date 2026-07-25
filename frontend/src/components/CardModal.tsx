@@ -360,7 +360,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
               </div>
             ) : (
               <img 
-                src={coverImage} 
+                src={coverImage.startsWith('http') ? coverImage : `${BACKEND_BASE_URL}/${coverImage.replace(/^\/?/, '')}`} 
                 alt="cover" 
                 className="w-full h-full object-cover" 
                 onError={() => setImageError(true)}
@@ -408,6 +408,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                         type="button"
                         onClick={async () => {
                           setCoverImage(preset.val);
+                          setImageError(false);
                           if (currentBoard) await updateCard(currentBoard.id, card.id, { coverImage: preset.val });
                         }}
                         className="h-6 rounded border border-black/10 dark:border-white/10 hover:scale-105 transition-transform"
@@ -420,14 +421,14 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                   <div className="flex gap-1.5 mt-2">
                     <input
                       type="text" value={coverImage}
-                      onChange={e => setCoverImage(e.target.value)}
+                      onChange={e => { setCoverImage(e.target.value); setImageError(false); }}
                       onBlur={() => save({ coverImage: coverImage || null })}
                       placeholder="Paste cover URL…"
                       className="flex-1 text-[10px] border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1 bg-transparent text-slate-800 dark:text-slate-100 focus:outline-none"
                     />
                     {coverImage && (
                       <button
-                        onClick={async () => { setCoverImage(''); if (currentBoard) await updateCard(currentBoard.id, card.id, { coverImage: null }); }}
+                        onClick={async () => { setCoverImage(''); setImageError(false); if (currentBoard) await updateCard(currentBoard.id, card.id, { coverImage: null }); }}
                         className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[10px] font-bold"
                       >
                         Clear
@@ -1142,6 +1143,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                                 type="button"
                                 onClick={async () => {
                                   setCoverImage(color);
+                                  setImageError(false);
                                   if (currentBoard) {
                                     await updateCard(currentBoard.id, card.id, { coverImage: color });
                                   }
@@ -1184,6 +1186,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                                 onClick={async () => {
                                   const hdUrl = url.replace('w=150', 'w=1080');
                                   setCoverImage(hdUrl);
+                                  setImageError(false);
                                   if (currentBoard) {
                                     await updateCard(currentBoard.id, card.id, { coverImage: hdUrl });
                                   }
