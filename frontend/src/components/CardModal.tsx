@@ -66,7 +66,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
   const [imageError, setImageError] = useState(false);
   const [estTime, setEstTime] = useState(card.estimatedTime || 0);
   const [newChecklistVal, setNewChecklistVal] = useState('');
-  
+
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [timeElapsed, setTimeElapsed] = useState(0); // seconds
   const [manualLogVal, setManualLogVal] = useState('');
@@ -99,7 +99,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
   // Custom visual label & emoji states
   const [labels, setLabels] = useState<{ name: string; color: string }[]>([]);
   const [cardEmoji, setCardEmoji] = useState('');
-  
+
   // Create label local form states
   const [newLabelName, setNewLabelName] = useState('');
   const [newLabelColor, setNewLabelColor] = useState('#ef4444');
@@ -138,7 +138,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
           } else {
             extras[c.id] = { reactions: [], replies: [], attachments: [] };
           }
-        } catch (e) {}
+        } catch (e) { }
       }
     }
     setCommentExtras(extras);
@@ -334,12 +334,12 @@ export default function CardModal({ card, onClose }: CardModalProps) {
     e.preventDefault();
     if (!newCommentVal.trim() || !currentBoard) return;
     const attachmentObj = commentAttachment ? { name: commentAttachment.name, size: '240 KB' } : null;
-    
+
     await createComment(currentBoard.id, card.id, newCommentVal);
     const savedVal = newCommentVal;
     setNewCommentVal('');
     setCommentAttachment(null);
-    
+
     if (attachmentObj) {
       setTimeout(() => {
         const newComm = card.comments?.find(c => c.content === savedVal && !localStorage.getItem(`comment_extras_${c.id}`));
@@ -401,10 +401,10 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                 <span className="text-[10px] font-bold text-slate-400 dark:text-slate-650 uppercase tracking-widest">No Banner Loaded</span>
               </div>
             ) : (
-              <img 
-                src={coverImage.startsWith('http') ? coverImage : `${BACKEND_BASE_URL}/${coverImage.replace(/^\/?/, '')}`} 
-                alt="cover" 
-                className="w-full h-full object-cover" 
+              <img
+                src={coverImage.startsWith('http') ? coverImage : `${BACKEND_BASE_URL}/${coverImage.replace(/^\/?/, '')}`}
+                alt="cover"
+                className="w-full h-full object-cover"
                 onError={() => setImageError(true)}
               />
             )}
@@ -463,7 +463,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                       />
                     ))}
                   </div>
-                  
+
                   <div className="flex gap-1.5 mt-2">
                     <input
                       type="text" value={coverImage}
@@ -491,7 +491,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                     >
                       Upload cover image
                     </button>
-                    
+
                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Photos from Unsplash</span>
                     <div className="grid grid-cols-4 gap-1">
                       {[
@@ -528,9 +528,8 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                         key={emoji}
                         type="button"
                         onClick={() => handleSelectEmoji(emoji)}
-                        className={`text-sm p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 ${
-                          cardEmoji === emoji ? 'bg-indigo-650/20 ring-1 ring-indigo-500' : ''
-                        }`}
+                        className={`text-sm p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 ${cardEmoji === emoji ? 'bg-indigo-650/20 ring-1 ring-indigo-500' : ''
+                          }`}
                       >
                         {emoji}
                       </button>
@@ -561,8 +560,8 @@ export default function CardModal({ card, onClose }: CardModalProps) {
               </div>
             )}
 
-            <button 
-              onClick={onClose} 
+            <button
+              onClick={onClose}
               className="p-1.5 rounded-lg hover:bg-slate-150 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-850 dark:hover:text-white transition-colors"
             >
               <X className="w-4 h-4" />
@@ -572,10 +571,10 @@ export default function CardModal({ card, onClose }: CardModalProps) {
 
         {/* Workspace Columns split */}
         <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden relative">
-          
+
           {/* Left panel (65%): Title, Description, Selectors/Metadata, Checklists, Attachments, Original Email, Dependencies */}
           <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5 space-y-6 scrollbar-thin" style={{ willChange: 'scroll-position', overscrollBehavior: 'contain' }}>
-            
+
             {/* Title Block */}
             <div className="relative group/title w-full">
               <textarea
@@ -603,7 +602,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                   </button>
 
                   {addCardMenuOpen && (
-                    <div 
+                    <div
                       className="absolute left-0 mt-2 z-[999] w-72 bg-white dark:bg-[#1d2127] border border-slate-205 dark:border-slate-800 rounded-xl shadow-xl p-3 animate-scale-in"
                       onClick={e => e.stopPropagation()}
                     >
@@ -790,8 +789,8 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                     <Clock className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Dates
                   </button>
                   {datePickerOpen && (
-                    <div 
-                      className="absolute left-0 mt-2 top-full z-[999] w-72 max-h-[480px] overflow-y-auto bg-white dark:bg-[#1d2127] border border-slate-205 dark:border-slate-800 rounded-xl shadow-2xl p-4 animate-scale-in scrollbar-thin" 
+                    <div
+                      className="absolute left-0 mt-2 top-full z-[999] w-72 max-h-[480px] overflow-y-auto bg-white dark:bg-[#1d2127] border border-slate-205 dark:border-slate-800 rounded-xl shadow-2xl p-4 animate-scale-in scrollbar-thin"
                       onClick={e => e.stopPropagation()}
                       onWheel={e => e.stopPropagation()}
                       style={{ overscrollBehavior: 'contain' }}
@@ -862,7 +861,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                           let rawFirstDay = new Date(year, month, 1).getDay();
                           // Adjust Sunday (0) to index 6, Monday (1) to index 0, etc.
                           const firstDayIndex = rawFirstDay === 0 ? 6 : rawFirstDay - 1;
-                          
+
                           const totalDays = new Date(year, month + 1, 0).getDate();
                           const prevTotalDays = new Date(year, month, 0).getDate();
 
@@ -882,7 +881,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                           return days.map((dObj, idx) => {
                             const isSelected = dueDate && new Date(dueDate).toDateString() === dObj.date.toDateString();
                             const isToday = new Date().toDateString() === dObj.date.toDateString();
-                            
+
                             return (
                               <button
                                 key={idx}
@@ -891,15 +890,14 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                                   setDueDate(dObj.date.toISOString().split('T')[0]);
                                   setDueDateEnabled(true);
                                 }}
-                                className={`h-6 text-[11px] rounded flex items-center justify-center font-medium border-0 cursor-pointer select-none transition-colors ${
-                                  !dObj.isCurrentMonth
+                                className={`h-6 text-[11px] rounded flex items-center justify-center font-medium border-0 cursor-pointer select-none transition-colors ${!dObj.isCurrentMonth
                                     ? 'text-slate-300 dark:text-slate-600 bg-transparent'
                                     : isSelected
                                       ? 'bg-blue-600 text-white font-bold'
                                       : isToday
                                         ? 'border border-blue-500 text-blue-600 font-bold bg-blue-500/5'
                                         : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-[#b6c2cf] bg-transparent'
-                                }`}
+                                  }`}
                               >
                                 {dObj.day}
                               </button>
@@ -1028,7 +1026,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                     <CheckSquare className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Checklist
                   </button>
                   {checklistPopoverOpen && (
-                    <div 
+                    <div
                       className="absolute left-0 mt-2 z-[999] w-72 bg-white dark:bg-[#1d2127] border border-slate-205 dark:border-slate-800 rounded-xl shadow-2xl p-4 animate-scale-in text-left"
                       onClick={e => e.stopPropagation()}
                     >
@@ -1103,9 +1101,8 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                                   currentBoard && assignUserToCard(currentBoard.id, card.id, m.user.id);
                                 }
                               }}
-                              className={`w-full flex items-center gap-1.5 px-2 py-1 rounded-md text-xs hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left ${
-                                assigned ? 'text-indigo-500 dark:text-indigo-400 font-semibold' : 'text-slate-650 dark:text-slate-400'
-                              }`}
+                              className={`w-full flex items-center gap-1.5 px-2 py-1 rounded-md text-xs hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left ${assigned ? 'text-indigo-500 dark:text-indigo-400 font-semibold' : 'text-slate-650 dark:text-slate-400'
+                                }`}
                             >
                               <img
                                 src={getAvatarUrl(m.user.avatarUrl, m.user.name || m.user.username)}
@@ -1135,7 +1132,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                     <div className="w-3.5 h-3.5 rounded bg-indigo-500 shrink-0" /> Cover
                   </button>
                   {coverPickerOpen && (
-                    <div 
+                    <div
                       className="absolute left-0 mt-2 z-[999] w-72 max-h-[480px] overflow-y-auto bg-white dark:bg-[#1d2127] border border-slate-205 dark:border-slate-800 rounded-xl shadow-2xl p-4 animate-scale-in text-left scrollbar-thin"
                       onClick={e => e.stopPropagation()}
                       onWheel={e => e.stopPropagation()}
@@ -1161,11 +1158,10 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                             <button
                               type="button"
                               onClick={() => setCoverSize('HEADER')}
-                              className={`p-2 rounded-lg border text-left cursor-pointer transition-all bg-transparent ${
-                                coverSize === 'HEADER' 
-                                  ? 'border-blue-500 ring-1 ring-blue-500' 
+                              className={`p-2 rounded-lg border text-left cursor-pointer transition-all bg-transparent ${coverSize === 'HEADER'
+                                  ? 'border-blue-500 ring-1 ring-blue-500'
                                   : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
-                              }`}
+                                }`}
                             >
                               <div className="h-6 w-full bg-slate-200 dark:bg-slate-805 rounded mb-1.5" />
                               <div className="h-1.5 w-12 bg-slate-400 dark:bg-slate-600 rounded mb-1" />
@@ -1175,11 +1171,10 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                             <button
                               type="button"
                               onClick={() => setCoverSize('FULL')}
-                              className={`p-2 rounded-lg border text-left cursor-pointer transition-all bg-transparent ${
-                                coverSize === 'FULL' 
-                                  ? 'border-blue-500 ring-1 ring-blue-500' 
+                              className={`p-2 rounded-lg border text-left cursor-pointer transition-all bg-transparent ${coverSize === 'FULL'
+                                  ? 'border-blue-500 ring-1 ring-blue-500'
                                   : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
-                              }`}
+                                }`}
                             >
                               <div className="h-12 w-full bg-slate-200 dark:bg-slate-805 rounded flex flex-col justify-end p-1.5">
                                 <div className="h-1.5 w-12 bg-slate-400 dark:bg-slate-600 rounded mb-1" />
@@ -1339,10 +1334,9 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                   </div>
                 ) : (
                   <div className="relative">
-                    <div 
-                      className={`p-3.5 bg-slate-50/70 dark:bg-[#22272b]/80 border border-slate-150/40 dark:border-slate-800/40 rounded-lg text-sm leading-relaxed text-slate-800 dark:text-[#b6c2cf] font-normal whitespace-pre-wrap font-sans hover:bg-slate-100/60 dark:hover:bg-[#2c333a] transition-all cursor-pointer scrollbar-thin ${
-                        !descExpanded ? 'max-h-48 overflow-hidden relative' : 'max-h-[420px] overflow-y-auto'
-                      }`}
+                    <div
+                      className={`p-3.5 bg-slate-50/70 dark:bg-[#22272b]/80 border border-slate-150/40 dark:border-slate-800/40 rounded-lg text-sm leading-relaxed text-slate-800 dark:text-[#b6c2cf] font-normal whitespace-pre-wrap font-sans hover:bg-slate-100/60 dark:hover:bg-[#2c333a] transition-all cursor-pointer scrollbar-thin ${!descExpanded ? 'max-h-48 overflow-hidden relative' : 'max-h-[420px] overflow-y-auto'
+                        }`}
                       onClick={() => setIsEditingDesc(true)}
                     >
                       {description ? (
@@ -1531,8 +1525,8 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                         });
 
                         return (
-                          <div 
-                            key={att.id} 
+                          <div
+                            key={att.id}
                             className="group/att flex items-center gap-3 p-2 bg-[#22272b]/30 dark:bg-[#22272b]/60 border border-slate-150/40 dark:border-slate-800/40 rounded-xl relative"
                           >
                             {/* File icon preview block */}
@@ -1553,10 +1547,10 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                             {/* Actions Right Buttons block */}
                             <div className="flex items-center gap-1.5 shrink-0 relative" onClick={(e) => e.stopPropagation()}>
                               {/* Open link */}
-                              <a 
-                                href={displayPath} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
+                              <a
+                                href={displayPath}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
                                 title="Open in new tab"
                               >
@@ -1575,7 +1569,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
 
                               {/* Options Dropdown menu overlay */}
                               {activeAttachmentMenuId === att.id && (
-                                <div 
+                                <div
                                   className="absolute right-0 mt-8 top-0 w-32 py-1 rounded-lg shadow-xl z-[999] border"
                                   style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}
                                 >
@@ -1703,7 +1697,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                         className="w-5 h-5 rounded-full object-cover border border-white dark:border-slate-850 cursor-pointer hover:scale-105 transition-transform"
                       />
                     ))}
-                    <button 
+                    <button
                       type="button"
                       onClick={() => setAssigneeSelectOpen(!assigneeSelectOpen)}
                       className="w-5 h-5 rounded-full border border-dashed border-slate-450 dark:border-slate-655 flex items-center justify-center text-slate-455 hover:text-indigo-500 hover:border-indigo-500 transition-all font-bold text-xs"
@@ -1731,9 +1725,8 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                                   currentBoard && assignUserToCard(currentBoard.id, card.id, m.user.id);
                                 }
                               }}
-                              className={`w-full flex items-center gap-1.5 px-2 py-1 rounded-md text-xs hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left ${
-                                assigned ? 'text-indigo-500 dark:text-indigo-400 font-semibold' : 'text-slate-650 dark:text-slate-400'
-                              }`}
+                              className={`w-full flex items-center gap-1.5 px-2 py-1 rounded-md text-xs hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left ${assigned ? 'text-indigo-500 dark:text-indigo-400 font-semibold' : 'text-slate-650 dark:text-slate-400'
+                                }`}
                             >
                               <img
                                 src={getAvatarUrl(m.user.avatarUrl, m.user.name || m.user.username)}
@@ -1863,17 +1856,16 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                           setIsTimerActive(true);
                         }
                       }}
-                      className={`px-3 py-1 text-xs font-semibold rounded transition-all ${
-                        isTimerActive 
-                          ? 'bg-rose-600 hover:bg-rose-700 text-white animate-pulse' 
+                      className={`px-3 py-1 text-xs font-semibold rounded transition-all ${isTimerActive
+                          ? 'bg-rose-600 hover:bg-rose-700 text-white animate-pulse'
                           : 'bg-indigo-650 hover:bg-indigo-700 text-white'
-                      }`}
+                        }`}
                     >
-                      {isTimerActive 
-                        ? `Stop (${Math.floor(timeElapsed / 60).toString().padStart(2, '0')}:${(timeElapsed % 60).toString().padStart(2, '0')})` 
+                      {isTimerActive
+                        ? `Stop (${Math.floor(timeElapsed / 60).toString().padStart(2, '0')}:${(timeElapsed % 60).toString().padStart(2, '0')})`
                         : 'Start Timer'}
                     </button>
-                    
+
                     <div className="flex gap-1 items-center">
                       <input
                         type="number"
@@ -1921,13 +1913,13 @@ export default function CardModal({ card, onClose }: CardModalProps) {
 
           {/* Right sidebar (35%): ONLY Comments / Activity Feed */}
           <div className="w-full md:w-[22rem] shrink-0 border-t md:border-t-0 md:border-l border-slate-205 dark:border-slate-800 flex flex-col md:h-full bg-slate-50/20 dark:bg-[#11141c] p-4 overflow-visible md:overflow-hidden">
-            
+
             {/* Activity Hub */}
             <div className="flex-grow flex flex-col min-h-0 md:h-full">
               <h4 className="text-xs font-bold text-slate-400 dark:text-slate-555 uppercase tracking-wider mb-3 flex items-center gap-2 shrink-0">
                 <MessageSquare className="w-4 h-4 text-indigo-500" /> Activity Feed
               </h4>
-              
+
               {/* Comments timeline (scrolls independently) */}
               <div className="flex-grow overflow-y-auto space-y-4 pr-1 scrollbar-thin" style={{ willChange: 'scroll-position', overscrollBehavior: 'contain' }}>
                 {liveCard.comments?.length === 0 ? (
@@ -1957,9 +1949,9 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                             <span>•</span>
                             <span>{new Date(c.createdAt).toLocaleDateString()}</span>
                           </div>
-                          
+
                           <p className="mt-1 text-slate-650 leading-relaxed break-words text-xs">{c.content}</p>
-                          
+
                           {/* Rich Comments attachments */}
                           {extras.attachments?.map((att, idx) => (
                             <div key={idx} className="mt-2 flex items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-800 text-[10px]">
@@ -1980,11 +1972,10 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                                     key={emoji}
                                     type="button"
                                     onClick={() => handleToggleReaction(c.id, emoji)}
-                                    className={`px-1.5 py-0.5 rounded text-[9px] border transition-colors ${
-                                      active 
-                                        ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-500' 
+                                    className={`px-1.5 py-0.5 rounded text-[9px] border transition-colors ${active
+                                        ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-500'
                                         : 'bg-transparent border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900'
-                                    }`}
+                                      }`}
                                   >
                                     {emoji} {r?.users.length || 0}
                                   </button>
@@ -2066,7 +2057,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                   rows={2}
                   className="w-full text-xs p-2.5 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-transparent text-slate-800 dark:text-slate-100 resize-none leading-relaxed"
                 />
-                
+
                 <div className="flex justify-between items-center gap-2">
                   <input
                     type="file"
@@ -2082,7 +2073,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                     <Paperclip className="w-3.5 h-3.5" />
                     {commentAttachment ? commentAttachment.name.slice(0, 10) + '...' : 'Attach File'}
                   </button>
-                  
+
                   <button
                     type="submit"
                     className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm"
