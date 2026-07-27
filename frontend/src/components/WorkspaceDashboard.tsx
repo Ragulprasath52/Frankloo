@@ -281,18 +281,18 @@ export default function WorkspaceDashboard({ activeTab, onSelectBoard }: Workspa
                 </div>
                 <div className="flex items-center gap-3">
                   {/* Search */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                  <div className="relative flex items-center">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none z-10" style={{ color: 'var(--text-muted)' }} />
                     <input
                       ref={searchInputRef}
                       type="text"
                       placeholder="Search boards…"
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
-                      className="tf-input pl-9 pr-10 py-2 text-sm h-9"
-                      style={{ width: '240px' }}
+                      className="tf-input pr-10 py-2 text-sm h-9"
+                      style={{ width: '240px', paddingLeft: '2.5rem' }}
                     />
-                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold hidden sm:block" style={{ color: 'var(--text-muted)' }}>⌘K</span>
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold hidden sm:block pointer-events-none" style={{ color: 'var(--text-muted)' }}>⌘K</span>
                   </div>
                   <button onClick={() => setBoardModalOpen(true)} className="btn-primary text-sm h-9 px-4 gap-2 font-semibold">
                     <Plus className="w-4 h-4" /> New board

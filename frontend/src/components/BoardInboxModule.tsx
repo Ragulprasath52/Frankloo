@@ -747,7 +747,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                       <div className="hidden md:block overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                           <thead>
-                            <tr className="bg-slate-50 dark:bg-white/5 border-b border-gray-200 dark:border-gray-800 text-xs text-gray-450 dark:text-gray-400 font-extrabold uppercase tracking-wider">
+                            <tr className="bg-slate-50 dark:bg-white/5 border-b border-gray-200 dark:border-gray-800 text-[11px] text-slate-500 dark:text-slate-300 font-extrabold uppercase tracking-wider">
                               <th className="p-4 w-[180px]">Sender</th>
                               <th className="p-4">Subject & Preview</th>
                               <th className="p-4 w-[120px] text-center">Attachments</th>
@@ -777,10 +777,10 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                                         {initials}
                                       </div>
                                       <div className="min-w-0">
-                                        <p className="font-bold text-sm text-[#172b4d] dark:text-[#b6c2cf] truncate">
+                                        <p className="font-bold text-sm text-[#172b4d] dark:text-[#f0f6fc] truncate">
                                           {details.sender?.split('<')[0]?.trim() || details.sender || 'Unknown'}
                                         </p>
-                                        <p className="text-xs text-gray-450 dark:text-gray-500 truncate mt-0.5">
+                                        <p className="text-xs text-indigo-600 dark:text-indigo-300 truncate mt-0.5 font-medium">
                                           {details.sender?.match(/<([^>]+)>/)?.[1] || ''}
                                         </p>
                                       </div>
@@ -790,10 +790,10 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                                   {/* Subject & body text excerpt */}
                                   <td className="p-4 min-w-[240px]">
                                     <div className="min-w-0">
-                                      <p className={`text-sm text-[#172b4d] dark:text-[#f0f6fc] truncate ${isNew ? 'font-bold' : 'font-semibold'}`}>
+                                      <p className={`text-sm text-[#172b4d] dark:text-white truncate ${isNew ? 'font-bold' : 'font-semibold'}`}>
                                         {item.title}
                                       </p>
-                                      <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-1 max-w-[500px]">
+                                      <p className="text-xs text-slate-500 dark:text-slate-300 truncate mt-1 max-w-[500px]">
                                         {item.description}
                                       </p>
                                     </div>
@@ -802,16 +802,16 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                                   {/* Attachment Indicator */}
                                   <td className="p-4 text-center">
                                     {hasAtts ? (
-                                      <span className="bg-indigo-50 dark:bg-indigo-950/20 text-indigo-605 dark:text-indigo-400 px-2.5 py-0.5 rounded-full font-bold text-xs inline-flex items-center gap-1 border border-indigo-500/10">
+                                      <span className="bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 px-2.5 py-0.5 rounded-full font-bold text-xs inline-flex items-center gap-1 border border-indigo-200 dark:border-indigo-500/30">
                                         <Paperclip className="w-3.5 h-3.5" /> {details.attachments.length}
                                       </span>
                                     ) : (
-                                      <span className="text-gray-300 dark:text-gray-700 text-xs font-semibold">—</span>
+                                      <span className="text-gray-300 dark:text-gray-600 text-xs font-semibold">—</span>
                                     )}
                                   </td>
                                   
                                   {/* Relative Received Time */}
-                                  <td className="p-4 text-center text-xs text-gray-400 dark:text-gray-550 whitespace-nowrap font-bold">
+                                  <td className="p-4 text-center text-xs text-slate-500 dark:text-slate-300 whitespace-nowrap font-bold">
                                     {formatRelativeTime(item.createdAt)}
                                   </td>
                                   
@@ -1435,27 +1435,27 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
             {/* Email Sender/Subject details panel */}
             <div className="p-5 border-b border-gray-150 dark:border-gray-850 space-y-2.5 text-xs bg-slate-50/50 dark:bg-[#161a22]/20">
               <h1 className="text-sm font-bold text-slate-850 dark:text-[#f0f6fc] leading-snug">{selectedEmail.title}</h1>
-              <div className="grid grid-cols-1 gap-1 text-gray-500 dark:text-[#8d96a0] font-sans">
+              <div className="grid grid-cols-1 gap-1 text-slate-500 dark:text-slate-400 font-sans">
                 <div>
-                  <span className="font-semibold inline-block w-14">From:</span>
-                  <span className="text-slate-800 dark:text-slate-200">
+                  <span className="font-semibold inline-block w-14 text-slate-500 dark:text-slate-400">From:</span>
+                  <span className="text-slate-900 dark:text-[#f0f6fc] font-medium">
                     {JSON.parse(selectedEmail.sourceDetails || '{}').senderName || ''} {` <${JSON.parse(selectedEmail.sourceDetails || '{}').senderEmail || JSON.parse(selectedEmail.sourceDetails || '{}').sender}>`}
                   </span>
                 </div>
                 <div>
-                  <span className="font-semibold inline-block w-14">To:</span>
-                  <span className="text-slate-800 dark:text-slate-200 break-all">{JSON.parse(selectedEmail.sourceDetails || '{}').recipients}</span>
+                  <span className="font-semibold inline-block w-14 text-slate-500 dark:text-slate-400">To:</span>
+                  <span className="text-slate-900 dark:text-[#f0f6fc] font-medium break-all">{JSON.parse(selectedEmail.sourceDetails || '{}').recipients}</span>
                 </div>
                 {JSON.parse(selectedEmail.sourceDetails || '{}').cc && (
                   <div>
-                    <span className="font-semibold inline-block w-14">Cc:</span>
-                    <span className="text-slate-800 dark:text-slate-200 break-all">{JSON.parse(selectedEmail.sourceDetails || '{}').cc}</span>
+                    <span className="font-semibold inline-block w-14 text-slate-500 dark:text-slate-400">Cc:</span>
+                    <span className="text-slate-900 dark:text-[#f0f6fc] font-medium break-all">{JSON.parse(selectedEmail.sourceDetails || '{}').cc}</span>
                   </div>
                 )}
                 {JSON.parse(selectedEmail.sourceDetails || '{}').receivedDate && (
                   <div>
-                    <span className="font-semibold inline-block w-14">Received:</span>
-                    <span className="text-slate-800 dark:text-slate-200">
+                    <span className="font-semibold inline-block w-14 text-slate-500 dark:text-slate-400">Received:</span>
+                    <span className="text-slate-900 dark:text-[#f0f6fc] font-medium">
                       {new Date(JSON.parse(selectedEmail.sourceDetails || '{}').receivedDate).toLocaleString()}
                     </span>
                   </div>
@@ -1515,14 +1515,14 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
             </div>
 
             {/* Email Body Container */}
-            <div className="flex-1 p-5 overflow-y-auto font-sans leading-relaxed text-sm text-slate-800 dark:text-[#c9d1d9] bg-white dark:bg-[#1c2128]">
+            <div className="flex-1 p-5 overflow-y-auto font-sans leading-relaxed text-sm text-slate-800 dark:text-[#f0f6fc] bg-white dark:bg-[#1c2128]">
               {previewTab === 'text' ? (
-                <pre className="font-sans text-xs whitespace-pre-wrap leading-relaxed select-text font-medium">
+                <pre className="font-sans text-xs whitespace-pre-wrap leading-relaxed select-text font-medium text-slate-800 dark:text-[#f0f6fc]">
                   {JSON.parse(selectedEmail.sourceDetails || '{}').text || selectedEmail.description}
                 </pre>
               ) : (
                 <div 
-                  className="bg-white p-4 rounded-xl border border-gray-250 text-black overflow-x-auto min-h-[160px] select-text email-content-wrapper"
+                  className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 overflow-x-auto min-h-[160px] select-text email-content-wrapper"
                   dangerouslySetInnerHTML={{ __html: JSON.parse(selectedEmail.sourceDetails || '{}').html || selectedEmail.description }}
                 />
               )}

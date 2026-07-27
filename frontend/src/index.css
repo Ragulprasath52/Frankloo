@@ -830,11 +830,11 @@ body.is-resizing-column * { user-select: none !important; }
 .dark .bg-overlay-blur { background-color: rgba(0,0,0,0.20); }
 
 /* ============================================================
-   EMAIL CONTENT WRAPPER (always light, mail standards)
+   EMAIL CONTENT WRAPPER
    ============================================================ */
 .email-content-wrapper {
   background-color: #ffffff !important;
-  color: #000000 !important;
+  color: #0f172a !important;
   border-color: #e2e8f0 !important;
 }
 .email-content-wrapper img,
@@ -843,8 +843,20 @@ body.is-resizing-column * { user-select: none !important; }
 .email-content-wrapper p { max-width: 100% !important; box-sizing: border-box !important; }
 .email-content-wrapper img   { height: auto !important; }
 .email-content-wrapper table { width: 100% !important; table-layout: fixed !important; }
-.dark .email-content-wrapper { background-color: #ffffff !important; color: #000000 !important; }
-.dark .email-content-wrapper * { color: #000000; }
+.email-content-wrapper *     { color: #0f172a; }
+.email-content-wrapper a     { color: #0c66e4; }
+
+.dark .email-content-wrapper {
+  background-color: #161a22 !important;
+  color: #f0f6fc !important;
+  border-color: #30363d !important;
+}
+.dark .email-content-wrapper * {
+  color: #f0f6fc !important;
+}
+.dark .email-content-wrapper a {
+  color: #579dff !important;
+}
 
 /* ============================================================
    RESPONSIVE LAYOUT UTILITIES
