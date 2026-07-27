@@ -788,27 +788,33 @@ function BoardCard({
           </span>
 
           {/* Member stack */}
-          <div className="flex -space-x-1 shrink-0 mr-6">
-            {members.slice(0, 3).map((m, idx) => {
-              const init = (m.user?.name || m.user?.username || '?').substring(0, 2).toUpperCase();
-              const colors = ['#6366f1', '#ec4899', '#10b981', '#f59e0b'];
-              return (
-                <div
-                  key={m.user?.id || idx}
-                  className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white border border-white dark:border-[#161a20]"
-                  style={{ background: colors[idx % colors.length] }}
-                  title={m.user?.name || m.user?.username}
-                >
-                  {init}
-                </div>
-              );
-            })}
-            {members.length > 3 && (
-              <div className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold" style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>
-                +{members.length - 3}
+          {(() => {
+            const boardMembers = (b.members && b.members.length > 0) ? b.members : (members || []);
+            return (
+              <div className="flex -space-x-1 shrink-0 mr-6">
+                {boardMembers.slice(0, 3).map((m: any, idx: number) => {
+                  const u = m.user || m;
+                  const init = (u?.name || u?.username || '?').substring(0, 2).toUpperCase();
+                  const colors = ['#6366f1', '#ec4899', '#10b981', '#f59e0b'];
+                  return (
+                    <div
+                      key={u?.id || m.id || idx}
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white border border-white dark:border-[#161a20]"
+                      style={{ background: colors[idx % colors.length] }}
+                      title={u?.name || u?.username}
+                    >
+                      {init}
+                    </div>
+                  );
+                })}
+                {boardMembers.length > 3 && (
+                  <div className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold" style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>
+                    +{boardMembers.length - 3}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            );
+          })()}
         </div>
       </div>
     </div>

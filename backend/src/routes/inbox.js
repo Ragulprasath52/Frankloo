@@ -923,6 +923,36 @@ router.post('/:workspaceId/mock-incoming', authenticate, async (req, res) => {
   }
 });
 
+// Helper: persist attachments to uploads directory if base64 content is present and strip heavy buffers
+function sanitizeAndSaveAttachments(attList) {
+  if (!attList || !Array.isArray(attList)) return [];
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const uploadDir = path.join(__dirname, '../../../uploads');
+  
+  return attList.map((att, index) => {
+    let storagePath = att.storagePath || att.url || 'uploads/gmail-dummy';
+    if (att.base64Data || att.content) {
+      try {
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        const rawContent = att.content ? (Buffer.isBuffer(att.content) ? att.content : Buffer.from(att.content)) : Buffer.from(att.base64Data, 'base64');
+        const safeFilename = `${Date.now()}-${index}-${(att.filename || att.file_name || 'attachment').replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        fs.writeFileSync(path.join(uploadDir, safeFilename), rawContent);
+        storagePath = `uploads/${safeFilename}`;
+      } catch (err) {
+        console.error('Error writing incoming email attachment to disk:', err);
+      }
+    }
+    return {
+      filename: att.filename || att.file_name || `attachment_${index + 1}`,
+      storagePath,
+      mimeType: att.mimeType || att.content_type || 'application/octet-stream',
+      size: att.size || (att.base64Data ? Math.round(att.base64Data.length * 0.75) : 0)
+    };
+  });
+}
+
 // Helper function to process all incoming emails (from SMTP webhook or test simulator)
 export async function processIncomingEmail({ to, from, cc, subject, text, html, attachments, threadId, messageId, receivedDate }) {
   const cleanTo = to.match(/<([^>]+)>/)?.[1] || to.trim();
@@ -1022,21 +1052,21 @@ export async function processIncomingEmail({ to, from, cc, subject, text, html, 
     throw new Error('Email flagged as spam');
   }
 
-  // 4. Attachment size limit check
-  if (attachments && attachments.length > 0) {
-    const totalBytes = attachments.reduce((sum, att) => sum + (att.size || 0), 0);
-    const limitBytes = (board.incomingEmailAttachmentLimit || 10) * 1024 * 1024;
+  // 4. Attachment size limit check & persistence
+  const safeAttachments = sanitizeAndSaveAttachments(attachments || []);
+  if (safeAttachments.length > 0) {
+    const totalBytes = safeAttachments.reduce((sum, att) => sum + (att.size || 0), 0);
+    const limitBytes = (board.incomingEmailAttachmentLimit || 50) * 1024 * 1024;
     if (totalBytes > limitBytes) {
       await prisma.emailLog.create({
         data: {
           boardId: board.id,
           sender: from,
           subject: subject,
-          status: 'SIZE_EXCEEDED',
-          details: `Total attachment size (${(totalBytes / (1024 * 1024)).toFixed(2)} MB) exceeded the limit of ${board.incomingEmailAttachmentLimit} MB.`
+          status: 'SIZE_EXCEEDED_WARNING',
+          details: `Total attachment size (${(totalBytes / (1024 * 1024)).toFixed(2)} MB) exceeded limit of ${board.incomingEmailAttachmentLimit || 50} MB. Email delivered to inbox with attachments preserved.`
         }
       });
-      throw new Error('Attachment size limit exceeded');
     }
   }
 
@@ -1191,7 +1221,7 @@ export async function processIncomingEmail({ to, from, cc, subject, text, html, 
       }
     }
 
-    const allAttachments = [...(attachments || []), ...inlineAttachments];
+    const allAttachments = [...safeAttachments, ...inlineAttachments];
 
     const card = await prisma.card.create({
       data: {
@@ -1297,7 +1327,7 @@ export async function processIncomingEmail({ to, from, cc, subject, text, html, 
     receivedDate: receivedDate || new Date().toISOString(),
     text: text || '',
     html: html || '',
-    attachments: attachments || [],
+    attachments: safeAttachments,
     threadId: threadId || null,
     messageId: messageId || null,
     checklists: parsed.checklist || [],

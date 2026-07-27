@@ -59,7 +59,11 @@ router.get('/', authenticate, async (req, res) => {
               where: { isArchived: false },
               include: {
                 members: {
-                  select: { userId: true }
+                  include: {
+                    user: {
+                      select: { id: true, username: true, email: true, name: true, avatarUrl: true }
+                    }
+                  }
                 }
               }
             },
@@ -80,9 +84,6 @@ router.get('/', authenticate, async (req, res) => {
       const visibleBoards = m.workspace.boards.filter(b => {
         if (isOwnerOrAdmin) return true;
         return b.members && b.members.some(bm => bm.userId === req.user.id);
-      }).map(b => {
-        const { members, ...rest } = b;
-        return rest;
       });
 
       return {
@@ -428,6 +429,13 @@ router.get('/:id', authenticate, checkWorkspaceRole([]), async (req, res) => {
             } : {})
           },
           include: {
+            members: {
+              include: {
+                user: {
+                  select: { id: true, username: true, email: true, name: true, avatarUrl: true }
+                }
+              }
+            },
             lists: {
               include: {
                 cards: {

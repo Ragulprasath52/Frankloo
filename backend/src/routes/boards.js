@@ -113,6 +113,13 @@ router.get('/workspace/:workspaceId', authenticate, async (req, res) => {
         } : {})
       },
       include: {
+        members: {
+          include: {
+            user: {
+              select: { id: true, username: true, email: true, name: true, avatarUrl: true }
+            }
+          }
+        },
         lists: {
           include: {
             cards: {

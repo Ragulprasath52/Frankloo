@@ -4082,13 +4082,13 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
       {/* ── Share Board Modal ── */}
       {isShareModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setIsShareModalOpen(false)}>
-          <div className="bg-white dark:bg-[#161b22] border border-slate-250 dark:border-[#30363d] rounded-2xl p-5 w-full max-w-lg shadow-2xl animate-scale-in text-xs max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded-2xl p-5 w-full max-w-lg shadow-2xl animate-scale-in text-xs max-h-[90vh] overflow-y-auto text-slate-900 dark:text-slate-100" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-205">Share Board: {currentBoard.name}</h3>
-                <p className="text-[10px] text-slate-450 dark:text-slate-500">Configure board access & permission roles</p>
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">Share Board: {currentBoard.name}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Configure board access & permission roles</p>
               </div>
-              <button onClick={() => setIsShareModalOpen(false)} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/5 text-slate-400">
+              <button onClick={() => setIsShareModalOpen(false)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -4096,10 +4096,10 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
             <div className="space-y-6 pt-4 text-left">
               {/* Section 1: Add Existing Workspace Members */}
               <div className="space-y-2">
-                <h4 className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">Add Workspace Member</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Add Workspace Member</h4>
                 <div className="flex gap-2">
                   <select
-                    className="flex-1 px-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl text-xs font-semibold cursor-pointer"
+                    className="flex-1 px-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#30363d] text-slate-900 dark:text-slate-100 rounded-xl text-xs font-semibold cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     onChange={e => {
                       if (e.target.value) {
                         handleAddWorkspaceMember(e.target.value);
@@ -4108,11 +4108,11 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                     }}
                     defaultValue=""
                   >
-                    <option value="" disabled>Select workspace member to add...</option>
+                    <option value="" disabled className="dark:bg-[#161b22] text-slate-400">Select workspace member to add...</option>
                     {currentWorkspace?.members
                       .filter(wm => !(currentBoard?.members || []).some((bm: any) => bm.userId === wm.user.id))
                       .map(wm => (
-                        <option key={wm.user.id} value={wm.user.id}>
+                        <option key={wm.user.id} value={wm.user.id} className="dark:bg-[#161b22] text-slate-900 dark:text-slate-100">
                           {wm.user.name || wm.user.username} (@{wm.user.username})
                         </option>
                       ))}
@@ -4121,26 +4121,26 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                   <select
                     value={shareUserRole}
                     onChange={e => setShareUserRole(e.target.value)}
-                    className="px-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl text-xs font-semibold cursor-pointer"
+                    className="px-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#30363d] text-slate-900 dark:text-slate-100 rounded-xl text-xs font-semibold cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   >
-                    <option value="VIEWER">Viewer</option>
-                    <option value="COMMENTER">Commenter</option>
-                    <option value="EDITOR">Editor</option>
-                    <option value="ADMIN">Board Admin</option>
+                    <option value="VIEWER" className="dark:bg-[#161b22]">Viewer</option>
+                    <option value="COMMENTER" className="dark:bg-[#161b22]">Commenter</option>
+                    <option value="EDITOR" className="dark:bg-[#161b22]">Editor</option>
+                    <option value="ADMIN" className="dark:bg-[#161b22]">Board Admin</option>
                   </select>
                 </div>
               </div>
 
               {/* Section 2: Invite New User Directly */}
               <form onSubmit={handleInviteNewUser} className="space-y-3 border-t border-slate-100 dark:border-slate-800 pt-4">
-                <h4 className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">Invite User to Board</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Invite User to Board</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <input
                     type="text"
                     placeholder="Email or Username"
                     value={shareEmail}
                     onChange={e => setShareEmail(e.target.value)}
-                    className="px-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl text-xs font-semibold"
+                    className="px-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#30363d] text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     required
                   />
                   <input
@@ -4148,12 +4148,12 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                     placeholder="Custom Invite Message (optional)"
                     value={shareMessage}
                     onChange={e => setShareMessage(e.target.value)}
-                    className="px-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#2d3139] rounded-xl text-xs font-semibold"
+                    className="px-3 py-2 bg-slate-50 dark:bg-[#0d0d0f] border border-slate-200 dark:border-[#30363d] text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   />
                 </div>
-                <div className="flex justify-between items-center gap-2">
-                  <span className="text-[10px] text-slate-400">User will receive a workspace invite linked to this board.</span>
-                  <button type="submit" disabled={sharingSubmitting} className="btn-primary py-1.5 px-4 rounded-xl text-xs font-bold shrink-0">
+                <div className="flex justify-between items-center gap-2 pt-1">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">User will receive a workspace invite linked to this board.</span>
+                  <button type="submit" disabled={sharingSubmitting} className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-xl text-xs font-bold shrink-0 shadow-sm transition-all active:scale-[0.98]">
                     {sharingSubmitting ? 'Inviting...' : 'Send Invite'}
                   </button>
                 </div>
@@ -4161,43 +4161,43 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
 
               {/* Section 3: Current Board Members List */}
               <div className="border-t border-slate-100 dark:border-slate-800 pt-4 space-y-2">
-                <h4 className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">Current Members ({currentBoard?.members?.length || 0})</h4>
-                <div className="max-h-48 overflow-y-auto space-y-2 pr-1 divide-y divide-slate-100 dark:divide-slate-850">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Current Members ({currentBoard?.members?.length || 0})</h4>
+                <div className="max-h-48 overflow-y-auto space-y-2 pr-1 divide-y divide-slate-100 dark:divide-slate-800">
                   {currentBoard?.members?.map((bm: any) => {
                     const wsMember = currentWorkspace?.members.find(wm => wm.user.id === bm.userId);
                     const isOwner = wsMember?.role === 'OWNER';
                     return (
                       <div key={bm.id} className="flex items-center justify-between pt-2">
-                        <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex items-center gap-2.5 min-w-0">
                           <img
                             src={getAvatarUrl(bm.user.avatarUrl, bm.user.name || bm.user.username)}
                             alt="Avatar"
-                            className="w-6 h-6 rounded-full object-cover shrink-0"
+                            className="w-7 h-7 rounded-full object-cover shrink-0 border border-slate-200 dark:border-slate-700"
                           />
                           <div className="min-w-0">
-                            <p className="font-bold text-slate-850 dark:text-slate-200 truncate">{bm.user.name || bm.user.username}</p>
-                            <p className="text-[9px] text-slate-400">@{bm.user.username}</p>
+                            <p className="font-bold text-slate-900 dark:text-slate-100 truncate text-xs">{bm.user.name || bm.user.username}</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400">@{bm.user.username}</p>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2">
                           {isOwner ? (
-                            <span className="text-[10px] font-bold text-amber-500 uppercase px-2">Owner</span>
+                            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase px-2 py-0.5 bg-amber-500/10 rounded">Owner</span>
                           ) : (
                             <>
                               <select
                                 value={bm.role}
                                 onChange={e => handleUpdateBoardMemberRole(bm.userId, e.target.value)}
-                                className="px-2 py-1 bg-white dark:bg-[#161b22] border border-slate-250 dark:border-[#2d3139] rounded text-[10px] cursor-pointer"
+                                className="px-2 py-1 bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] text-slate-900 dark:text-slate-100 rounded text-[11px] font-medium cursor-pointer"
                               >
-                                <option value="VIEWER">Viewer</option>
-                                <option value="COMMENTER">Commenter</option>
-                                <option value="EDITOR">Editor</option>
-                                <option value="ADMIN">Board Admin</option>
+                                <option value="VIEWER" className="dark:bg-[#161b22]">Viewer</option>
+                                <option value="COMMENTER" className="dark:bg-[#161b22]">Commenter</option>
+                                <option value="EDITOR" className="dark:bg-[#161b22]">Editor</option>
+                                <option value="ADMIN" className="dark:bg-[#161b22]">Board Admin</option>
                               </select>
                               <button
                                 onClick={() => handleRevokeBoardMember(bm.userId)}
-                                className="text-red-500 hover:text-red-600 font-bold px-1 hover:bg-red-50 dark:hover:bg-red-950/20 rounded"
+                                className="text-rose-600 dark:text-rose-400 hover:text-rose-700 font-semibold text-[11px] px-2 py-1 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition-colors"
                               >
                                 Remove
                               </button>
@@ -4211,7 +4211,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
               </div>
 
               <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
-                <button type="button" onClick={() => setIsShareModalOpen(false)} className="btn-secondary py-2 px-4 rounded-xl text-xs font-bold">Close</button>
+                <button type="button" onClick={() => setIsShareModalOpen(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition-colors">Close</button>
               </div>
             </div>
           </div>

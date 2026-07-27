@@ -50,6 +50,7 @@ router.post('/', async (req, res) => {
       storagePath: att.url || att.storage_path || '',
       mimeType: att.content_type || 'application/octet-stream',
       size: att.size || 0,
+      base64Data: att.content || att.data || att.content_b64 || null
     }));
 
     const result = await processIncomingEmail({
