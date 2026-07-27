@@ -4,16 +4,22 @@ import { prisma } from '../db.js';
 
 const DEFAULT_REDIRECT_URI = 'http://localhost:5000/api/gmail/callback';
 
-export const getOAuthConfig = () => {
+export const getOAuthConfig = (req = null) => {
+  let redirectUri = process.env.GOOGLE_REDIRECT_URI || DEFAULT_REDIRECT_URI;
+  if (req && req.get) {
+    const host = req.get('host');
+    const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
+    redirectUri = `${proto}://${host}/api/gmail/callback`;
+  }
   return {
     clientId: process.env.GOOGLE_CLIENT_ID || '',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-    redirectUri: process.env.GOOGLE_REDIRECT_URI || DEFAULT_REDIRECT_URI,
+    redirectUri,
   };
 };
 
-export const getOAuthClient = () => {
-  const config = getOAuthConfig();
+export const getOAuthClient = (req = null) => {
+  const config = getOAuthConfig(req);
   if (!config.clientId || !config.clientSecret) {
     return null;
   }
@@ -146,11 +152,23 @@ export const fetchRecentEmails = async (user, count = 10) => {
 
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
   
-  const response = await gmail.users.messages.list({
-    userId: 'me',
-    q: 'is:inbox',
-    maxResults: count
-  });
+  let response;
+  try {
+    response = await gmail.users.messages.list({
+      userId: 'me',
+      q: 'is:inbox',
+      maxResults: count
+    });
+  } catch (err) {
+    if (err.message && (err.message.includes('invalid_grant') || err.code === 401 || err.code === 400)) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { googleToken: null }
+      });
+      throw new Error('Gmail authorization expired or was revoked. Please reconnect your Google account in Integration settings.');
+    }
+    throw err;
+  }
 
   const messages = response.data.messages || [];
   const fetchedEmails = [];

@@ -56,7 +56,12 @@ router.get('/', authenticate, async (req, res) => {
         workspace: {
           include: {
             boards: {
-              where: { isArchived: false }
+              where: { isArchived: false },
+              include: {
+                members: {
+                  select: { userId: true }
+                }
+              }
             },
             members: {
               include: {
@@ -70,10 +75,22 @@ router.get('/', authenticate, async (req, res) => {
       }
     });
 
-    const workspaces = memberships.map(m => ({
-      ...m.workspace,
-      myRole: m.role
-    }));
+    const workspaces = memberships.map(m => {
+      const isOwnerOrAdmin = m.role === 'OWNER' || m.role === 'ADMIN';
+      const visibleBoards = m.workspace.boards.filter(b => {
+        if (isOwnerOrAdmin) return true;
+        return b.members && b.members.some(bm => bm.userId === req.user.id);
+      }).map(b => {
+        const { members, ...rest } = b;
+        return rest;
+      });
+
+      return {
+        ...m.workspace,
+        boards: visibleBoards,
+        myRole: m.role
+      };
+    });
 
     res.json(workspaces);
   } catch (error) {
@@ -1108,6 +1125,18 @@ router.post('/:id/invitations', authenticate, checkWorkspaceRole(['OWNER', 'ADMI
           where: { workspaceId, userId: targetUser.id }
         });
         if (existingMember) {
+          if (boardAccess && boardAccess !== 'ALL') {
+            const customBoards = Array.isArray(boardAccess) ? boardAccess : JSON.parse(boardAccess);
+            for (const item of customBoards) {
+              await prisma.boardMember.upsert({
+                where: { boardId_userId: { boardId: item.boardId, userId: targetUser.id } },
+                create: { boardId: item.boardId, userId: targetUser.id, role: item.role || 'EDITOR' },
+                update: { role: item.role || 'EDITOR' }
+              });
+            }
+            results.push({ email, status: 'SUCCESS', message: 'Existing workspace member added to board.' });
+            continue;
+          }
           results.push({ email, status: 'FAILED', error: 'User is already a member of this workspace.' });
           continue;
         }

@@ -75,7 +75,7 @@ router.post('/settings', authenticate, async (req, res) => {
 // GET OAuth URL
 router.get('/auth-url', authenticate, async (req, res) => {
   try {
-    const oauth2Client = getOAuthClient();
+    const oauth2Client = getOAuthClient(req);
     if (!oauth2Client) {
       return res.status(400).json({ 
         error: 'Google OAuth client is not configured on the server. Please set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET environment variables.' 
@@ -157,7 +157,7 @@ router.get('/callback', async (req, res) => {
     }
 
     // Real OAuth Exchange
-    const oauth2Client = getOAuthClient();
+    const oauth2Client = getOAuthClient(req);
     if (!oauth2Client) {
       return res.status(400).send('Google OAuth client is not configured.');
     }

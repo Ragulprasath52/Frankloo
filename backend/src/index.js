@@ -50,11 +50,16 @@ app.use('/api/inbox', inboxRoutes);
 app.use('/api/cloudmailin', cloudmailinRoutes);
 app.use('/api/gmail', gmailRoutes);
 
+app.get('/', (_req, res) => {
+  res.json({ message: 'Frankloo API Server Running', status: 'ok', health: '/health' });
+});
+
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
 const PORT = env.port;
+
 server.listen(env.port, env.host, () => {
   console.log(`🚀 Frankloo running on ${env.backendBaseUrl}`);
 });
