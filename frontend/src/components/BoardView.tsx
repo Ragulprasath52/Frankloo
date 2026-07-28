@@ -1102,6 +1102,7 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
   const [inboxWidth, setInboxWidth] = useState(() => parseInt(localStorage.getItem('frankloo-inbox-width') || '360', 10));
   const [isResizingInbox, setIsResizingInbox] = useState(false);
   const [inboxSearchQuery, setInboxSearchQuery] = useState('');
+  const [isRefreshingInbox, setIsRefreshingInbox] = useState(false);
   const [inboxSourceFilter, setInboxSourceFilter] = useState('ALL');
   const [inboxPriorityFilter, setInboxPriorityFilter] = useState('ALL');
   const [previewInboxItem, setPreviewInboxItem] = useState<any | null>(null);
@@ -2556,21 +2557,26 @@ export default function BoardView({ boardId, onBack, onOpenCardDetails, onOpenGu
                         </button>
                         <button
                           onClick={async () => {
-                            if (currentWorkspace) {
-                              addToast('Refreshing', 'Refreshing inbox items...', 'info');
-                              try {
-                                  await fetchInboxItems(currentWorkspace.id);
-                                  addToast('Refreshed', 'Inbox updated successfully.', 'success');
-                                } catch (err: any) {
-                                  addToast('Refresh Failed', err.message || 'Error updating inbox.', 'error');
-                                }
-                              }
-                            }}
-                            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0"
-                            title="Refresh Inbox"
-                          >
-                            <RotateCw className="w-3.5 h-3.5" />
-                          </button>
+                            if (!currentWorkspace || isRefreshingInbox) return;
+                            setIsRefreshingInbox(true);
+                            addToast('Refreshing', 'Refreshing inbox items...', 'info');
+                            try {
+                              await fetchInboxItems(currentWorkspace.id);
+                              addToast('Refreshed', 'Inbox updated successfully.', 'success');
+                            } catch (err: any) {
+                              addToast('Refresh Failed', err.message || 'Error updating inbox.', 'error');
+                            } finally {
+                              setIsRefreshingInbox(false);
+                            }
+                          }}
+                          disabled={isRefreshingInbox}
+                          className={`p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0 ${
+                            isRefreshingInbox ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                          title="Refresh Inbox"
+                        >
+                          <RotateCw className={`w-3.5 h-3.5 ${isRefreshingInbox ? 'animate-spin text-indigo-500' : ''}`} />
+                        </button>
                           <button
                             onClick={() => {
                               setIsInboxCollapsed(true);

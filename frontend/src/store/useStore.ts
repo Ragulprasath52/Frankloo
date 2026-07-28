@@ -2059,10 +2059,19 @@ export const useStore = create<AppState>((set, get) => ({
   toasts: [],
   addToast: (title, message, type = 'info', action) => {
     const id = Math.random().toString(36).substring(2, 9);
-    set((state) => ({ toasts: [...state.toasts, { id, title, message, type, action }] }));
+    set((state) => {
+      // Remove duplicates or replace active Refreshing/Refreshed toasts
+      const filtered = state.toasts.filter(
+        (t) =>
+          !(t.title === title && t.message === message) &&
+          !((title === 'Refreshing' || title === 'Refreshed') && (t.title === 'Refreshing' || t.title === 'Refreshed'))
+      );
+      // Limit to max 3 toasts visible at once to prevent screen clutter
+      return { toasts: [...filtered, { id, title, message, type, action }].slice(-3) };
+    });
     setTimeout(() => {
       get().removeToast(id);
-    }, 6000);
+    }, 4000);
   },
   removeToast: (id) => {
     set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }));
