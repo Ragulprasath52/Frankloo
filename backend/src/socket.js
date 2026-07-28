@@ -56,6 +56,7 @@ export function initSocket(server) {
 export function notifyBoardUpdate(boardId, action, data) {
   if (ioInstance && boardId) {
     ioInstance.to(`board:${boardId}`).emit('board_change', { action, data });
+    ioInstance.emit('board_change', { boardId, action, data });
   }
 }
 
@@ -66,9 +67,12 @@ export function notifyUser(userId, notification) {
   }
 }
 
-// Push workspace event to all clients connected in that workspace room
+// Push workspace event to all clients connected in that workspace room and globally
 export function notifyWorkspaceUpdate(workspaceId, event, data) {
   if (ioInstance && workspaceId) {
+    console.log(`[SOCKET] Broadcasting workspace update: "${event}" to workspace ${workspaceId}`);
     ioInstance.to(`workspace:${workspaceId}`).emit(event, data);
+    ioInstance.emit(event, data); // Global emit as fail-safe guarantee for all connected clients
   }
 }
+

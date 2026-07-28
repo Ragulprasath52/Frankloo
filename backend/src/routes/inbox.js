@@ -1,8 +1,8 @@
-import express, { Router } from 'express';
+﻿import express, { Router } from 'express';
 import PostalMime from 'postal-mime';
 import { prisma } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
-import { notifyBoardUpdate } from '../socket.js';
+import { notifyBoardUpdate, notifyWorkspaceUpdate } from '../socket.js';
 import { parseEmailBody } from '../utils/emailParser.js';
 import { parseEmailIntelligently, getDiceSimilarity, parseSender } from '../utils/emailParserService.js';
 import fs from 'fs';
@@ -924,443 +924,434 @@ router.post('/:workspaceId/mock-incoming', authenticate, async (req, res) => {
 });
 
 // Helper: persist attachments to uploads directory if base64 content is present and strip heavy buffers
+// Every attachment is processed independently â€“ one failure never blocks the others
 function sanitizeAndSaveAttachments(attList) {
   if (!attList || !Array.isArray(attList)) return [];
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const uploadDir = path.join(__dirname, '../../../uploads');
-  
-  return attList.map((att, index) => {
+
+  const results = [];
+  for (let index = 0; index < attList.length; index++) {
+    const att = attList[index];
     let storagePath = att.storagePath || att.url || 'uploads/gmail-dummy';
-    if (att.base64Data || att.content) {
-      try {
+    try {
+      if (att.base64Data || att.content) {
         if (!fs.existsSync(uploadDir)) {
           fs.mkdirSync(uploadDir, { recursive: true });
         }
-        const rawContent = att.content ? (Buffer.isBuffer(att.content) ? att.content : Buffer.from(att.content)) : Buffer.from(att.base64Data, 'base64');
+        const rawContent = att.content
+          ? (Buffer.isBuffer(att.content) ? att.content : Buffer.from(att.content))
+          : Buffer.from(att.base64Data, 'base64');
         const safeFilename = `${Date.now()}-${index}-${(att.filename || att.file_name || 'attachment').replace(/[^a-zA-Z0-9._-]/g, '_')}`;
         fs.writeFileSync(path.join(uploadDir, safeFilename), rawContent);
         storagePath = `uploads/${safeFilename}`;
-      } catch (err) {
-        console.error('Error writing incoming email attachment to disk:', err);
+        console.log(`[ATTACHMENT] Saved attachment ${index + 1}: ${safeFilename} (${rawContent.length} bytes)`);
       }
+    } catch (err) {
+      // Never let one bad attachment kill the whole email â€” log and continue
+      console.error(`[ATTACHMENT] Error saving attachment ${index + 1} ("${att.filename || 'unknown'}"): ${err.message}`);
     }
-    return {
+    results.push({
       filename: att.filename || att.file_name || `attachment_${index + 1}`,
       storagePath,
       mimeType: att.mimeType || att.content_type || 'application/octet-stream',
       size: att.size || (att.base64Data ? Math.round(att.base64Data.length * 0.75) : 0)
-    };
-  });
+    });
+  }
+  return results;
 }
 
 // Helper function to process all incoming emails (from SMTP webhook or test simulator)
+// This function is BULLETPROOF: every step is isolated so no single failure prevents email delivery
 export async function processIncomingEmail({ to, from, cc, subject, text, html, attachments, threadId, messageId, receivedDate }) {
-  const cleanTo = to.match(/<([^>]+)>/)?.[1] || to.trim();
-  console.log(`[PROCESS INCOMING EMAIL] cleanTo = ${cleanTo}`);
-  const prefix = cleanTo.split('@')[0] || '';
-  const board = await prisma.board.findFirst({
-    where: {
-      OR: [
-        { incomingEmailAddress: cleanTo },
-        ...(prefix.length >= 8 ? [{ id: { startsWith: prefix } }] : [])
-      ]
-    },
-    include: { workspace: true }
-  });
+  // â”€â”€ Step 0: Input sanitization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const safeSubject = (subject || '(No Subject)').substring(0, 998); // MySQL VARCHAR safety
+  const safeFrom = (from || '').substring(0, 998);
+  const safeTo = (to || '').substring(0, 998);
+  const safeText = text || '';
+  const safeHtml = html || '';
+  const safeAttachments = attachments || [];
 
-  if (!board) {
-    console.warn(`[PROCESS INCOMING EMAIL] Board not found for address: "${cleanTo}"`);
-    throw new Error('Board not found for this email address');
+  const cleanTo = safeTo.match(/<([^>]+)>/)?.[1] || safeTo.trim();
+  console.log(`[EMAIL] Processing â†’ to: "${cleanTo}", from: "${safeFrom}", subject: "${safeSubject}", attachments: ${safeAttachments.length}`);
+  console.log(`[EMAIL] Body sizes â†’ HTML: ${(Buffer.byteLength(safeHtml, 'utf8') / 1024).toFixed(1)}KB, Text: ${(Buffer.byteLength(safeText, 'utf8') / 1024).toFixed(1)}KB`);
+
+  // â”€â”€ Step 1: Find board â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const prefix = cleanTo.split('@')[0] || '';
+  let board;
+  try {
+    board = await prisma.board.findFirst({
+      where: {
+        OR: [
+          { incomingEmailAddress: cleanTo },
+          ...(prefix.length >= 8 ? [{ id: { startsWith: prefix } }] : [])
+        ]
+      },
+      include: { workspace: true }
+    });
+  } catch (dbErr) {
+    console.error('[EMAIL] DB error finding board:', dbErr.message);
+    throw new Error('Database error looking up board');
   }
 
-  console.log(`[PROCESS INCOMING EMAIL] Found board: "${board.name}" (id: ${board.id})`);
+  if (!board) {
+    console.warn(`[EMAIL] No board found for address "${cleanTo}"`);
+    throw new Error('Board not found for this email address');
+  }
+  console.log(`[EMAIL] Found board: "${board.name}" (id: ${board.id})`);
 
   if (!board.incomingEmailEnabled) {
-    console.warn(`[PROCESS INCOMING EMAIL] Incoming email is disabled for board: "${board.name}"`);
+    console.warn(`[EMAIL] Incoming email disabled for board: "${board.name}"`);
     throw new Error('Incoming email is disabled for this board');
   }
 
-  const cleanFrom = from.match(/<([^>]+)>/)?.[1] || from.trim();
+  const cleanFrom = safeFrom.match(/<([^>]+)>/)?.[1] || safeFrom.trim();
 
-  // 1. Rate Limiting check (max 60/hour)
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-  const hourlyCount = await prisma.emailLog.count({
-    where: { boardId: board.id, createdAt: { gte: oneHourAgo } }
-  });
-  if (hourlyCount >= 60) {
-    await prisma.emailLog.create({
-      data: {
-        boardId: board.id,
-        sender: from,
-        subject: subject,
-        status: 'RATE_LIMITED',
-        details: 'Hourly email limit reached (60/hour).'
-      }
+  // â”€â”€ Step 2: Rate limiting (max 60/hour) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  try {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const hourlyCount = await prisma.emailLog.count({
+      where: { boardId: board.id, createdAt: { gte: oneHourAgo } }
     });
-    throw new Error('Rate limit exceeded (60/hour)');
-  }
-
-  // 2. Sender validation check
-  if (board.incomingEmailAllowedSenders && board.incomingEmailAllowedSenders !== 'ANY') {
-    const allowedDomains = board.incomingEmailAllowedSenders.split(',').map(d => d.trim().toLowerCase());
-    const senderDomain = cleanFrom.split('@')[1] || '';
-    const isAllowed = allowedDomains.some(domain => 
-      cleanFrom.toLowerCase() === domain || 
-      senderDomain === domain || 
-      (domain.startsWith('.') && senderDomain.endsWith(domain))
-    );
-
-    if (!isAllowed) {
+    if (hourlyCount >= 60) {
       await prisma.emailLog.create({
-        data: {
-          boardId: board.id,
-          sender: from,
-          subject: subject,
-          status: 'SENDER_BLOCKED',
-          details: `Sender domain/address "${cleanFrom}" is not in the allowed list: "${board.incomingEmailAllowedSenders}".`
-        }
-      });
-      throw new Error('Sender not authorized');
+        data: { boardId: board.id, sender: safeFrom, subject: safeSubject, status: 'RATE_LIMITED', details: 'Hourly email limit reached (60/hour).' }
+      }).catch(() => {});
+      throw new Error('Rate limit exceeded (60/hour)');
+    }
+  } catch (err) {
+    if (err.message.includes('Rate limit')) throw err;
+    // If rate limit check itself fails (DB error), log and continue â€” better to deliver than block
+    console.warn('[EMAIL] Rate limit check failed (DB error), continuing:', err.message);
+  }
+
+  // â”€â”€ Step 3: Sender validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  if (board.incomingEmailAllowedSenders && board.incomingEmailAllowedSenders !== 'ANY') {
+    try {
+      const allowedDomains = board.incomingEmailAllowedSenders.split(',').map(d => d.trim().toLowerCase());
+      const senderDomain = cleanFrom.split('@')[1] || '';
+      const isAllowed = allowedDomains.some(domain =>
+        cleanFrom.toLowerCase() === domain ||
+        senderDomain === domain ||
+        (domain.startsWith('.') && senderDomain.endsWith(domain))
+      );
+      if (!isAllowed) {
+        await prisma.emailLog.create({
+          data: { boardId: board.id, sender: safeFrom, subject: safeSubject, status: 'SENDER_BLOCKED', details: `Sender "${cleanFrom}" not in allowed list.` }
+        }).catch(() => {});
+        throw new Error('Sender not authorized');
+      }
+    } catch (err) {
+      if (err.message.includes('Sender not authorized')) throw err;
+      console.warn('[EMAIL] Sender validation error, continuing:', err.message);
     }
   }
 
-  // 3. Spam filtering check
-  let isSpam = false;
-  let spamTrigger = '';
+  // â”€â”€ Step 4: Spam filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (board.incomingEmailSpamFilter) {
-    const spamKeywords = ['viagra', 'buy now', 'credit check', 'lottery winner', 'casino', 'free money', 'millions of dollars', '[spam]'];
-    const cleanSubject = (subject || '').toLowerCase();
-    const cleanBody = (text || html || '').toLowerCase();
-    for (const kw of spamKeywords) {
-      if (cleanSubject.includes(kw) || cleanBody.includes(kw)) {
-        isSpam = true;
-        spamTrigger = kw;
-        break;
+    try {
+      const spamKeywords = ['viagra', 'buy now', 'credit check', 'lottery winner', 'casino', 'free money', 'millions of dollars', '[spam]'];
+      const cleanSubjectLower = safeSubject.toLowerCase();
+      const cleanBodyLower = (safeText || safeHtml || '').substring(0, 5000).toLowerCase(); // only check first 5KB for spam
+      for (const kw of spamKeywords) {
+        if (cleanSubjectLower.includes(kw) || cleanBodyLower.includes(kw)) {
+          await prisma.emailLog.create({
+            data: { boardId: board.id, sender: safeFrom, subject: safeSubject, status: 'SPAM', details: `Flagged as spam by keyword: "${kw}"` }
+          }).catch(() => {});
+          throw new Error(`Email flagged as spam (keyword: ${kw})`);
+        }
       }
+    } catch (err) {
+      if (err.message.includes('spam')) throw err;
+      console.warn('[EMAIL] Spam check error, continuing:', err.message);
     }
   }
-  if (isSpam) {
-    await prisma.emailLog.create({
-      data: {
-        boardId: board.id,
-        sender: from,
-        subject: subject,
-        status: 'SPAM',
-        details: `Flagged as spam by keyword match: "${spamTrigger}"`
-      }
-    });
-    throw new Error('Email flagged as spam');
+
+  // â”€â”€ Step 5: Save attachments to disk (each one independently) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  let persistedAttachments = [];
+  try {
+    persistedAttachments = sanitizeAndSaveAttachments(safeAttachments);
+  } catch (err) {
+    console.error('[EMAIL] Attachment processing error (continuing without attachments):', err.message);
+    persistedAttachments = [];
   }
 
-  // 4. Attachment size limit check & persistence
-  const safeAttachments = sanitizeAndSaveAttachments(attachments || []);
-  if (safeAttachments.length > 0) {
-    const totalBytes = safeAttachments.reduce((sum, att) => sum + (att.size || 0), 0);
+  // â”€â”€ Step 6: Attachment size limit warning (non-blocking) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  try {
+    const totalBytes = persistedAttachments.reduce((sum, att) => sum + (att.size || 0), 0);
     const limitBytes = (board.incomingEmailAttachmentLimit || 50) * 1024 * 1024;
     if (totalBytes > limitBytes) {
       await prisma.emailLog.create({
         data: {
-          boardId: board.id,
-          sender: from,
-          subject: subject,
+          boardId: board.id, sender: safeFrom, subject: safeSubject,
           status: 'SIZE_EXCEEDED_WARNING',
-          details: `Total attachment size (${(totalBytes / (1024 * 1024)).toFixed(2)} MB) exceeded limit of ${board.incomingEmailAttachmentLimit || 50} MB. Email delivered to inbox with attachments preserved.`
+          details: `Total attachment size (${(totalBytes / 1024 / 1024).toFixed(2)} MB) exceeds limit of ${board.incomingEmailAttachmentLimit || 50} MB. Email still delivered.`
         }
-      });
+      }).catch(() => {});
     }
+  } catch (err) {
+    console.warn('[EMAIL] Size check error (continuing):', err.message);
   }
 
-  // 5. Threading replies check
+  // â”€â”€ Step 7: Thread reply check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (threadId) {
-    const existingThreadCard = await prisma.card.findFirst({
-      where: {
-        list: { boardId: board.id },
-        emailDetails: { threadId }
-      }
-    });
-
-    if (existingThreadCard) {
-      const threadAction = board.incomingEmailThreadAction || 'COMMENT';
-      const ownerMember = await prisma.workspaceMember.findFirst({
-        where: { workspaceId: board.workspaceId, role: 'OWNER' }
+    try {
+      const existingThreadCard = await prisma.card.findFirst({
+        where: { list: { boardId: board.id }, emailDetails: { threadId } }
       });
-      const userId = ownerMember?.userId || 'system';
-
-      if (threadAction === 'COMMENT') {
-        await prisma.comment.create({
-          data: {
-            cardId: existingThreadCard.id,
-            userId,
-            content: `[Reply from Email: ${from}]\n\n${text || 'Empty message body'}`
-          }
+      if (existingThreadCard) {
+        const threadAction = board.incomingEmailThreadAction || 'COMMENT';
+        const ownerMember = await prisma.workspaceMember.findFirst({
+          where: { workspaceId: board.workspaceId, role: 'OWNER' }
         });
-        notifyBoardUpdate(board.id, 'COMMENT_CREATE', { cardId: existingThreadCard.id });
-      } else {
-        await prisma.activityLog.create({
-          data: {
-            userId,
-            boardId: board.id,
-            cardId: existingThreadCard.id,
-            action: 'THREAD_REPLY',
-            details: `Threaded reply email from ${from}: "${subject}"`
-          }
-        });
-      }
-
-      await prisma.emailLog.create({
-        data: {
-          boardId: board.id,
-          sender: from,
-          subject: subject,
-          status: 'SUCCESS',
-          details: `Appended as threaded reply to Card "${existingThreadCard.title}" (ID: ${existingThreadCard.id}) via ${threadAction}.`
+        const userId = ownerMember?.userId || 'system';
+        if (threadAction === 'COMMENT') {
+          await prisma.comment.create({
+            data: { cardId: existingThreadCard.id, userId, content: `[Reply from Email: ${safeFrom}]\n\n${safeText || 'Empty message body'}` }
+          });
+          notifyBoardUpdate(board.id, 'COMMENT_CREATE', { cardId: existingThreadCard.id });
+        } else {
+          await prisma.activityLog.create({
+            data: { userId, boardId: board.id, cardId: existingThreadCard.id, action: 'THREAD_REPLY', details: `Threaded reply from ${safeFrom}: "${safeSubject}"` }
+          });
         }
-      });
-
-      return { success: true, action: 'THREAD_REPLY', cardId: existingThreadCard.id };
+        await prisma.emailLog.create({
+          data: { boardId: board.id, sender: safeFrom, subject: safeSubject, status: 'SUCCESS', details: `Threaded reply appended to Card "${existingThreadCard.title}".` }
+        }).catch(() => {});
+        return { success: true, action: 'THREAD_REPLY', cardId: existingThreadCard.id };
+      }
+    } catch (err) {
+      console.warn('[EMAIL] Thread check error (continuing to inbox delivery):', err.message);
     }
   }
 
-  const parsed = parseEmailIntelligently(subject, text || '', html || '');
-  const senderInfo = parseSender(from);
+  // â”€â”€ Step 8: Parse email content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  let parsed = { title: safeSubject, description: safeText.substring(0, 2000), priority: 'MEDIUM', dueDate: null, checklist: [], labels: [] };
+  let senderInfo = { name: safeFrom, email: cleanFrom };
+  try {
+    parsed = parseEmailIntelligently(safeSubject, safeText, safeHtml);
+    senderInfo = parseSender(safeFrom);
+  } catch (err) {
+    console.warn('[EMAIL] Email parser error (using fallback values):', err.message);
+  }
 
-  // 6. Automation Rules auto-routing matching logic
+  // â”€â”€ Step 9: Automation rules check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let autoRouteMatch = false;
   let autoTargetListId = null;
   if (board.incomingEmailAutomationEnabled) {
-    const rules = await prisma.gmailAutoRule.findMany({
-      where: { targetBoardId: board.id }
-    });
-    if (rules.length > 0) {
-      for (const rule of rules) {
-        if (rule.triggerType === 'SENDER' && cleanFrom.toLowerCase().includes(rule.triggerVal.toLowerCase())) {
-          autoRouteMatch = true;
-          autoTargetListId = rule.targetListId;
-          break;
+    try {
+      const rules = await prisma.gmailAutoRule.findMany({ where: { targetBoardId: board.id } });
+      if (rules.length > 0) {
+        for (const rule of rules) {
+          if (rule.triggerType === 'SENDER' && cleanFrom.toLowerCase().includes(rule.triggerVal.toLowerCase())) {
+            autoRouteMatch = true; autoTargetListId = rule.targetListId; break;
+          }
+          if (rule.triggerType === 'KEYWORD' && safeSubject.toLowerCase().includes(rule.triggerVal.toLowerCase())) {
+            autoRouteMatch = true; autoTargetListId = rule.targetListId; break;
+          }
         }
-        if (rule.triggerType === 'KEYWORD' && (subject || '').toLowerCase().includes(rule.triggerVal.toLowerCase())) {
-          autoRouteMatch = true;
-          autoTargetListId = rule.targetListId;
-          break;
-        }
+      } else {
+        autoRouteMatch = true; // auto-convert all if no explicit rules
       }
-    } else {
-      // Automatically convert every email to a card if auto conversion toggle is enabled and no explicit match rules exist
-      autoRouteMatch = true;
+    } catch (err) {
+      console.warn('[EMAIL] Automation rule check error (skipping auto-convert):', err.message);
     }
   }
 
+  // â”€â”€ Step 10: Auto-convert to card if automation matched â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (autoRouteMatch) {
-    // Automatically convert to card
-    let listId = autoTargetListId || board.incomingEmailListId;
-    if (!listId) {
-      const firstList = await prisma.list.findFirst({
-        where: { boardId: board.id },
-        orderBy: { position: 'asc' }
-      });
-      listId = firstList?.id;
-    }
-    if (!listId) {
-      const defaultList = await prisma.list.create({
-        data: { name: 'Inbox', position: 1000.0, boardId: board.id }
-      });
-      listId = defaultList.id;
-    }
+    try {
+      let listId = autoTargetListId || board.incomingEmailListId;
+      if (!listId) {
+        const firstList = await prisma.list.findFirst({ where: { boardId: board.id }, orderBy: { position: 'asc' } });
+        listId = firstList?.id;
+      }
+      if (!listId) {
+        const defaultList = await prisma.list.create({ data: { name: 'Inbox', position: 1000.0, boardId: board.id } });
+        listId = defaultList.id;
+      }
 
-    const defaultLabels = [];
-    if (board.incomingEmailDefaultLabelIds) {
-      const labelNames = board.incomingEmailDefaultLabelIds.split(',').map(l => l.trim());
-      for (const name of labelNames) {
-        if (name) {
+      const defaultLabels = [];
+      if (board.incomingEmailDefaultLabelIds) {
+        for (const name of board.incomingEmailDefaultLabelIds.split(',').map(l => l.trim()).filter(Boolean)) {
           defaultLabels.push({ name, color: '#36b37e' });
         }
       }
-    }
-
-    // Add parsed auto labels
-    if (parsed.labels && parsed.labels.length > 0) {
-      for (const name of parsed.labels) {
-        if (!defaultLabels.some(l => l.name.toLowerCase() === name.toLowerCase())) {
-          defaultLabels.push({ name, color: '#0969da' });
-        }
-      }
-    }
-
-    // Extract inline base64 images from HTML content
-    const inlineAttachments = [];
-    const isHtml = (str) => /<html|<doctype|<head|<body|<style/i.test(str || '');
-    const htmlToParse = html || (isHtml(text) ? text : '');
-    if (htmlToParse) {
-      const base64ImageRegex = /<img[^>]+src=["']data:image\/([a-zA-Z]*);base64,([^"']+)["'][^>]*>/g;
-      let match;
-      let imgIndex = 1;
-      const __dirname = path.dirname(fileURLToPath(import.meta.url));
-      const uploadDir = path.join(__dirname, '../../../uploads');
-      
-      while ((match = base64ImageRegex.exec(htmlToParse)) !== null) {
-        const extension = match[1] || 'png';
-        const base64Data = match[2];
-        const filename = `inline_image_${imgIndex++}.${extension}`;
-        const uniqueName = `${Date.now()}-${filename}`;
-        
-        try {
-          if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
+      if (parsed.labels?.length > 0) {
+        for (const name of parsed.labels) {
+          if (!defaultLabels.some(l => l.name.toLowerCase() === name.toLowerCase())) {
+            defaultLabels.push({ name, color: '#0969da' });
           }
-          const filePath = path.join(uploadDir, uniqueName);
-          fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
-          inlineAttachments.push({
-            filename,
-            mimeType: `image/${extension}`,
-            size: Math.round(base64Data.length * 0.75),
-            storagePath: `uploads/${uniqueName}`
-          });
-        } catch (err) {
-          console.error('Error saving inline base64 image:', err);
         }
       }
-    }
 
-    const allAttachments = [...safeAttachments, ...inlineAttachments];
-
-    const card = await prisma.card.create({
-      data: {
-        title: parsed.title,
-        description: parsed.description,
-        position: 1000.0,
-        priority: parsed.priority || board.incomingEmailDefaultPriority || 'MEDIUM',
-        dueDate: parsed.dueDate ? new Date(parsed.dueDate) : null,
-        listId,
-        customFields: JSON.stringify({ labels: defaultLabels, emoji: '' })
-      }
-    });
-
-    const metadataJson = JSON.stringify({
-      cc: cc || '',
-      bcc: bcc || '',
-      recipients: to || '',
-      replyLink: null
-    });
-    await prisma.cardEmailDetails.create({
-      data: {
-        cardId: card.id,
-        sender: from,
-        subject: subject,
-        receivedTime: receivedDate ? new Date(receivedDate) : new Date(),
-        messageId: messageId || null,
-        threadId: threadId || null,
-        bodyHtml: html || text || '',
-        bodyText: parsed.description,
-        replyLink: metadataJson,
-        hasAttachments: allAttachments.length > 0
-      }
-    });
-
-    // Auto assignees
-    if (board.incomingEmailAutoAssigneeIds) {
-      const assigneeIds = board.incomingEmailAutoAssigneeIds.split(',').map(id => id.trim());
-      for (const uid of assigneeIds) {
-        if (uid) {
-          await prisma.cardAssignee.create({
-            data: { cardId: card.id, userId: uid }
-          });
+      // Extract inline base64 images from HTML
+      const inlineAttachments = [];
+      try {
+        const isHtml = (str) => /(<html|<!doctype|<head|<body|<style)/i.test(str || '');
+        const htmlToParse = safeHtml || (isHtml(safeText) ? safeText : '');
+        if (htmlToParse) {
+          const base64ImageRegex = /<img[^>]+src=["']data:image\/([a-zA-Z]*);base64,([^"']+)["'][^>]*>/g;
+          let match; let imgIndex = 1;
+          const __dirname = path.dirname(fileURLToPath(import.meta.url));
+          const uploadDir = path.join(__dirname, '../../../uploads');
+          while ((match = base64ImageRegex.exec(htmlToParse)) !== null) {
+            try {
+              const extension = match[1] || 'png';
+              const base64Data = match[2];
+              const uniqueName = `${Date.now()}-inline_image_${imgIndex++}.${extension}`;
+              if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+              fs.writeFileSync(path.join(uploadDir, uniqueName), Buffer.from(base64Data, 'base64'));
+              inlineAttachments.push({ filename: `inline_image_${imgIndex - 1}.${extension}`, mimeType: `image/${extension}`, size: Math.round(base64Data.length * 0.75), storagePath: `uploads/${uniqueName}` });
+            } catch (imgErr) {
+              console.warn('[EMAIL] Inline image save error (continuing):', imgErr.message);
+            }
+          }
         }
+      } catch (imgParseErr) {
+        console.warn('[EMAIL] Inline image extraction error (continuing):', imgParseErr.message);
       }
-    }
 
-    // Attachments
-    if (allAttachments.length > 0) {
-      const ownerMember = await prisma.workspaceMember.findFirst({
-        where: { workspaceId: board.workspaceId, role: 'OWNER' }
+      const allAttachments = [...persistedAttachments, ...inlineAttachments];
+
+      const card = await prisma.card.create({
+        data: {
+          title: parsed.title,
+          description: parsed.description,
+          position: 1000.0,
+          priority: parsed.priority || board.incomingEmailDefaultPriority || 'MEDIUM',
+          dueDate: parsed.dueDate ? new Date(parsed.dueDate) : null,
+          listId,
+          customFields: JSON.stringify({ labels: defaultLabels, emoji: '' })
+        }
       });
-      const uploaderId = ownerMember?.userId || 'system';
 
-      for (const att of allAttachments) {
-        await prisma.cardAttachment.create({
-          data: {
-            cardId: card.id,
-            uploadedBy: uploaderId,
-            filename: att.filename,
-            storagePath: att.storagePath || 'uploads/gmail-dummy',
-            mimeType: att.mimeType || 'application/octet-stream',
-            size: att.size || 0
-          }
-        });
+      // Save CardEmailDetails (non-blocking)
+      await prisma.cardEmailDetails.create({
+        data: {
+          cardId: card.id, sender: safeFrom, subject: safeSubject,
+          receivedTime: receivedDate ? new Date(receivedDate) : new Date(),
+          messageId: messageId || null, threadId: threadId || null,
+          bodyHtml: safeHtml, bodyText: safeText,
+          replyLink: JSON.stringify({ cc: cc || '', recipients: safeTo, replyLink: null }),
+          hasAttachments: allAttachments.length > 0
+        }
+      }).catch(e => console.warn('[EMAIL] CardEmailDetails save error (continuing):', e.message));
+
+      // Auto assignees (non-blocking)
+      if (board.incomingEmailAutoAssigneeIds) {
+        for (const uid of board.incomingEmailAutoAssigneeIds.split(',').map(id => id.trim()).filter(Boolean)) {
+          await prisma.cardAssignee.create({ data: { cardId: card.id, userId: uid } })
+            .catch(e => console.warn(`[EMAIL] Assignee ${uid} error (continuing):`, e.message));
+        }
       }
+
+      // Save card attachments one-by-one (non-blocking)
+      if (allAttachments.length > 0) {
+        const ownerMember = await prisma.workspaceMember.findFirst({ where: { workspaceId: board.workspaceId, role: 'OWNER' } }).catch(() => null);
+        const uploaderId = ownerMember?.userId || 'system';
+        for (const att of allAttachments) {
+          await prisma.cardAttachment.create({
+            data: { cardId: card.id, uploadedBy: uploaderId, filename: att.filename, storagePath: att.storagePath || 'uploads/gmail-dummy', mimeType: att.mimeType || 'application/octet-stream', size: att.size || 0 }
+          }).catch(e => console.warn(`[EMAIL] Attachment DB save error for "${att.filename}" (continuing):`, e.message));
+        }
+      }
+
+      // Checklists (non-blocking)
+      if (parsed.checklist?.length > 0) {
+        for (let idx = 0; idx < parsed.checklist.length; idx++) {
+          await prisma.checklistItem.create({ data: { cardId: card.id, content: parsed.checklist[idx], position: idx * 100.0 } })
+            .catch(e => console.warn('[EMAIL] Checklist item error (continuing):', e.message));
+        }
+      }
+
+      await prisma.emailLog.create({
+        data: { boardId: board.id, sender: safeFrom, subject: safeSubject, status: 'SUCCESS', details: `Auto-converted to Card "${card.title}" (ID: ${card.id}). Attachments: ${allAttachments.length}` }
+      }).catch(() => {});
+
+      try { notifyBoardUpdate(board.id, 'CARD_CREATE', card); } catch (socketErr) { console.warn('[EMAIL] Socket notify error:', socketErr.message); }
+      return { success: true, action: 'AUTO_CONVERT', cardId: card.id };
+    } catch (autoErr) {
+      // Auto-convert failed â€” fall through to inbox delivery as a safety net
+      console.error('[EMAIL] Auto-convert failed, falling through to inbox delivery:', autoErr.message);
     }
-
-    // Checklists
-    if (parsed.checklist && parsed.checklist.length > 0) {
-      for (let idx = 0; idx < parsed.checklist.length; idx++) {
-        await prisma.checklistItem.create({
-          data: {
-            cardId: card.id,
-            content: parsed.checklist[idx],
-            position: idx * 100.0
-          }
-        });
-      }
-    }
-
-    await prisma.emailLog.create({
-      data: {
-        boardId: board.id,
-        sender: from,
-        subject: subject,
-        status: 'SUCCESS',
-        details: `Automatically converted to Card "${card.title}" (ID: ${card.id}) matching automation rules.`
-      }
-    });
-
-    notifyBoardUpdate(board.id, 'CARD_CREATE', card);
-    return { success: true, action: 'AUTO_CONVERT', cardId: card.id };
   }
 
-  // Create workspace InboxItem
+  // â”€â”€ Step 11: Deliver to Board Inbox (InboxItem) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const detailsJson = {
-    sender: from,
+    sender: safeFrom,
     senderName: senderInfo.name,
     senderEmail: senderInfo.email,
-    subject: subject,
-    recipients: to,
+    subject: safeSubject,
+    recipients: safeTo,
     cc: cc || '',
     receivedDate: receivedDate || new Date().toISOString(),
-    text: text || '',
-    html: html || '',
-    attachments: safeAttachments,
+    text: safeText,
+    html: safeHtml,
+    attachments: persistedAttachments,
     threadId: threadId || null,
     messageId: messageId || null,
     checklists: parsed.checklist || [],
     labels: parsed.labels || []
   };
 
-  const item = await prisma.inboxItem.create({
-    data: {
-      title: parsed.title,
-      description: parsed.description,
-      source: 'EMAIL',
-      sourceDetails: JSON.stringify(detailsJson),
-      status: 'NEW',
-      priority: parsed.priority || board.incomingEmailDefaultPriority || 'MEDIUM',
-      dueDate: parsed.dueDate ? new Date(parsed.dueDate) : null,
-      workspaceId: board.workspaceId,
-      boardId: board.id
+  let item;
+  try {
+    item = await prisma.inboxItem.create({
+      data: {
+        title: parsed.title || safeSubject,
+        description: parsed.description || safeText.substring(0, 500) || '',
+        source: 'EMAIL',
+        sourceDetails: JSON.stringify(detailsJson),
+        status: 'NEW',
+        priority: parsed.priority || board.incomingEmailDefaultPriority || 'MEDIUM',
+        dueDate: parsed.dueDate ? new Date(parsed.dueDate) : null,
+        workspaceId: board.workspaceId,
+        boardId: board.id
+      }
+    });
+    console.log(`[EMAIL] âœ… InboxItem created (ID: ${item.id}) for board "${board.name}"`);
+  } catch (dbErr) {
+    console.error('[EMAIL] CRITICAL: Failed to create InboxItem:', dbErr.message);
+    // Last-resort: try creating with minimal data
+    try {
+      item = await prisma.inboxItem.create({
+        data: {
+          title: safeSubject.substring(0, 255),
+          description: 'Email body too large to display. Check your email client.',
+          source: 'EMAIL',
+          sourceDetails: JSON.stringify({ sender: safeFrom, subject: safeSubject, text: '', html: '', attachments: [], error: 'Body truncated due to DB write error' }),
+          status: 'NEW',
+          priority: 'MEDIUM',
+          workspaceId: board.workspaceId,
+          boardId: board.id
+        }
+      });
+      console.log(`[EMAIL] âš ï¸ Minimal InboxItem created as fallback (ID: ${item.id})`);
+    } catch (fallbackErr) {
+      console.error('[EMAIL] FATAL: Even fallback InboxItem creation failed:', fallbackErr.message);
+      throw new Error('Failed to save email to inbox after multiple attempts');
     }
-  });
+  }
 
+  // Log success (non-blocking)
   await prisma.emailLog.create({
     data: {
-      boardId: board.id,
-      sender: from,
-      subject: subject,
-      status: 'SUCCESS',
-      details: `Delivered to Board Inbox as InboxItem (ID: ${item.id}).`
+      boardId: board.id, sender: safeFrom, subject: safeSubject, status: 'SUCCESS',
+      details: `Delivered to Board Inbox (ID: ${item.id}). HTML: ${(Buffer.byteLength(safeHtml, 'utf8') / 1024).toFixed(1)}KB, Attachments: ${persistedAttachments.length}`
     }
-  });
+  }).catch(logErr => console.warn('[EMAIL] EmailLog write error (non-critical):', logErr.message));
+
+  // Socket real-time notification (non-blocking)
+  try {
+    notifyWorkspaceUpdate(board.workspaceId, 'new_inbox_item', { workspaceId: board.workspaceId, boardId: board.id, itemId: item.id });
+    console.log(`[EMAIL] ðŸ”” Socket event fired â†’ workspace ${board.workspaceId}`);
+  } catch (socketErr) {
+    console.warn('[EMAIL] Socket notify error (email still delivered):', socketErr.message);
+  }
 
   return { success: true, action: 'INBOX_DELIVERED', itemId: item.id };
 }
-
 
 
 // GET email logs for a board

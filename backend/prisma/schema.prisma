@@ -184,7 +184,7 @@ model List {
 model Card {
   id            String           @id @default(uuid())
   title         String
-  description   String           @default("") @db.Text
+  description   String           @default("") @db.LongText
   position      Float
   listId        String
   isArchived    Boolean          @default(false)
@@ -419,9 +419,9 @@ model IntegrationConfig {
 model InboxItem {
   id            String    @id @default(uuid())
   title         String
-  description   String    @default("") @db.Text
+  description   String    @default("") @db.LongText
   source        String    @default("QUICK") // "GMAIL", "SLACK", "DISCORD", "GITHUB", "CALENDAR", "QUICK"
-  sourceDetails String    @default("{}") @db.Text // JSON string containing sender, subject, link, channel, etc.
+  sourceDetails String    @default("{}") @db.LongText // JSON string containing sender, subject, link, channel, etc.
   status        String    @default("NEW") // "NEW", "PROCESSING", "CONVERTED", "ARCHIVED"
   priority      String    @default("MEDIUM") // "LOW", "MEDIUM", "HIGH", "URGENT"
   dueDate       DateTime?
@@ -507,8 +507,8 @@ model CardEmailDetails {
   receivedTime   DateTime  @default(now())
   messageId      String?
   threadId       String?
-  bodyHtml       String?   @db.Text
-  bodyText       String?   @db.Text
+  bodyHtml       String?   @db.LongText
+  bodyText       String?   @db.LongText
   replyLink      String?
   hasAttachments Boolean   @default(false)
 
@@ -522,7 +522,7 @@ model EmailLog {
   sender      String
   subject     String
   status      String   // "SUCCESS", "SPAM", "RATE_LIMITED", "SENDER_BLOCKED", "SIZE_EXCEEDED"
-  details     String?  @db.Text
+  details     String?  @db.LongText
   createdAt   DateTime @default(now())
 
   board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)

@@ -12,10 +12,11 @@ router.post('/', async (req, res) => {
       return res.status(401).json({ error: 'Invalid Cloudmailin secret' });
     }
 
-    // Log full payload in dev so we can inspect the exact field names
-    console.log('[Cloudmailin] Raw payload keys:', Object.keys(req.body));
-    console.log('[Cloudmailin] envelope:', req.body.envelope);
-    console.log('[Cloudmailin] headers:', req.body.headers);
+    // Log approximate payload size for diagnosing large email issues
+    const bodySize = JSON.stringify(req.body).length;
+    console.log(`[Cloudmailin] Payload size: ~${(bodySize / 1024).toFixed(1)}KB, keys: ${Object.keys(req.body).join(', ')}`);
+    console.log('[Cloudmailin] envelope:', JSON.stringify(req.body.envelope));
+    console.log('[Cloudmailin] headers keys:', Object.keys(req.body.headers || {}).join(', '));
 
     // Cloudmailin JSON-Normalized format fields
     const {
@@ -28,21 +29,36 @@ router.post('/', async (req, res) => {
       attachments = []
     } = req.body;
 
-    // ─── FIX 1: Board address lookup ────────────────────────────────────────
-    // envelope.to  = the Cloudmailin relay address  (abc@cloudmailin.net) ← WRONG for board lookup
-    // headers.to   = the original recipient address the sender addressed   ← CORRECT for board lookup
-    // When a user forwards to abc123@boards.frankloo.app, that address lives in headers.to
-    const to = headers.to || envelope.to || '';
+    // ─── Board address lookup ────────────────────────────────────────────────
+    // For newsletter/broadcast emails the To header may be a mailing list address.
+    // We try multiple fields in priority order to find our board address:
+    //   1. envelope.to          – The actual SMTP RCPT TO recipient (most reliable for routing)
+    //   2. headers['x-original-to']  – Set by MTA on forwarded emails
+    //   3. headers['x-forward-to']   – Some forwarding setups use this
+    //   4. headers.to           – The visible To: header (may be mailing list address for newsletters)
+    const envelopeTo = Array.isArray(envelope.to) ? envelope.to[0] : (envelope.to || '');
+    const headersXOriginalTo = headers['x-original-to'] || '';
+    const headersXForwardTo = headers['x-forward-to'] || '';
+    const headersTo = headers.to || '';
+
+    // Use the first non-empty value
+    const to = envelopeTo || headersXOriginalTo || headersXForwardTo || headersTo || '';
     const from = envelope.from || headers.from || '';
 
-    // ─── FIX 2: Subject field ────────────────────────────────────────────────
-    const subject = headers.subject || '';
+    // ─── Subject field ────────────────────────────────────────────────────────
+    const subject = headers.subject || '(No Subject)';
 
-    // ─── FIX 3: Body text field name ────────────────────────────────────────
+    // ─── Body text field name ─────────────────────────────────────────────────
     // Cloudmailin JSON-Normalized uses 'plain' for plain-text body, not 'text'
     const bodyText = plain || text || '';
 
-    console.log(`[Cloudmailin] Routing email → to: ${to}, from: ${from}, subject: ${subject}`);
+    console.log(`[Cloudmailin] Routing email → to: "${to}" (envelope: "${envelopeTo}", headers.to: "${headersTo}"), from: "${from}", subject: "${subject}", attachments: ${(attachments || []).length}`);
+
+    if (!to) {
+      console.error('[Cloudmailin] Could not determine recipient address from envelope or headers');
+      // Return 200 to avoid CloudMailin retries — this is a configuration issue, not a server error
+      return res.status(200).json({ error: 'Could not determine recipient board address', action: 'DROPPED' });
+    }
 
     // Transform attachments to match our internal shape
     const transformedAttachments = (attachments || []).map((att) => ({
@@ -65,6 +81,12 @@ router.post('/', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('[Cloudmailin] webhook error:', error.message);
+    // Return 200 for known "not found" / "disabled" errors to prevent CloudMailin from retrying endlessly
+    const knownErrors = ['Board not found', 'Incoming email is disabled', 'Rate limit exceeded', 'Sender not authorized', 'spam'];
+    const isKnownError = knownErrors.some(e => error.message?.toLowerCase().includes(e.toLowerCase()));
+    if (isKnownError) {
+      return res.status(200).json({ error: error.message, action: 'REJECTED' });
+    }
     res.status(500).json({ error: error.message || 'Failed to process Cloudmailin webhook' });
   }
 });

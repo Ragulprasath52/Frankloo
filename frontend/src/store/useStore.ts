@@ -602,6 +602,17 @@ export const useStore = create<AppState>((set, get) => ({
       }
     });
 
+    // ── REAL-TIME INBOX: Listen for new incoming emails delivered to this workspace
+    newSocket.on('new_inbox_item', async (data: { workspaceId: string; boardId: string; itemId: string }) => {
+      console.log('🔔 [LIVE SOCKET] New email received:', data);
+      const currentWorkspace = get().currentWorkspace;
+      if (!currentWorkspace || currentWorkspace.id === data.workspaceId) {
+        // Re-fetch inbox items so the new email appears immediately in the Board Inbox
+        await get().fetchInboxItems(data.workspaceId);
+        get().addToast('New Email Received', 'A new email has arrived in your board inbox.', 'info');
+      }
+    });
+
     set({ socket: newSocket });
   },
 
