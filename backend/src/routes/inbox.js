@@ -223,12 +223,18 @@ router.post('/cloudflare-email', express.text({ type: 'text/plain', limit: '25mb
       messageId = parsedEmail.messageId || null;
       threadId = null;
       receivedDate = parsedEmail.date || new Date().toISOString();
-      attachments = (parsedEmail.attachments || []).map(att => ({
-        filename: att.filename,
-        mimeType: att.mimeType,
-        size: att.content ? att.content.byteLength : 0,
-        storagePath: 'uploads/gmail-dummy'
-      }));
+      attachments = (parsedEmail.attachments || []).map(att => {
+        let base64Data = null;
+        if (att.content) {
+          base64Data = Buffer.from(att.content).toString('base64');
+        }
+        return {
+          filename: att.filename || 'attachment',
+          mimeType: att.mimeType || 'application/octet-stream',
+          size: att.content ? att.content.byteLength : 0,
+          base64Data
+        };
+      });
     } else {
       console.log('Body is JSON object...');
       ({ to, from, cc, subject, text, html, attachments, threadId, messageId, receivedDate } = req.body || {});
@@ -1267,8 +1273,18 @@ export async function processIncomingEmail({ to, from, cc, subject, text, html, 
         for (let aIdx = 0; aIdx < allAttachments.length; aIdx++) {
           const att = allAttachments[aIdx];
           let storagePath = att.storagePath;
-          if (!storagePath || storagePath.includes('gmail-dummy')) {
-            const uploadDir = path.join(__dirname, '../../../uploads');
+          const uploadDir = path.join(__dirname, '../../../uploads');
+          if (att.base64Data || att.content) {
+            try {
+              if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+              const rawBuffer = att.content ? (Buffer.isBuffer(att.content) ? att.content : Buffer.from(att.content)) : Buffer.from(att.base64Data, 'base64');
+              const safeFilename = `${Date.now()}-${aIdx}-${(att.filename || 'attachment').replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+              fs.writeFileSync(path.join(uploadDir, safeFilename), rawBuffer);
+              storagePath = `uploads/${safeFilename}`;
+            } catch (err) {
+              console.error(`[EMAIL] Error saving binary attachment ${att.filename}:`, err);
+            }
+          } else if (!storagePath || storagePath.includes('gmail-dummy')) {
             const safeFilename = `${Date.now()}-${aIdx}-${(att.filename || 'attachment').replace(/[^a-zA-Z0-9._-]/g, '_')}.txt`;
             const placeholderText = `Attachment: ${att.filename || 'attachment'}\nSource: Incoming Email Pipeline\nMIME Type: ${att.mimeType || 'unknown'}\nSize: ${att.size || 0} bytes\n`;
             try {

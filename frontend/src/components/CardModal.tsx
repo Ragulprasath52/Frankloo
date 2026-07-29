@@ -7,7 +7,7 @@ import {
   Trash2, Plus, Archive,
   Paperclip, MoreHorizontal, Check, Download, Mail,
   Compass, Flag, Calendar, Users, Tag, Clock, UserPlus,
-  ChevronUp, ChevronDown, ExternalLink
+  ChevronUp, ChevronDown, ExternalLink, Mic, MicOff
 } from 'lucide-react';
 
 interface CardModalProps { card: Card; onClose: () => void; }
@@ -112,6 +112,78 @@ export default function CardModal({ card, onClose }: CardModalProps) {
   const fileInputRefForCard = useRef<HTMLInputElement>(null);
   const isCoverUpload = useRef(false);
   const [activeAttachmentMenuId, setActiveAttachmentMenuId] = useState<string | null>(null);
+
+  // Speech to Text state for Comments
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  const baseCommentTextRef = useRef('');
+
+  const toggleSpeechRecognition = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      addToast('Speech Recognition Error', 'Voice input is not supported in this browser.', 'error');
+      return;
+    }
+
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      // Capture existing text before starting voice dictation
+      baseCommentTextRef.current = newCommentVal.trim();
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        addToast('Voice Input Active', 'Listening... Speak your comment.', 'info');
+      };
+
+      recognition.onresult = (event: any) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+
+        for (let i = 0; i < event.results.length; i++) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            finalTranscript += result[0].transcript + ' ';
+          } else {
+            interimTranscript += result[0].transcript;
+          }
+        }
+
+        const currentSpeechText = (finalTranscript + interimTranscript).trim();
+        const prefix = baseCommentTextRef.current;
+        setNewCommentVal(prefix ? `${prefix} ${currentSpeechText}` : currentSpeechText);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        if (event.error !== 'no-speech') {
+          addToast('Voice Input Error', `Mic error: ${event.error}`, 'error');
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err: any) {
+      console.error('Failed to start speech recognition:', err);
+      setIsListening(false);
+      addToast('Voice Input Error', 'Could not start microphone.', 'error');
+    }
+  };
 
   const [commentExtras, setCommentExtras] = useState<Record<string, { reactions: CommentReactions[], replies: CommentReply[], attachments: { name: string, size: string }[] }>>({});
 
@@ -333,20 +405,32 @@ export default function CardModal({ card, onClose }: CardModalProps) {
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCommentVal.trim() || !currentBoard) return;
-    const attachmentObj = commentAttachment ? { name: commentAttachment.name, size: '240 KB' } : null;
 
-    await createComment(currentBoard.id, card.id, newCommentVal);
-    const savedVal = newCommentVal;
+    const fileToUpload = commentAttachment;
     setNewCommentVal('');
     setCommentAttachment(null);
 
-    if (attachmentObj) {
-      setTimeout(() => {
-        const newComm = card.comments?.find(c => c.content === savedVal && !localStorage.getItem(`comment_extras_${c.id}`));
-        if (newComm) {
-          localStorage.setItem(`comment_extras_${newComm.id}`, JSON.stringify({ reactions: [], replies: [], attachments: [attachmentObj] }));
-        }
-      }, 600);
+    // Create the comment first
+    await createComment(currentBoard.id, card.id, newCommentVal);
+
+    // If a file/PDF was attached to this comment, upload it as a card attachment so all board members can access it
+    if (fileToUpload) {
+      try {
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64Data = (reader.result as string).split(',')[1];
+          await uploadAttachment(currentBoard.id, card.id, {
+            filename: fileToUpload.name,
+            mimeType: fileToUpload.type,
+            size: fileToUpload.size,
+            base64Data
+          });
+          addToast('Attachment Shared', `File ${fileToUpload.name} attached and visible to all members.`, 'success');
+        };
+        reader.readAsDataURL(fileToUpload);
+      } catch (err) {
+        console.error('Failed to upload comment attachment:', err);
+      }
     }
   };
 
@@ -402,7 +486,11 @@ export default function CardModal({ card, onClose }: CardModalProps) {
               </div>
             ) : (
               <img
-                src={coverImage.startsWith('http') ? coverImage : `${BACKEND_BASE_URL}/${coverImage.replace(/^\/?/, '')}`}
+                src={
+                  coverImage.startsWith('http')
+                    ? coverImage.replace(/^http:\/\/(localhost|127\.0\.0\.1):5000/, BACKEND_BASE_URL)
+                    : `${BACKEND_BASE_URL}/${coverImage.replace(/^\/?/, '')}`
+                }
                 alt="cover"
                 className="w-full h-full object-cover"
                 onError={() => setImageError(true)}
@@ -1469,7 +1557,7 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                 </h4>
                 <button
                   type="button"
-                  onClick={() => fileInputRefForCard.current?.click()}
+                  onClick={() => { isCoverUpload.current = false; fileInputRefForCard.current?.click(); }}
                   className="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-[#2c333a] dark:hover:bg-[#3c444e] text-slate-800 dark:text-[#b6c2cf] rounded-md transition-colors"
                 >
                   Add
@@ -1485,19 +1573,34 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                         const reader = new FileReader();
                         reader.onloadend = async () => {
                           const base64Data = (reader.result as string).split(',')[1];
-                          const uploaded = await uploadAttachment(currentBoard.id, card.id, {
-                            filename: file.name,
-                            mimeType: file.type,
-                            size: file.size,
-                            base64Data
-                          });
-                          if (isCoverUpload.current && uploaded?.storagePath) {
-                            const fullPath = `${BACKEND_BASE_URL}/${uploaded.storagePath.replace(/^\/?/, '')}`;
-                            setCoverImage(fullPath);
-                            await updateCard(currentBoard.id, card.id, { coverImage: fullPath });
+                          if (isCoverUpload.current) {
+                            isCoverUpload.current = false;
+                            const uploaded = await uploadAttachment(currentBoard.id, card.id, {
+                              filename: file.name,
+                              mimeType: file.type,
+                              size: file.size,
+                              base64Data
+                            });
+                            if (uploaded?.storagePath) {
+                              const relPath = uploaded.storagePath.replace(/^\/?/, '');
+                              setCoverImage(relPath);
+                              setImageError(false);
+                              await updateCard(currentBoard.id, card.id, { coverImage: relPath });
+                              // Clean up attachment so cover isn't duplicated in file attachments list
+                              if (uploaded.id) {
+                                await deleteAttachment(currentBoard.id, card.id, uploaded.id);
+                              }
+                              addToast('Cover Updated', 'Card cover image updated successfully.', 'success');
+                            }
+                          } else {
+                            await uploadAttachment(currentBoard.id, card.id, {
+                              filename: file.name,
+                              mimeType: file.type,
+                              size: file.size,
+                              base64Data
+                            });
+                            addToast('Attachment Added', `File ${file.name} successfully uploaded.`, 'success');
                           }
-                          isCoverUpload.current = false;
-                          addToast('Attachment Added', `File ${file.name} successfully uploaded.`, 'success');
                         };
                         reader.readAsDataURL(file);
                       }
@@ -2065,14 +2168,39 @@ export default function CardModal({ card, onClose }: CardModalProps) {
                     onChange={(e) => setCommentAttachment(e.target.files?.[0] || null)}
                     className="hidden"
                   />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="text-[10px] font-bold text-slate-500 hover:text-indigo-550 flex items-center gap-1.5 px-2 py-1.5 bg-slate-100/50 dark:bg-slate-900/50 rounded-lg border border-slate-200/40 dark:border-slate-800/40"
-                  >
-                    <Paperclip className="w-3.5 h-3.5" />
-                    {commentAttachment ? commentAttachment.name.slice(0, 10) + '...' : 'Attach File'}
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-[10px] font-bold text-slate-500 hover:text-indigo-550 flex items-center gap-1.5 px-2 py-1.5 bg-slate-100/50 dark:bg-slate-900/50 rounded-lg border border-slate-200/40 dark:border-slate-800/40 cursor-pointer"
+                    >
+                      <Paperclip className="w-3.5 h-3.5" />
+                      {commentAttachment ? commentAttachment.name.slice(0, 10) + '...' : 'Attach File'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={toggleSpeechRecognition}
+                      title={isListening ? 'Stop recording voice comment' : 'Speak to comment (Voice input)'}
+                      className={`text-[10px] font-bold flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
+                        isListening
+                          ? 'bg-rose-500/10 text-rose-500 border-rose-500/30 animate-pulse font-extrabold'
+                          : 'bg-slate-100/50 dark:bg-slate-900/50 text-slate-500 hover:text-indigo-500 border-slate-200/40 dark:border-slate-800/40'
+                      }`}
+                    >
+                      {isListening ? (
+                        <>
+                          <MicOff className="w-3.5 h-3.5 text-rose-500" />
+                          <span>Listening…</span>
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="w-3.5 h-3.5" />
+                          <span>Voice</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
 
                   <button
                     type="submit"
