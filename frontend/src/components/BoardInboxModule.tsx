@@ -6,7 +6,7 @@ import {
   ExternalLink, ShieldCheck, Paperclip, Clock, 
   Archive, Eye, Edit3
 } from 'lucide-react';
-import { getEmailDomain } from '../config/api';
+import { getEmailDomain, BACKEND_BASE_URL } from '../config/api';
 
 interface BoardInboxModuleProps {
   workspaceId: string;
@@ -1476,8 +1476,10 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                         <span className="font-bold truncate max-w-[150px] text-slate-850 dark:text-slate-250" title={att.filename}>{att.filename}</span>
                         <span className="text-gray-400">({(att.size / 1024).toFixed(0)} KB)</span>
                         <a
-                          href={`/api/attachments/download/${att.storagePath}`}
+                          href={att.storagePath?.startsWith('http') ? att.storagePath : `${BACKEND_BASE_URL}/${(att.storagePath || 'uploads/gmail-dummy').replace(/^\/?/, '')}`}
                           download={att.filename}
+                          target="_blank"
+                          rel="noreferrer"
                           className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 text-indigo-500 shrink-0"
                           title="Download attachment"
                         >
@@ -1942,7 +1944,7 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                               <div className="flex items-center gap-1 shrink-0">
                                 {canPreview && att.storagePath && (
                                   <a
-                                    href={`/uploads/${att.storagePath.replace('uploads/', '')}`}
+                                    href={att.storagePath.startsWith('http') ? att.storagePath : `${BACKEND_BASE_URL}/${att.storagePath.replace(/^\/?/, '')}`}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="px-1.5 py-0.5 text-[9px] font-bold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 rounded"
@@ -1952,8 +1954,10 @@ export default function BoardInboxModule({ workspaceId, isEditor, onSelectBoard 
                                 )}
                                 {att.storagePath && (
                                   <a
-                                    href={`/uploads/${att.storagePath.replace('uploads/', '')}`}
+                                    href={att.storagePath.startsWith('http') ? att.storagePath : `${BACKEND_BASE_URL}/${att.storagePath.replace(/^\/?/, '')}`}
                                     download={att.filename}
+                                    target="_blank"
+                                    rel="noreferrer"
                                     className="p-1 text-indigo-500 hover:bg-black/5 dark:hover:bg-white/5 rounded"
                                     title="Download"
                                   >

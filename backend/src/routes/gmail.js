@@ -416,15 +416,39 @@ router.post('/sync', authenticate, async (req, res) => {
           }
 
           if (email.attachments && email.attachments.length > 0) {
-            for (const att of email.attachments) {
+            const uploadDir = path.join(__dirname, '../../../uploads');
+            if (!fs.existsSync(uploadDir)) {
+              fs.mkdirSync(uploadDir, { recursive: true });
+            }
+            for (let idx = 0; idx < email.attachments.length; idx++) {
+              const att = email.attachments[idx];
+              let storagePath = att.storagePath;
+              if (att.base64Data) {
+                try {
+                  const buffer = Buffer.from(att.base64Data, 'base64');
+                  const safeFilename = `${Date.now()}-${idx}-${(att.filename || 'attachment').replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+                  fs.writeFileSync(path.join(uploadDir, safeFilename), buffer);
+                  storagePath = `uploads/${safeFilename}`;
+                } catch (e) {}
+              }
+              if (!storagePath || storagePath.includes('gmail-dummy')) {
+                const safeFilename = `${Date.now()}-${idx}-${(att.filename || 'attachment').replace(/[^a-zA-Z0-9._-]/g, '_')}.txt`;
+                const placeholderText = `Attachment: ${att.filename || 'attachment'}\nSource: Gmail Auto-Sync Rule\nMIME Type: ${att.mimeType || 'unknown'}\nSize: ${att.size || 0} bytes\n`;
+                try {
+                  fs.writeFileSync(path.join(uploadDir, safeFilename), placeholderText);
+                  storagePath = `uploads/${safeFilename}`;
+                } catch (e) {
+                  storagePath = `uploads/${safeFilename}`;
+                }
+              }
               await prisma.cardAttachment.create({
                 data: {
                   cardId: card.id,
                   uploadedBy: req.user.id,
-                  filename: att.filename,
-                  storagePath: 'uploads/gmail-dummy',
-                  mimeType: att.mimeType,
-                  size: att.size
+                  filename: att.filename || 'attachment',
+                  storagePath,
+                  mimeType: att.mimeType || 'application/octet-stream',
+                  size: att.size || 0
                 }
               });
             }

@@ -1,4 +1,4 @@
-﻿import express, { Router } from 'express';
+import express, { Router } from 'express';
 import PostalMime from 'postal-mime';
 import { prisma } from '../db.js';
 import { authenticate } from '../middleware/auth.js';
@@ -498,15 +498,25 @@ export async function convertSingleItemInternal({
     }
 
     for (const att of finalAttachments) {
-      let storagePath = att.storagePath || 'uploads/gmail-dummy';
+      let storagePath = att.storagePath;
       if (att.base64Data) {
         try {
           const buffer = Buffer.from(att.base64Data, 'base64');
-          const uniqueFilename = `${Date.now()}-${att.filename}`;
-          fs.writeFileSync(path.join(uploadDir, uniqueFilename), buffer);
-          storagePath = `uploads/${uniqueFilename}`;
+          const safeFilename = `${Date.now()}-${(att.filename || 'attachment').replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+          fs.writeFileSync(path.join(uploadDir, safeFilename), buffer);
+          storagePath = `uploads/${safeFilename}`;
         } catch (err) {
           console.error('Error saving base64 attachment:', err);
+        }
+      }
+      if (!storagePath || storagePath.includes('gmail-dummy')) {
+        const safeFilename = `${Date.now()}-${(att.filename || 'attachment').replace(/[^a-zA-Z0-9._-]/g, '_')}.txt`;
+        const placeholderText = `Attachment: ${att.filename || 'attachment'}\nSource: Converted Email\nMIME Type: ${att.mimeType || 'unknown'}\nSize: ${att.size || 0} bytes\n`;
+        try {
+          fs.writeFileSync(path.join(uploadDir, safeFilename), placeholderText);
+          storagePath = `uploads/${safeFilename}`;
+        } catch (e) {
+          storagePath = `uploads/${safeFilename}`;
         }
       }
       await prisma.cardAttachment.create({
@@ -933,12 +943,12 @@ function sanitizeAndSaveAttachments(attList) {
   const results = [];
   for (let index = 0; index < attList.length; index++) {
     const att = attList[index];
-    let storagePath = att.storagePath || att.url || 'uploads/gmail-dummy';
+    let storagePath = att.storagePath || att.url;
     try {
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
       if (att.base64Data || att.content) {
-        if (!fs.existsSync(uploadDir)) {
-          fs.mkdirSync(uploadDir, { recursive: true });
-        }
         const rawContent = att.content
           ? (Buffer.isBuffer(att.content) ? att.content : Buffer.from(att.content))
           : Buffer.from(att.base64Data, 'base64');
@@ -946,9 +956,13 @@ function sanitizeAndSaveAttachments(attList) {
         fs.writeFileSync(path.join(uploadDir, safeFilename), rawContent);
         storagePath = `uploads/${safeFilename}`;
         console.log(`[ATTACHMENT] Saved attachment ${index + 1}: ${safeFilename} (${rawContent.length} bytes)`);
+      } else if (!storagePath || storagePath.includes('gmail-dummy')) {
+        const safeFilename = `${Date.now()}-${index}-${(att.filename || att.file_name || 'attachment').replace(/[^a-zA-Z0-9._-]/g, '_')}.txt`;
+        const placeholderText = `Attachment: ${att.filename || att.file_name || 'attachment'}\nSource: Email Ingestion Pipeline\nMIME Type: ${att.mimeType || att.content_type || 'unknown'}\nSize: ${att.size || 0} bytes\n`;
+        fs.writeFileSync(path.join(uploadDir, safeFilename), placeholderText);
+        storagePath = `uploads/${safeFilename}`;
       }
     } catch (err) {
-      // Never let one bad attachment kill the whole email â€” log and continue
       console.error(`[ATTACHMENT] Error saving attachment ${index + 1} ("${att.filename || 'unknown'}"): ${err.message}`);
     }
     results.push({
@@ -1250,9 +1264,23 @@ export async function processIncomingEmail({ to, from, cc, subject, text, html, 
       if (allAttachments.length > 0) {
         const ownerMember = await prisma.workspaceMember.findFirst({ where: { workspaceId: board.workspaceId, role: 'OWNER' } }).catch(() => null);
         const uploaderId = ownerMember?.userId || 'system';
-        for (const att of allAttachments) {
+        for (let aIdx = 0; aIdx < allAttachments.length; aIdx++) {
+          const att = allAttachments[aIdx];
+          let storagePath = att.storagePath;
+          if (!storagePath || storagePath.includes('gmail-dummy')) {
+            const uploadDir = path.join(__dirname, '../../../uploads');
+            const safeFilename = `${Date.now()}-${aIdx}-${(att.filename || 'attachment').replace(/[^a-zA-Z0-9._-]/g, '_')}.txt`;
+            const placeholderText = `Attachment: ${att.filename || 'attachment'}\nSource: Incoming Email Pipeline\nMIME Type: ${att.mimeType || 'unknown'}\nSize: ${att.size || 0} bytes\n`;
+            try {
+              if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+              fs.writeFileSync(path.join(uploadDir, safeFilename), placeholderText);
+              storagePath = `uploads/${safeFilename}`;
+            } catch (e) {
+              storagePath = `uploads/${safeFilename}`;
+            }
+          }
           await prisma.cardAttachment.create({
-            data: { cardId: card.id, uploadedBy: uploaderId, filename: att.filename, storagePath: att.storagePath || 'uploads/gmail-dummy', mimeType: att.mimeType || 'application/octet-stream', size: att.size || 0 }
+            data: { cardId: card.id, uploadedBy: uploaderId, filename: att.filename || 'attachment', storagePath, mimeType: att.mimeType || 'application/octet-stream', size: att.size || 0 }
           }).catch(e => console.warn(`[EMAIL] Attachment DB save error for "${att.filename}" (continuing):`, e.message));
         }
       }
