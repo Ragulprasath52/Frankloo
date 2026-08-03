@@ -297,44 +297,98 @@ router.put('/me', authenticate, async (req, res) => {
   }
 });
 
-// Password reset request (Free/Localhost version)
-router.post('/reset-password', async (req, res) => {
+// Password reset request (Send verification / reset email)
+router.post('/forgot-password', async (req, res) => {
   try {
-    const { email, username, newPassword } = req.body;
-
-    if (!email || !username || !newPassword) {
-      return res.status(400).json({ error: 'Email, username, and new password are required' });
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email address is required' });
     }
 
     const trimmedEmail = String(email).trim().toLowerCase();
-    const trimmedUsername = String(username).trim();
-
-    console.log(`[AUTH RESET PASSWORD] Reset request for Email: "${trimmedEmail}", Username: "${trimmedUsername}"`);
-
     const user = await prisma.user.findFirst({
-      where: {
-        email: trimmedEmail,
-        username: trimmedUsername
-      }
+      where: { email: trimmedEmail }
     });
 
     if (!user) {
-      console.log(`[AUTH RESET PASSWORD] Matching user not found for Email: "${trimmedEmail}", Username: "${trimmedUsername}"`);
-      return res.status(404).json({ error: 'No matching user found with those credentials' });
+      // Return success even if email not found to prevent user enumeration
+      return res.json({ message: 'If an account exists with that email, a password reset link has been sent.' });
+    }
+
+    // Generate password reset token valid for 1 hour
+    const resetToken = jwt.sign(
+      { userId: user.id, purpose: 'password-reset' },
+      JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${encodeURIComponent(resetToken)}`;
+
+    // Try sending email via Gmail OAuth or SMTP
+    if (user.googleToken) {
+      try {
+        await sendGmailOAuthEmail({
+          userId: user.id,
+          to: user.email,
+          subject: 'Reset your Frankloo Password',
+          text: `Hi ${user.name || user.username},\n\nYou requested a password reset for your Frankloo account. Click the link below to set a new password:\n\n${resetUrl}\n\nThis link is valid for 1 hour.\n\nIf you did not request this, please ignore this email.`,
+          htmlText: `
+            <div style="font-family: sans-serif; padding: 24px; border: 1px solid #dfe1e6; border-radius: 12px; max-width: 500px; margin: 0 auto;">
+              <h2 style="color: #0052cc; margin-top: 0;">Reset Password</h2>
+              <p>Hi <strong>${user.name || user.username}</strong>,</p>
+              <p>You requested a password reset for your Frankloo account. Click the button below to update your credentials:</p>
+              <p style="margin: 24px 0;">
+                <a href="${resetUrl}" style="background: #0052cc; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; display: inline-block;">Reset Password</a>
+              </p>
+              <p style="font-size: 12px; color: #6b778c;">This link is valid for 1 hour. If you didn't request this, you can safely ignore this email.</p>
+            </div>
+          `
+        });
+      } catch (e) {
+        console.error('Failed to send reset email via Google OAuth:', e);
+      }
+    } else {
+      console.log(`[PASSWORD RESET LINK] Sent to ${user.email}:\n${resetUrl}`);
+    }
+
+    res.json({ message: 'A password reset link has been sent to your email address.' });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Server error requesting password reset' });
+  }
+});
+
+// Password reset execution (Verify token and update password)
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Token and new password are required' });
     }
 
     if (newPassword.length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters long' });
     }
 
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+      if (decoded.purpose !== 'password-reset') {
+        return res.status(400).json({ error: 'Invalid token type' });
+      }
+    } catch (err) {
+      return res.status(400).json({ error: 'Password reset link is invalid or has expired' });
+    }
+
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     await prisma.user.update({
-      where: { id: user.id },
+      where: { id: decoded.userId },
       data: { password: hashedPassword }
     });
 
-    console.log(`[AUTH RESET PASSWORD] Password updated successfully for User ID: ${user.id}`);
+    console.log(`[AUTH RESET PASSWORD] Password updated successfully for User ID: ${decoded.userId}`);
 
     res.json({ message: 'Password has been reset successfully' });
   } catch (error) {

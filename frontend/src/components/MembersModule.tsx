@@ -1229,7 +1229,7 @@ export default function MembersModule({ workspaceId, isEditor, onSelectBoard }: 
         const memberActivity = workspaceActivity?.filter(act => act.userId === selectedMember.user.id) || [];
 
         return (
-          <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedMember(null)}>
+          <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 animate-fade-in" onClick={() => setSelectedMember(null)}>
             <div 
               className="bg-white dark:bg-[#161b22] border-l border-slate-200 dark:border-[#30363d] w-full max-w-md h-full flex flex-col justify-between shadow-xl p-6 overflow-y-auto text-xs animate-slide-in relative"
               onClick={e => e.stopPropagation()}

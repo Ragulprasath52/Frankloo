@@ -15,7 +15,13 @@ export default function AcceptInvite() {
   const [success, setSuccess] = useState(false);
   const [invitationDetails, setInvitationDetails] = useState<any>(null);
 
-  const isEmailMismatch = user && invitationDetails && user.email.toLowerCase() !== invitationDetails.email.toLowerCase();
+  const extractEmail = (str: string | undefined | null) => {
+    if (!str) return '';
+    const match = str.match(/<([^>]+)>/);
+    return (match ? match[1] : str).trim().toLowerCase();
+  };
+
+  const isEmailMismatch = user && invitationDetails && extractEmail(user.email) !== extractEmail(invitationDetails.email);
 
   useEffect(() => {
     if (authToken) {
@@ -34,6 +40,10 @@ export default function AcceptInvite() {
       setError('');
       try {
         const details = await verifyInvitationToken(token);
+        if (details && details.email) {
+          const match = details.email.match(/<([^>]+)>/);
+          details.email = (match ? match[1] : details.email).trim();
+        }
         setInvitationDetails(details);
       } catch (err: any) {
         setError(err.message || 'Failed to verify invitation. The invitation may have expired or belongs to a different email.');

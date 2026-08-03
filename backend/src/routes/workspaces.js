@@ -205,7 +205,13 @@ router.post('/user/accept-invitation', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'This invitation has expired' });
     }
 
-    if (invitation.email.toLowerCase() !== req.user.email.toLowerCase()) {
+    const cleanEmail = (str) => {
+      if (!str) return '';
+      const m = str.match(/<([^>]+)>/);
+      return (m ? m[1] : str).trim().toLowerCase();
+    };
+
+    if (cleanEmail(invitation.email) !== cleanEmail(req.user.email)) {
       return res.status(403).json({ error: 'This invitation belongs to a different email address' });
     }
 
@@ -305,7 +311,13 @@ router.post('/user/decline-invitation', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Invitation not found' });
     }
 
-    if (invitation.email.toLowerCase() !== req.user.email.toLowerCase()) {
+    const cleanEmail = (str) => {
+      if (!str) return '';
+      const m = str.match(/<([^>]+)>/);
+      return (m ? m[1] : str).trim().toLowerCase();
+    };
+
+    if (cleanEmail(invitation.email) !== cleanEmail(req.user.email)) {
       return res.status(403).json({ error: 'This invitation belongs to a different email address' });
     }
 
@@ -374,15 +386,18 @@ router.get('/invitations/verify/:token', async (req, res) => {
       return res.status(400).json({ error: 'This invitation has expired.' });
     }
 
+    const match = invitation.email ? invitation.email.match(/<([^>]+)>/) : null;
+    const cleanInviteEmail = (match ? match[1] : invitation.email || '').trim();
+
     // Check if recipient email matches an existing user
     const existingUser = await prisma.user.findFirst({
-      where: { email: invitation.email }
+      where: { email: cleanInviteEmail }
     });
 
     res.json({
       workspaceName: invitation.workspace.name,
       role: invitation.role,
-      email: invitation.email,
+      email: cleanInviteEmail,
       expiresAt: invitation.expiresAt,
       hasAccount: !!existingUser,
       branding: {
@@ -1112,10 +1127,15 @@ router.post('/:id/invitations', authenticate, checkWorkspaceRole(['OWNER', 'ADMI
     });
 
     for (const target of targets) {
-      let email = target;
+      let email = target ? target.trim() : '';
+      const emailBracketMatch = email.match(/<([^>]+)>/);
+      if (emailBracketMatch) {
+        email = emailBracketMatch[1].trim();
+      }
+
       let targetUser = null;
 
-      if (!target.includes('@')) {
+      if (!email.includes('@')) {
         // Assume username lookup
         targetUser = await prisma.user.findUnique({ where: { username: target } });
         if (!targetUser) {
@@ -1124,7 +1144,7 @@ router.post('/:id/invitations', authenticate, checkWorkspaceRole(['OWNER', 'ADMI
         }
         email = targetUser.email;
       } else {
-        targetUser = await prisma.user.findUnique({ where: { email: target } });
+        targetUser = await prisma.user.findUnique({ where: { email } });
       }
 
       // Check if already workspace member
