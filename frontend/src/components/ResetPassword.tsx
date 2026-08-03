@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { AlertCircle, CheckCircle, KeyRound, Mail, ArrowRight } from 'lucide-react';
+import { AlertCircle, CheckCircle, KeyRound, Mail } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 import { apiUrl } from '../config/api';
 
